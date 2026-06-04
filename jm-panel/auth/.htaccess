@@ -1,0 +1,20 @@
+# ══════════════════════════════════════════════
+# JMbenga Portfolio v1.0 — .htaccess AUTH
+# Localização: /jm-panel/auth/.htaccess
+# ══════════════════════════════════════════════
+
+Options -Indexes
+RewriteEngine On
+
+# ── Bloquear acesso directo à pasta include ───
+RewriteRule ^include/ - [F,L]
+
+# ── Bloquear _process.php via GET ─────────────
+# _process só aceita POST — GET redireciona para login
+RewriteCond %{REQUEST_METHOD} !POST
+RewriteRule _process\.php$ ../entrar [R=302,L]
+
+# ── Bloquear acesso directo a ficheiros PHP internos ──
+# (que não são páginas de entrada directa)
+RewriteCond %{THE_REQUEST} \s/(?:.*?/)?(lockscreen|invite-accept)\.php [NC]
+RewriteRule ^(lockscreen|invite-accept)\.php$ - [F,L]

@@ -1,0 +1,175 @@
+# ══════════════════════════════════════════════
+# JMbenga Portfolio v1.0 — .htaccess PAINEL ADMIN
+# Localização: /jm-panel/.htaccess
+# NOTA: As rotas aqui NÃO têm o prefixo "jm-panel/"
+#       porque o RewriteBase já o define.
+# ══════════════════════════════════════════════
+
+Options -Indexes
+RewriteEngine On
+RewriteBase /portfolio-jmbenga/jm-panel/
+
+
+# ── Redirecionar raiz do painel para home ──────
+RewriteRule ^$ home.php [L]
+
+# ── Bloquear acesso a pastas de sistema ────────
+RewriteRule ^include/  - [F,L]
+RewriteRule ^pages/manager/include/ - [F,L]
+
+# ── Servir ficheiros e pastas reais directamente
+RewriteCond %{REQUEST_FILENAME} -f [OR]
+RewriteCond %{REQUEST_FILENAME} -d
+RewriteRule ^ - [L]
+
+# ══════════════════════════════════════════════
+# AUTH (login, logout, reset, lockscreen)
+# ══════════════════════════════════════════════
+
+RewriteRule ^entrar/?$                        auth/login.php [L]
+RewriteRule ^login/?$                         auth/login.php [L]
+RewriteRule ^login-process/?$                 auth/login-process.php [L]
+RewriteRule ^logout/?$                        auth/logout.php [L]
+RewriteRule ^forgot-password/?$               auth/forgot-password.php [L]
+RewriteRule ^forgot-password-process/?$       auth/forgot-password-process.php [L]
+RewriteRule ^reset-password/?$                auth/reset-password.php [L,QSA]
+RewriteRule ^reset-password-process/?$        auth/reset-password-process.php [L,QSA]
+RewriteRule ^lockscreen/?$                    auth/lockscreen.php [L]
+RewriteRule ^lockscreen-process/?$            auth/lockscreen-process.php [L]
+RewriteRule ^invite/accept/?$                 auth/invite-accept.php [L,QSA]
+
+# ══════════════════════════════════════════════
+# DASHBOARD HOME
+# ══════════════════════════════════════════════
+
+RewriteRule ^home/?$                          home.php [L]
+
+# ══════════════════════════════════════════════
+# PERFIL DO ADMIN
+# ══════════════════════════════════════════════
+
+RewriteRule ^profile/?$                       pages/profile/profile.php [L]
+RewriteRule ^profile-process/?$               pages/profile/profile-process.php [L]
+RewriteRule ^profile/change-password/?$       pages/profile/change-password.php [L]
+RewriteRule ^profile/change-password-process/?$ pages/profile/change-password-process.php [L]
+
+# ══════════════════════════════════════════════
+# PROJECTOS
+# ══════════════════════════════════════════════
+
+RewriteRule ^projects/?$                      pages/projects/all-projects.php [L]
+RewriteRule ^projects/add/?$                  pages/projects/add.php [L]
+RewriteRule ^projects/add-process/?$          pages/projects/add-process.php [L]
+RewriteRule ^projects/edit/?$                 pages/projects/edit.php [L,QSA]
+RewriteRule ^projects/edit-process/?$         pages/projects/edit-process.php [L]
+RewriteRule ^projects/view/?$                 pages/projects/view.php [L,QSA]
+RewriteRule ^projects/delete/?$               pages/projects/delete.php [L,QSA]
+RewriteRule ^projects/toggle-status/?$        pages/projects/toggle-status.php [L,QSA]
+RewriteRule ^projects/toggle-featured/?$      pages/projects/toggle-featured.php [L,QSA]
+RewriteRule ^projects/media/?$                pages/projects/media.php [L,QSA]
+RewriteRule ^projects/media-process/?$        pages/projects/media-process.php [L]
+RewriteRule ^projects/media-delete/?$         pages/projects/media-delete.php [L,QSA]
+
+# ══════════════════════════════════════════════
+# HABILIDADES (SKILLS)
+# ══════════════════════════════════════════════
+
+RewriteRule ^skills/?$                        pages/skills/all-skills.php [L]
+RewriteRule ^skills/add/?$                    pages/skills/add.php [L]
+RewriteRule ^skills/add-process/?$            pages/skills/add-process.php [L]
+RewriteRule ^skills/edit/?$                   pages/skills/edit.php [L,QSA]
+RewriteRule ^skills/edit-process/?$           pages/skills/edit-process.php [L]
+RewriteRule ^skills/delete/?$                 pages/skills/delete.php [L,QSA]
+RewriteRule ^skills/toggle-visibility/?$       pages/skills/toggle-visibility.php [L]
+
+
+# ══════════════════════════════════════════════
+# DEPOIMENTOS (TESTIMONIALS)
+# ══════════════════════════════════════════════
+
+RewriteRule ^testimonials/?$                  pages/testimonials/all-testimonials.php [L]
+RewriteRule ^testimonials/add/?$              pages/testimonials/add.php [L]
+RewriteRule ^testimonials/add-process/?$      pages/testimonials/add-process.php [L]
+RewriteRule ^testimonials/edit/?$             pages/testimonials/edit.php [L,QSA]
+RewriteRule ^testimonials/edit-process/?$     pages/testimonials/edit-process.php [L]
+RewriteRule ^testimonials/delete/?$           pages/testimonials/delete.php [L,QSA]
+RewriteRule ^testimonials/toggle/?$           pages/testimonials/toggle.php [L,QSA]
+
+# ══════════════════════════════════════════════
+# FAQ
+# ══════════════════════════════════════════════
+
+RewriteRule ^faq/?$                           pages/faq/all-faq.php [L]
+RewriteRule ^faq/add/?$                       pages/faq/add.php [L]
+RewriteRule ^faq/add-process/?$               pages/faq/add-process.php [L]
+RewriteRule ^faq/edit/?$                      pages/faq/edit.php [L,QSA]
+RewriteRule ^faq/edit-process/?$              pages/faq/edit-process.php [L]
+RewriteRule ^faq/delete/?$                    pages/faq/delete.php [L,QSA]
+RewriteRule ^faq/toggle/?$                    pages/faq/toggle.php [L,QSA]
+
+
+# ══════════════════════════════════════════════
+# MENSAGENS DE CONTACTO
+# ══════════════════════════════════════════════
+
+RewriteRule ^messages/?$                      pages/messages/inbox.php [L]
+RewriteRule ^messages/view/?$                 pages/messages/view.php [L,QSA]
+RewriteRule ^messages/reply/?$                pages/messages/reply.php [L,QSA]
+RewriteRule ^messages/reply-process/?$        pages/messages/reply-process.php [L]
+RewriteRule ^messages/delete/?$               pages/messages/delete.php [L,QSA]
+RewriteRule ^messages/toggle-star/?$          pages/messages/toggle-star.php [L,QSA]
+RewriteRule ^messages/archive/?$              pages/messages/archive.php [L,QSA]
+RewriteRule ^messages/toggle-read/?$              pages/messages/toggle-read.php [L,QSA]
+
+
+# ── Feedbacks ────────────────────────────────
+RewriteRule ^feedback/?$                      pages/feedback/all-feedback.php [L]
+RewriteRule ^feedback/view/?$                 pages/feedback/view.php [L,QSA]
+RewriteRule ^feedback/delete/?$               pages/feedback/delete.php [L,QSA]
+RewriteRule ^feedback/toggle-read/?$          pages/feedback/toggle-read.php [L,QSA]
+RewriteRule ^feedback/toggle-star/?$          pages/feedback/toggle-star.php [L,QSA]
+RewriteRule ^feedback/archive/?$              pages/feedback/toggle-archive.php [L,QSA]
+RewriteRule ^feedback/unarchive/?$            pages/feedback/toggle-archive.php [L,QSA]
+
+# ══════════════════════════════════════════════
+# VISITANTES & ANALYTICS
+# ══════════════════════════════════════════════
+
+RewriteRule ^visitors/?$                      pages/visitors/all-visitors.php [L]
+RewriteRule ^visitors/view/?$                 pages/visitors/view.php [L,QSA]
+RewriteRule ^visitors/block/?$                pages/visitors/block.php [L,QSA]
+RewriteRule ^visitors/unblock/?$              pages/visitors/unblock.php [L,QSA]
+RewriteRule ^visitors/online/?$               pages/visitors/online.php [L]
+RewriteRule ^visitors/api/?$                  pages/visitors/visitors-api.php [L,QSA]
+
+RewriteRule ^analytics/?$                     pages/analytics/analytics.php [L]
+RewriteRule ^analytics/overview/?$            pages/analytics/overview.php [L]
+RewriteRule ^analytics/pageviews/?$           pages/analytics/pageviews.php [L]
+RewriteRule ^analytics/devices/?$             pages/analytics/devices.php [L]
+RewriteRule ^analytics/geo/?$                 pages/analytics/geo.php [L]
+
+# ══════════════════════════════════════════════
+# SEGURANÇA
+# ══════════════════════════════════════════════
+
+RewriteRule ^security/?$                      pages/security/security.php [L]
+RewriteRule ^security/ip-whitelist/?$         pages/security/ip-whitelist.php [L]
+RewriteRule ^security/ip-whitelist-process/?$ pages/security/ip-whitelist-process.php [L]
+RewriteRule ^security/access-log/?$           pages/security/access-log.php [L]
+RewriteRule ^security/audit/?$                pages/security/audit.php [L,QSA]
+
+# ══════════════════════════════════════════════
+# CONFIGURAÇÕES DO SITE
+# ══════════════════════════════════════════════
+
+RewriteRule ^settings/?$                      pages/settings/config.php [L]
+RewriteRule ^settings/general/?$              pages/settings/general.php [L]
+RewriteRule ^settings/general-process/?$      pages/settings/general-process.php [L]
+RewriteRule ^settings/social/?$               pages/settings/social.php [L]
+RewriteRule ^settings/social-process/?$       pages/settings/social-process.php [L]
+RewriteRule ^settings/appearance/?$           pages/settings/appearance.php [L]
+RewriteRule ^settings/appearance-process/?$   pages/settings/appearance-process.php [L]
+RewriteRule ^settings/seo/?$                  pages/settings/seo.php [L]
+RewriteRule ^settings/seo-process/?$          pages/settings/seo-process.php [L]
+RewriteRule ^settings/maintenance/?$          pages/settings/maintenance.php [L]
+RewriteRule ^settings/maintenance-process/?$  pages/settings/maintenance-process.php [L]

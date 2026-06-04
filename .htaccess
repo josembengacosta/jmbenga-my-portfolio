@@ -1,0 +1,134 @@
+# ══════════════════════════════════════════════════════════════
+# JMbenga Portfolio — .htaccess RAIZ
+# Ambiente: DESENVOLVIMENTO (XAMPP localhost)
+# Localização: /portfolio-jmbenga/.htaccess
+#
+# ── DIFERENÇA DEV vs PRODUÇÃO ──────────────────────────────────
+# DEV: RewriteBase /portfolio-jmbenga/ ← pasta no XAMPP
+# PROD: RewriteBase / ← domínio na raiz
+#
+# ── PARA PASSAR A PRODUÇÃO ─────────────────────────────────────
+# 1. Trocar RewriteBase /portfolio-jmbenga/ → RewriteBase /
+# 2. Apagar a linha "AddHandler application/x-httpd-php82 .php"
+# (o servidor de produção já configura isso)
+# ══════════════════════════════════════════════════════════════
+
+Options -Indexes
+
+# PHP 8.2 (necessário em alguns shared hostings — comentar no XAMPP se der erro)
+# AddHandler application/x-httpd-php82 .php
+
+RewriteEngine On
+
+# ── LINHA CRÍTICA: mudar entre dev e prod ──────────────────
+# DEV (XAMPP): /portfolio-jmbenga/
+# PROD (domínio): /
+RewriteBase /portfolio-jmbenga/
+
+# ── Redirecionar raiz para home ───────────────────────────────
+# SEM barra inicial → relativo ao RewriteBase (funciona em dev e prod)
+RewriteRule ^$ home [L,R=302]
+
+# ── Erros personalizados ──────────────────────────────────────
+ErrorDocument 400 /portfolio-jmbenga/status/404.php
+ErrorDocument 403 /portfolio-jmbenga/status/403.php
+ErrorDocument 404 /portfolio-jmbenga/status/404.php
+ErrorDocument 500 /portfolio-jmbenga/status/500.php
+ErrorDocument 503 /portfolio-jmbenga/status/503.php
+
+# ── Bloquear ficheiros sensíveis ──────────────────────────────
+RewriteRule \.(sql|log|env|sh|bak|lock|md)$ - [F,L]
+
+# ── Bloquear pastas internas ──────────────────────────────────
+RewriteRule ^includes/ - [F,L]
+RewriteRule ^database/ - [F,L]
+
+# ── Servir ficheiros e pastas reais directamente ──────────────
+RewriteCond %{REQUEST_FILENAME} -f [OR]
+RewriteCond %{REQUEST_FILENAME} -d
+RewriteRule ^ - [L]
+
+# ══════════════════════════════════════════════════════════════
+# PÁGINAS PÚBLICAS
+# ══════════════════════════════════════════════════════════════
+
+RewriteRule ^home/?$ home.php [L]
+RewriteRule ^about/?$ about.php [L]
+RewriteRule ^contact/?$ contact.php [L]
+RewriteRule ^feedback/?$ feedback.php [L]
+RewriteRule ^projects/?$ projects.php [L]
+RewriteRule ^project/([a-z0-9-]+)/?$ project.php?slug=$1 [L,QSA]
+RewriteRule ^faq/?$ faq.php [L]
+RewriteRule ^cv/?$ cv.php [L]
+RewriteRule ^download/cv/?$ download/cv.php [L]
+
+# ══════════════════════════════════════════════════════════════
+# PÁGINAS SERVICES
+# ══════════════════════════════════════════════════════════════
+RewriteRule ^services/mobile-apps/?$        services/mobile-apps.php [L]
+RewriteRule ^services/web-development/?$        services/web-development.php [L]
+RewriteRule ^services/api-backend/?$            services/api-backend.php [L]
+RewriteRule ^services/ui-ux-design/?$          services/ui-ux-design.php [L]
+RewriteRule ^services/maintenance/?$                 services/maintenance.php [L]
+RewriteRule ^services/hosting/?$             services/hosting.php [L]
+RewriteRule ^services/cms/?$                 services/cms.php [L]
+RewriteRule ^services/social-media/?$        services/social-media.php [L]
+
+
+# ══════════════════════════════════════════════════════════════
+# API (endpoints JSON)
+# ══════════════════════════════════════════════════════════════
+
+RewriteRule ^api/contact/?$ api/contact.php [L]
+RewriteRule ^api/feedback/?$ api/feedback.php [L]
+RewriteRule ^api/visitor/?$ api/visitor.php [L]
+RewriteRule ^api/config/?$ api/config.php [L]
+
+# ══════════════════════════════════════════════════════════════
+# PÁGINAS DE ESTADO / ERRO
+# ══════════════════════════════════════════════════════════════
+
+RewriteRule ^status/maintenance/?$ status/maintenance.php [L]
+RewriteRule ^status/403/?$ status/403.php [L]
+RewriteRule ^status/404/?$ status/404.php [L]
+RewriteRule ^status/500/?$ status/500.php [L]
+RewriteRule ^status/503/?$ status/503.php [L]
+RewriteRule ^status/offline/?$ status/offline.php [L]
+RewriteRule ^status/blocked/?$ status/blocked.php [L]
+
+# ── Fallback: .php na raiz sem extensão ───────────────────────
+RewriteCond %{REQUEST_FILENAME}\.php -f
+RewriteRule ^([a-z0-9-]+)/?$ $1.php [L]
+
+# ══════════════════════════════════════════════════════════════
+# HEADERS DE SEGURANÇA
+# ══════════════════════════════════════════════════════════════
+
+<IfModule mod_headers.c>
+    Header always set X-Content-Type-Options "nosniff"
+    Header always set X-Frame-Options "SAMEORIGIN"
+    Header always set X-XSS-Protection "1; mode=block"
+    Header always set Referrer-Policy "strict-origin-when-cross-origin"
+</IfModule>
+
+# ══════════════════════════════════════════════════════════════
+# CACHE & PERFORMANCE (activo em prod, inofensivo em dev)
+# ══════════════════════════════════════════════════════════════
+
+<IfModule mod_expires.c>
+    ExpiresActive On
+    ExpiresByType image/jpeg "access plus 1 month"
+    ExpiresByType image/png "access plus 1 month"
+    ExpiresByType image/webp "access plus 1 month"
+    ExpiresByType image/svg+xml "access plus 1 month"
+    ExpiresByType image/x-icon "access plus 1 year"
+    ExpiresByType text/css "access plus 1 week"
+    ExpiresByType application/javascript "access plus 1 week"
+    ExpiresByType application/json "access plus 0 seconds"
+</IfModule>
+
+<IfModule mod_deflate.c>
+    AddOutputFilterByType DEFLATE text/html text/css application/javascript application/json image/svg+xml
+</IfModule>
+
+php_value date.timezone Africa/Luanda

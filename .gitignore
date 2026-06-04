@@ -1,0 +1,40 @@
+-- Active: 1771850637954@@127.0.0.1@3306@portfolio_db
+# Sistema
+.DS_Store
+Thumbs.db
+*.log
+
+# Ambiente & credenciais (NUNCA subir ao git)
+# config base
+/includes/config.php
+includes/config.*.php
+.env
+*.env
+
+# Qualquer outro ficheiro dentro de includes/api com segredos
+/includes/*config*.php
+/api/*config*.php
+/api/*secret*.php
+
+# Uploads e ficheiros gerados
+assets/img/profile/*
+assets/img/projects/*
+assets/img/testimonials/*
+!assets/img/profile/.gitkeep
+!assets/img/projects/.gitkeep
+!assets/img/testimonials/.gitkeep
+
+# CV (ficheiro pessoal, não versionar)
+download/*.pdf
+
+# Base de dados (nunca subir dumps com dados reais)
+database/seeds.sql
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Cache PHP
+*.cache
