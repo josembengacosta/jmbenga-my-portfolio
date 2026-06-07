@@ -21,7 +21,7 @@ if (!isset($pdo)) {
             PDO::ATTR_EMULATE_PREPARES   => false,
         ]);
     } catch (PDOException $e) {
-        if (APP_ENV === 'development') {
+        if (APP_ENV === 'production') {
             die('DB Error: ' . $e->getMessage());
         }
         header('Location: ' . BASE_URL . '/status/503');

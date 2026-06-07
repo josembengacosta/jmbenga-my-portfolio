@@ -1,4 +1,5 @@
 <?php
+
 /**
  * JMbenga Portfolio — Gemini Client (Refactored v2)
  * Suporte a streaming SSE, keepalive, tratamento robusto de erros.
@@ -121,7 +122,8 @@ class GeminiClient implements LLMClientInterface
             CURLOPT_CONNECTTIMEOUT => $this->connectTimeout,
             CURLOPT_TIMEOUT => $this->timeout,
             CURLOPT_TCP_KEEPALIVE => 1,
-            CURLOPT_TCP_KEEPIDLE => 10,
+            CURLOPT_TCP_KEEPIDLE => 5,
+            CURLOPT_SSL_VERIFYPEER => (APP_ENV === 'production'), // Segurança em prod
             CURLOPT_FOLLOWLOCATION => true,
             CURLOPT_MAXREDIRS => 2,
         ]);

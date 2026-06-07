@@ -23,18 +23,29 @@ RewriteEngine On
 # ── LINHA CRÍTICA: mudar entre dev e prod ──────────────────
 # DEV (XAMPP): /portfolio-jmbenga/
 # PROD (domínio): /
-RewriteBase /portfolio-jmbenga/
+# RewriteBase /portfolio-jmbenga/
+ RewriteBase /
 
 # ── Redirecionar raiz para home ───────────────────────────────
 # SEM barra inicial → relativo ao RewriteBase (funciona em dev e prod)
-RewriteRule ^$ home [L,R=302]
+# Comentamos a linha abaixo para deixar o index.php processar o redirecionamento via BASE_URL
+# RewriteRule ^$ home [L,R=302]
 
 # ── Erros personalizados ──────────────────────────────────────
-ErrorDocument 400 /portfolio-jmbenga/status/404.php
-ErrorDocument 403 /portfolio-jmbenga/status/403.php
+# InfinityFree: ErrorDocument (aponta para o ficheiro real /status/xxx.php)
+# ErrorDocument 403  /status/403.php
+# ErorDocument  404  /status/404.php
+# ErrorDocument 500  /status/500.php
+# ErrorDocument 503  /status/503.php
+
+
+# DEV (XAMPP):
+# ── Erros personalizados ──────────────────────────────────────
 ErrorDocument 404 /portfolio-jmbenga/status/404.php
+ErrorDocument 403 /portfolio-jmbenga/status/403.php
 ErrorDocument 500 /portfolio-jmbenga/status/500.php
 ErrorDocument 503 /portfolio-jmbenga/status/503.php
+
 
 # ── Bloquear ficheiros sensíveis ──────────────────────────────
 RewriteRule \.(sql|log|env|sh|bak|lock|md)$ - [F,L]
@@ -130,5 +141,3 @@ RewriteRule ^([a-z0-9-]+)/?$ $1.php [L]
 <IfModule mod_deflate.c>
     AddOutputFilterByType DEFLATE text/html text/css application/javascript application/json image/svg+xml
 </IfModule>
-
-php_value date.timezone Africa/Luanda

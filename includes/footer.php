@@ -1,4 +1,5 @@
 <?php
+
 /**
  * includes/footer.php — GLOBAL
  * Reutilizável em TODAS as páginas (incluindo home.php quando quiseres).
@@ -17,10 +18,22 @@ if (!isset($cfg)) {
 // Carregar TODAS as redes sociais configuradas
 $allSocials = [];
 $socialKeys = [
-    'github_url', 'linkedin_url', 'whatsapp_url', 'twitter_url',
-    'instagram_url', 'youtube_url', 'behance_url', 'dribbble_url',
-    'medium_url', 'devto_url', 'facebook_url', 'telegram_url',
-    'tiktok_url', 'discord_url', 'stackoverflow_url', 'codepen_url',
+    'github_url',
+    'linkedin_url',
+    'whatsapp_url',
+    'twitter_url',
+    'instagram_url',
+    'youtube_url',
+    'behance_url',
+    'dribbble_url',
+    'medium_url',
+    'devto_url',
+    'facebook_url',
+    'telegram_url',
+    'tiktok_url',
+    'discord_url',
+    'stackoverflow_url',
+    'codepen_url',
 ];
 
 foreach ($socialKeys as $key) {
@@ -30,9 +43,9 @@ foreach ($socialKeys as $key) {
     }
 }
 
-$email    = $cfg('email_contact');
+$email = $cfg('email_contact');
 $whatsapp = $cfg('whatsapp_url');
-$wa       = $whatsapp;
+$wa = $whatsapp;
 ?>
 
 <!-- ════════ FOOTER ════════════════════════════════════════════ -->
@@ -50,22 +63,22 @@ $wa       = $whatsapp;
                     <?php
                         // Mapear chave para ícone Font Awesome
                         $iconMap = [
-                            'github_url'        => 'fab fa-github',
-                            'linkedin_url'      => 'fab fa-linkedin-in',
-                            'whatsapp_url'      => 'fab fa-whatsapp',
-                            'twitter_url'       => 'fab fa-x-twitter',
-                            'instagram_url'     => 'fab fa-instagram',
-                            'youtube_url'       => 'fab fa-youtube',
-                            'behance_url'       => 'fab fa-behance',
-                            'dribbble_url'      => 'fab fa-dribbble',
-                            'medium_url'        => 'fab fa-medium-m',
-                            'devto_url'         => 'fab fa-dev',
-                            'facebook_url'      => 'fab fa-facebook-f',
-                            'telegram_url'      => 'fab fa-telegram-plane',
-                            'tiktok_url'        => 'fab fa-tiktok',
-                            'discord_url'       => 'fab fa-discord',
+                            'github_url' => 'fab fa-github',
+                            'linkedin_url' => 'fab fa-linkedin-in',
+                            'whatsapp_url' => 'fab fa-whatsapp',
+                            'twitter_url' => 'fab fa-x-twitter',
+                            'instagram_url' => 'fab fa-instagram',
+                            'youtube_url' => 'fab fa-youtube',
+                            'behance_url' => 'fab fa-behance',
+                            'dribbble_url' => 'fab fa-dribbble',
+                            'medium_url' => 'fab fa-medium-m',
+                            'devto_url' => 'fab fa-dev',
+                            'facebook_url' => 'fab fa-facebook-f',
+                            'telegram_url' => 'fab fa-telegram-plane',
+                            'tiktok_url' => 'fab fa-tiktok',
+                            'discord_url' => 'fab fa-discord',
                             'stackoverflow_url' => 'fab fa-stack-overflow',
-                            'codepen_url'       => 'fab fa-codepen',
+                            'codepen_url' => 'fab fa-codepen',
                         ];
                         $icon = $iconMap[$key] ?? 'fas fa-link';
                         ?>
@@ -111,22 +124,22 @@ $wa       = $whatsapp;
                     <?php foreach ($allSocials as $key => $url): ?>
                     <?php
                         $labelMap = [
-                            'github_url'        => 'GitHub',
-                            'linkedin_url'      => 'LinkedIn',
-                            'whatsapp_url'      => 'WhatsApp',
-                            'twitter_url'       => 'Twitter / X',
-                            'instagram_url'     => 'Instagram',
-                            'youtube_url'       => 'YouTube',
-                            'behance_url'       => 'Behance',
-                            'dribbble_url'      => 'Dribbble',
-                            'medium_url'        => 'Medium',
-                            'devto_url'         => 'Dev.to',
-                            'facebook_url'      => 'Facebook',
-                            'telegram_url'      => 'Telegram',
-                            'tiktok_url'        => 'TikTok',
-                            'discord_url'       => 'Discord',
+                            'github_url' => 'GitHub',
+                            'linkedin_url' => 'LinkedIn',
+                            'whatsapp_url' => 'WhatsApp',
+                            'twitter_url' => 'Twitter / X',
+                            'instagram_url' => 'Instagram',
+                            'youtube_url' => 'YouTube',
+                            'behance_url' => 'Behance',
+                            'dribbble_url' => 'Dribbble',
+                            'medium_url' => 'Medium',
+                            'devto_url' => 'Dev.to',
+                            'facebook_url' => 'Facebook',
+                            'telegram_url' => 'Telegram',
+                            'tiktok_url' => 'TikTok',
+                            'discord_url' => 'Discord',
                             'stackoverflow_url' => 'Stack Overflow',
-                            'codepen_url'       => 'CodePen',
+                            'codepen_url' => 'CodePen',
                         ];
                         $label = $labelMap[$key] ?? ucfirst(str_replace('_url', '', $key));
                         $icon = $iconMap[$key] ?? 'fas fa-link';
@@ -176,8 +189,9 @@ $wa       = $whatsapp;
         </header>
 
         <div class="jm-chatbot-messages" id="jm-chatbot-messages" role="log" aria-live="polite">
-            <div class="jm-chatbot-message bot">Olá! Sou o assistente virtual do portfolio JMbenga.
-                Posso ajudar com serviços, projetos, contacto ou dúvidas rápidas.
+            <div class="jm-chatbot-message bot" style="font-style: italic; text-align: justify; max-width: 100%;"> Olá!
+                Sou o assistente virtual do JMbenga.
+                <div> Posso ajudar com serviços, projetos, contacto ou dúvidas rápidas.</div>
             </div>
         </div>
 

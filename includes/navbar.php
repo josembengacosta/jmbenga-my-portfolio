@@ -1,6 +1,7 @@
 <!-- Loading -->
 <div id="loading">
-    <div class="loader-logo">Carregando<span style="color:var(--accent)">.</span></div>
+    <div class="loader-logo" style="display: flex; justify-content: center; align-items: center; ">
+        Carregando<span style="color:var(--accent)">...</span></div>
     <div class="loader-bar">
         <div class="loader-fill"></div>
     </div>

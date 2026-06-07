@@ -3,8 +3,8 @@
   "short_name": "JMbenga",
   "description": "Portfólio de José Mbenga - Desenvolvedor Full Stack & UI/UX Designer",
   
-  "start_url": "http://localhost/portfolio-jmbenga/",
-  "scope": "http://localhost/portfolio-jmbenga/",
+  "start_url": "https://jmbenga.freedev.app/",
+  "scope": "https://jmbenga.freedev.app/",
   
   "display": "standalone",
   "display_override": ["standalone", "minimal-ui"],
@@ -106,7 +106,7 @@
       "name": "Ver Projetos",
       "short_name": "Projetos",
       "description": "Explore todos os meus projetos",
-      "url": "http://localhost/portfolio-jmbenga/pages/all-projects.php",
+      "url": "https://jmbenga.freedev.app/pages/all-projects.php",
       "icons": [{
         "src": "./assets/img/icons/file-graph.svg",
         "sizes": "96x96",
@@ -117,7 +117,7 @@
       "name": "Baixar Currículo",
       "short_name": "CV",
       "description": "Baixe meu currículo em PDF",
-      "url": "http://localhost/portfolio-jmbenga/descarregar/descarregar_jmbenga.pdf",
+      "url": "https://jmbenga.freedev.app/descarregar/descarregar_jmbenga.pdf",
       "icons": [{
         "src": "./assets/img/icons/file-cv.svg",
         "sizes": "96x96",
@@ -128,7 +128,7 @@
       "name": "Entre em Contato",
       "short_name": "Contato",
       "description": "Envie uma mensagem",
-      "url": "http://localhost/portfolio-jmbenga/index.php#contact",
+      "url": "https://jmbenga.freedev.app/index.php#contact",
       "icons": [{
         "src": "./assets/img/icons/contact.svg",
         "sizes": "96x96",
@@ -139,7 +139,7 @@
       "name": "Minhas Habilidades",
       "short_name": "Skills",
       "description": "Veja minhas tecnologias",
-      "url": "http://localhost/portfolio-jmbenga/index.php#skills",
+      "url": "https://jmbenga.freedev.app/index.php#skills",
       "icons": [{
         "src": "./assets/img/icons/skills.svg",
         "sizes": "96x96",
@@ -149,7 +149,7 @@
   ],
   
   "share_target": {
-    "action": "http://localhost/portfolio-jmbenga/index.php",
+    "action": "https://jmbenga.freedev.app/index.php",
     "method": "GET",
     "enctype": "application/x-www-form-urlencoded",
     "params": {

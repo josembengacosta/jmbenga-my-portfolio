@@ -2,13 +2,20 @@
 // ══════════════════════════════════════════════════════
 // JMbenga Portfolio — Página 404
 // ══════════════════════════════════════════════════════
+
+// DEBUG (temporário para diagnosticar 500 no InfinityFree)
+ini_set('display_errors', '1');
+ini_set('display_startup_errors', '1');
+error_reporting(E_ALL);
+
 http_response_code(404);
 
 // Tentar carregar configs da BD (se falhar, usar defaults)
 $site_name     = 'JMbenga';
-$accent_color  = '#2563eb';
+$accent_color  = '#2563eb' ;
 $contact_email = 'josembengadacosta@gmail.com';
 $is_logged_in  = false;
+
 
 try {
     require_once __DIR__ . '/../includes/config.php';
@@ -17,14 +24,16 @@ try {
     
     if (isset($pdo)) {
         $stmt = $pdo->query("SELECT config_value FROM _site_config WHERE config_key IN ('site_name','accent_color','email_contact')");
-        $configs = $stmt->fetchAll(PDO::FETCH_KEY_PAIR);
+        $configs = $stmt->fetchAll(PDO::FETCH_DEFAULT);
         $site_name     = $configs['site_name']     ?? 'JMbenga';
         $accent_color  = $configs['accent_color']  ?? '#2563eb';
         $contact_email = $configs['email_contact'] ?? 'josembengadacosta@gmail.com';
-    }
+        
+    }   
 } catch (Throwable $e) {
     // BD indisponível — usar defaults
 }
+
 
 $back_url = BASE_URL ?? '/';
 ?>

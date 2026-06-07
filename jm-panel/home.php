@@ -2,6 +2,12 @@
 // ══════════════════════════════════════════════════════════════
 // JMbenga Portfolio — Dashboard Principal (Versão Melhorada)
 // ══════════════════════════════════════════════════════════════
+
+// DEBUG (temporário para diagnosticar 500 no InfinityFree)
+ini_set('display_errors', '1');
+ini_set('display_startup_errors', '1');
+error_reporting(E_ALL);
+
 require_once __DIR__ . '/include/functions_admin.php';
 
 startAdminSession();
@@ -135,7 +141,7 @@ $phpVersion   = phpversion();
 $mysqlVersion = $db->query("SELECT VERSION()")->fetchColumn();
 $diskFreeBytes = disk_free_space(__DIR__);
 $diskFreeGB   = round($diskFreeBytes / 1024 / 1024 / 1024, 1);
-$diskTotalGB  = round(disk_total_space(__DIR__) / 1024 / 1024 / 1024, 1);
+$diskTotalGB  = function_exists('disk_total_space') ? round(disk_total_space(__DIR__) / 1024 / 1024 / 1024, 1) : 0;
 $diskUsedPct  = $diskTotalGB > 0 ? round((($diskTotalGB - $diskFreeGB) / $diskTotalGB) * 100) : 0;
 $serverSoft   = $_SERVER['SERVER_SOFTWARE'] ?? 'Apache';
 

@@ -10,48 +10,48 @@ const CACHE_NAME = `jmbenga-pwa-v${APP_VERSION.replace(/\./g, "-")}`;
 // 1. CACHE IMMEDIATELY - Recursos essenciais
 const IMMEDIATE_CACHE = [
   // HTML Core
-  "https://jmbenga.vercel.app/index.html",
-  "https://jmbenga.vercel.app/offline.html",
+  "https://jmbenga.freedev.app/index.html",
+  "https://jmbenga.freedev.app/offline.html",
 
   // Manifest & Icons
-  "https://jmbenga.vercel.app/manifest.json",
-  "https://jmbenga.vercel.app/assets/img/icons/icon-192x192.png",
-  "https://jmbenga.vercel.app/assets/img/icons/icon-512x512.png",
-  "https://jmbenga.vercel.app/assets/img/svg/favicon_jm.ico",
+  "https://jmbenga.freedev.app/manifest.json",
+  "https://jmbenga.freedev.app/assets/img/icons/icon-192x192.png",
+  "https://jmbenga.freedev.app/assets/img/icons/icon-512x512.png",
+  "https://jmbenga.freedev.app/assets/img/svg/favicon_jm.ico",
 
   // Core CSS
-  "https://jmbenga.vercel.app/assets/css/main.css",
-  "https://jmbenga.vercel.app/assets/css/improvements.css",
-  "https://jmbenga.vercel.app/assets/css/particles.css",
+  "https://jmbenga.freedev.app/assets/css/main.css",
+  "https://jmbenga.freedev.app/assets/css/improvements.css",
+  "https://jmbenga.freedev.app/assets/css/particles.css",
 
   // Core JS
-  "https://jmbenga.vercel.app/assets/js/main.js",
-  "https://jmbenga.vercel.app/assets/js/improvements.js",
+  "https://jmbenga.freedev.app/assets/js/main.js",
+  "https://jmbenga.freedev.app/assets/js/improvements.js",
 
   // Fonts (Font Awesome)
-  "https://jmbenga.vercel.app/assets/fontawesome-free/webfonts/fa-solid-900.woff2",
-  "https://jmbenga.vercel.app/assets/fontawesome-free/webfonts/fa-brands-400.woff2",
+  "https://jmbenga.freedev.app/assets/fontawesome-free/webfonts/fa-solid-900.woff2",
+  "https://jmbenga.freedev.app/assets/fontawesome-free/webfonts/fa-brands-400.woff2",
 ];
 
 // 2. CACHE LAZY - Recursos importantes (cache após instalação)
 const LAZY_CACHE = [
   // Other HTML pages
-  "https://jmbenga.vercel.app/pages/all-projects.html",
-  "https://jmbenga.vercel.app/pages/project-demo.html",
+  "https://jmbenga.freedev.app/pages/all-projects.html",
+  "https://jmbenga.freedev.app/pages/project-demo.html",
 
   // Additional CSS
-  "https://jmbenga.vercel.app/assets/css/particles.css",
-  "https://jmbenga.vercel.app/assets/css/all-projects.css",
-  "https://jmbenga.vercel.app/assets/css/project-demo.css",
+  "https://jmbenga.freedev.app/assets/css/particles.css",
+  "https://jmbenga.freedev.app/assets/css/all-projects.css",
+  "https://jmbenga.freedev.app/assets/css/project-demo.css",
 
   // Additional JS
-  "https://jmbenga.vercel.app/assets/js/pwa-install.js",
-  "https://jmbenga.vercel.app/assets/js/pwa-native.js",
-  "https://jmbenga.vercel.app/assets/js/project-demo.js",
-  "https://jmbenga.vercel.app/assets/js/all-projects.js",
+  "https://jmbenga.freedev.app/assets/js/pwa-install.js",
+  "https://jmbenga.freedev.app/assets/js/pwa-native.js",
+  "https://jmbenga.freedev.app/assets/js/project-demo.js",
+  "https://jmbenga.freedev.app/assets/js/all-projects.js",
 
   // Important images
-  "https://jmbenga.vercel.app/assets/img/photo/josembengadacosta.png",
+  "https://jmbenga.freedev.app/assets/img/photo/josembengadacosta.png",
 ];
 
 // 3. EXTERNAL RESOURCES
@@ -98,7 +98,7 @@ self.addEventListener("install", (event) => {
                 self.location.hostname === "localhost" ||
                 self.location.hostname === "127.0.0.1"
               ) {
-                return url.replace("https://jmbenga.vercel.app/", "./");
+                return url.replace("https://jmbenga.freedev.app/", "./");
               }
               return url;
             })
@@ -346,7 +346,7 @@ async function cacheLazyResources() {
         self.location.hostname === "localhost" ||
         self.location.hostname === "127.0.0.1"
       ) {
-        return url.replace("https://jmbenga.vercel.app/", "./");
+        return url.replace("https://jmbenga.freedev.app/", "./");
       }
       return url;
     });
@@ -388,7 +388,7 @@ async function getOfflinePage() {
   const offlinePage = await cache.match(
     self.location.hostname === "localhost"
       ? "./offline.html"
-      : "https://jmbenga.vercel.app/offline.html"
+      : "https://jmbenga.freedev.app/offline.html"
   );
 
   if (offlinePage) {
@@ -504,11 +504,11 @@ self.addEventListener("push", (event) => {
 
   const options = {
     body: data.body || "Novo conteúdo disponível no meu portfólio!",
-    icon: "https://jmbenga.vercel.app/assets/img/icons/icon-192x192.png",
-    badge: "https://jmbenga.vercel.app/assets/img/icons/icon-72x72.png",
+    icon: "https://jmbenga.freedev.app/assets/img/icons/icon-192x192.png",
+    badge: "https://jmbenga.freedev.app/assets/img/icons/icon-72x72.png",
     vibrate: [200, 100, 200],
     data: {
-      url: data.url || "https://jmbenga.vercel.app/",
+      url: data.url || "https://jmbenga.freedev.app/",
       date: new Date().toISOString(),
     },
     actions: [

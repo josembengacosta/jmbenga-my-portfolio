@@ -239,7 +239,7 @@ function sendAdminResetEmail(string $email, string $name, string $token): bool
         $mailer->secure   = MAIL_SECURE;
         $mailer->username = MAIL_USER;
         $mailer->password = MAIL_PASS;
-        $mailer->debug    = (APP_ENV === 'development') ? 1 : 0;
+        $mailer->debug    = (APP_ENV === 'production') ? 1 : 0;
 
         $mailer->setFrom(MAIL_FROM, MAIL_FROM_NAME)
             ->addAddress($email, $name)

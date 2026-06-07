@@ -6,6 +6,8 @@
     //           theme toggle, loading screen, scroll progress,
     //           WhatsApp float, particles, offcanvas mobile.
     // ══════════════════════════════════════════════════════════════
+
+    
     require_once __DIR__ . '/includes/config.php';
     require_once __DIR__ . '/includes/db.php';
     require_once __DIR__ . '/includes/functions.php';
@@ -120,6 +122,28 @@
     background: radial-gradient(circle, <?=e($accent) ?>22 0%, transparent 65%);
     animation: blob 14s ease-in-out infinite alternate;
     pointer-events: none;
+}
+
+@media (max-width: 768px) {
+    .projects-grid {
+        display: block;
+    }
+
+    .project-card {
+        display: flex;
+        flex-direction: column;
+        margin-bottom: 2rem;
+    }
+
+    /* Coluna visual — code editor */
+    .code-editor {
+        max-width: 280px;
+        word-break: break-all;
+    }
+
+    .hero-visual {
+        max-width: 100%;
+    }
 }
  </style>
 
