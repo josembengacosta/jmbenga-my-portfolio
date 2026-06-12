@@ -2,7 +2,7 @@
 // SERVICE WORKER - PORTFÓLIO JOSÉ MBENDA (OTIMIZADO)
 // ============================================
 
-const APP_VERSION = "1.0.0";
+const APP_VERSION = "2.0";
 const CACHE_NAME = `jmbenga-pwa-v${APP_VERSION.replace(/\./g, "-")}`;
 
 // ========== CACHE STRATEGIES ==========

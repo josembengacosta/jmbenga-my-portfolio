@@ -12,7 +12,7 @@
   const send = document.getElementById("jm-chatbot-send");
   const messages = document.getElementById("jm-chatbot-messages");
   const baseUrl = document.documentElement.dataset.baseUrl || "";
-  const apiUrl = widget.dataset.apiUrl || `${baseUrl}/api/chat-api.php`;
+  const apiUrl = widget.dataset.apiUrl || `${baseUrl}/api/core-sync`;
   const MAX_INPUT = 600;
 
   // ── Persistência via sessionStorage ─────────────────────────

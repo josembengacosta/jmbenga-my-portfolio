@@ -173,7 +173,7 @@ $wa = $whatsapp;
 </button>
 
 <!-- Chatbot flutuante -->
-<div class="jm-chatbot" id="jm-chatbot" data-api-url="<?= BASE_URL ?>/api/chat-api.php">
+<div class="jm-chatbot" id="jm-chatbot" data-api-url="<?= BASE_URL ?>/api/core-sync">
     <section class="jm-chatbot-panel" id="jm-chatbot-panel" aria-labelledby="jm-chatbot-title" aria-hidden="true">
         <header class="jm-chatbot-header">
             <div class="jm-chatbot-avatar" aria-hidden="true">
@@ -221,4 +221,4 @@ $wa = $whatsapp;
 <script src="<?= BASE_URL ?>/assets/js/visitor-tracker.js"></script>
 <script src="<?= BASE_URL ?>/assets/js/pwa-install.js"></script>
 <script src="<?= BASE_URL ?>/assets/js/pwa-native.js"></script>
-<script src="<?= BASE_URL ?>/assets/js/chatbot-widget.js"></script>
+<script src="<?= BASE_URL ?>/assets/js/app-util.js"></script>

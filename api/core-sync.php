@@ -1,11 +1,19 @@
 <?php
+
+declare(strict_types=1);
+
 /**
  * JMbenga Portfolio — Chatbot API (Refactored v2)
  * Rate limiting, validação de histórico, cache de contexto, anti-injection, logs.
  */
 
-declare(strict_types=1);
+// 3. Headers HTTP de segurança e CORS
+header("Content-Type: application/json; charset=UTF-8");
+header("Access-Control-Allow-Origin: https://jmbenga.freedev.app");
+header("Access-Control-Allow-Methods: POST");
+header("Access-Control-Allow-Headers: Content-Type, Access-Control-Allow-Headers, Authorization, X-Requested-With");
 
+// 4. Inclusão dos ficheiros do sistema
 require_once dirname(__DIR__) . '/includes/config.php';
 require_once dirname(__DIR__) . '/includes/db.php';
 require_once dirname(__DIR__) . '/includes/functions.php';
@@ -40,33 +48,22 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
 // ── Rate Limiting (por IP, via sessão/ficheiro) ───────────
 function checkRateLimit(): ?string
 {
-    $ip = $_SERVER['REMOTE_ADDR'] ?? '0.0.0.0';
-    $key = 'chatbot_rl_' . preg_replace('/[^a-z0-9]/i', '_', $ip);
     $now = time();
 
-    // Usar ficheiro em /tmp para rate limiting (funciona sem memcached/redis)
-    $file = sys_get_temp_dir() . '/' . $key . '.json';
-    $data = ['count' => 0, 'reset' => $now + CHAT_RATE_LIMIT_WINDOW];
-
-    if (is_file($file) && is_readable($file)) {
-        $raw = @file_get_contents($file);
-        if ($raw) {
-            $decoded = json_decode($raw, true);
-            if (is_array($decoded)) {
-                $data = $decoded;
-            }
-        }
+    // Inicializa a estrutura de rate limit na sessão se não existir ou se o tempo expirou
+    if (!isset($_SESSION['chat_rate_limit']) || $_SESSION['chat_rate_limit']['reset'] < $now) {
+        $_SESSION['chat_rate_limit'] = [
+            'count' => 0,
+            'reset' => $now + CHAT_RATE_LIMIT_WINDOW
+        ];
     }
 
-    if ($data['reset'] < $now) {
-        $data = ['count' => 0, 'reset' => $now + CHAT_RATE_LIMIT_WINDOW];
-    }
+    // Incrementa o contador para a sessão atual
+    $_SESSION['chat_rate_limit']['count']++;
 
-    $data['count']++;
-    @file_put_contents($file, json_encode($data), LOCK_EX);
-
-    if ($data['count'] > CHAT_RATE_LIMIT_REQUESTS) {
-        $remaining = max(0, $data['reset'] - $now);
+    // Verifica se ultrapassou o limite definido nas constantes
+    if ($_SESSION['chat_rate_limit']['count'] > CHAT_RATE_LIMIT_REQUESTS) {
+        $remaining = max(0, $_SESSION['chat_rate_limit']['reset'] - $now);
         return "Muitas mensagens. Aguarde {$remaining}s.";
     }
 
@@ -401,7 +398,6 @@ try {
     logChatbot($clientIp, $userMessage, '', $durationMs, 'error: ' . $result['error']);
     http_response_code($httpCode);
     echo json_encode(['error' => $result['error']], JSON_UNESCAPED_UNICODE);
-
 } catch (Throwable $e) {
     $durationMs = (int) round((hrtime(true) - $startTime) / 1e6);
     logChatbot($clientIp, $userMessage, '', $durationMs, 'exception: ' . $e->getMessage());

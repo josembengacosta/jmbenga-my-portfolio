@@ -134,6 +134,12 @@ ul {
   -webkit-text-fill-color: transparent;
   background-clip: text;
 }
+  @media (max-width: 768px) {
+    .loader-logo {
+      font-size: 1.4rem !important;
+      letter-spacing: -0.01em !important;
+    }
+  }
 
 .loader-bar {
   width: 160px;

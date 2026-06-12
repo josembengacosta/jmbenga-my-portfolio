@@ -94,6 +94,15 @@ include 'includes/header.php';
     animation: blob 14s ease-in-out infinite alternate;
     pointer-events: none;
 }
+
+@media (max-width: 768px) {
+    .about-hero-text h1 {
+        font-size: 1.6rem !important;
+        line-height: 1.3 !important;
+        letter-spacing: normal !important;
+        margin-bottom: 12px !important;
+    }
+}
 </style>
 </head>
 

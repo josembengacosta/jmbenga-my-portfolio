@@ -7,7 +7,7 @@
     //           WhatsApp float, particles, offcanvas mobile.
     // ══════════════════════════════════════════════════════════════
 
-    
+
     require_once __DIR__ . '/includes/config.php';
     require_once __DIR__ . '/includes/db.php';
     require_once __DIR__ . '/includes/functions.php';
@@ -143,6 +143,13 @@
 
     .hero-visual {
         max-width: 100%;
+    }
+
+    .section-title {
+
+        font-size: 1.7rem !important;
+        line-height: 1.3 !important;
+        letter-spacing: normal !important;
     }
 }
  </style>

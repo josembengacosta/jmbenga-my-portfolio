@@ -71,5 +71,12 @@ $_og_image = BASE_URL . '/assets/img/profile/og.jpg';
         --accent-glow: <?=e($_accent) ?>33;
         --border-acc: <?=e($_accent) ?>66;
     }
+
+    @media (max-width: 768px) {
+        .loader-logo {
+            font-size: 1.4rem !important;
+            letter-spacing: -0.01em !important;
+        }
+    }
     </style>
     <?php endif; ?>
