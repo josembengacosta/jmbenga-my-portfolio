@@ -15,20 +15,25 @@ $cfg = function (string $key, string $default = ''): string {
     return get_config($pdo, $key, $default);
 };
 
-$accent   = $cfg('accent_color', '#2563eb');
-$whatsapp = $cfg('whatsapp_url');
-$email    = $cfg('email_contact');
+$accent = $cfg('accent_color', '#2563eb');
+if (!is_string($accent) || !preg_match('/^#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/', $accent)) {
+    $accent = '#2563eb';
+}
 
-$page_title   = 'APIs & Backend — José Mbenga | Full Stack Developer';
-$page_desc    = 'Desenvolvimento de APIs REST, GraphQL e sistemas backend escaláveis com PHP, Node.js e MySQL. Arquitetura sólida para o seu produto digital.';
+$whatsapp = trim($cfg('whatsapp_url'));
+$whatsapp_parts = $whatsapp !== '' ? parse_url($whatsapp) : false;
+if (!is_array($whatsapp_parts) || strtolower($whatsapp_parts['scheme'] ?? '') !== 'https' || empty($whatsapp_parts['host'])) {
+    $whatsapp = '';
+}
+$wa = $whatsapp; // Compatibilidade com o bloco flutuante desta página.
+
+$page_title   = 'APIs e Backend — José Mbenga | JMbenga';
+$page_desc    = 'Desenvolvimento e integração de APIs, funcionalidades backend, bases de dados e sistemas personalizados. Orçamento em kwanzas conforme os requisitos.';
+$meta_desc    = $page_desc; // Compatibilidade com cabeçalhos que utilizem esta variável.
 $page_section = 'services';
 
+include __DIR__ . '/../includes/header.php';
 ?>
-<?php
-
-include '../includes/header.php';
-?>
-
 
 <link rel="stylesheet" href="<?= BASE_URL ?>/assets/css/services/api.css">
 
@@ -92,6 +97,15 @@ include '../includes/header.php';
     animation: blob 14s ease-in-out infinite alternate;
     pointer-events: none;
 }
+
+@media (max-width: 768px) {
+    .service-hero-text h1 {
+        font-size: 1.6rem !important;
+        line-height: 1.3 !important;
+        letter-spacing: normal !important;
+        margin-bottom: 12px !important;
+    }
+}
 </style>
 
 </head>
@@ -99,9 +113,10 @@ include '../includes/header.php';
 <body>
 
     <!-- WhatsApp Float -->
-    <?php if ($wa = $cfg('whatsapp_url')): ?>
+    <?php if ($wa): ?>
     <div class=" whatsapp-float" id="whatsappFloat">
-        <a href="<?= e($wa) ?>?text=Olá%20José,%20vim%20do%20seu%20portfólio" target="_blank" rel="noopener">
+        <a href="<?= e($wa . (str_contains($wa, '?') ? '&' : '?') . 'text=' . rawurlencode('Olá José, vim do seu portfólio')) ?>"
+            target="_blank" rel="noopener noreferrer">
             <i class="fab fa-whatsapp"></i> <span>Vamos conversar?</span>
         </a>
         <button class="close-whatsapp" onclick="this.parentElement.style.display='none'" aria-label="Fechar">
@@ -109,7 +124,7 @@ include '../includes/header.php';
         </button>
     </div>
     <?php endif; ?>
-    <?php include '../includes/navbar.php'; ?>
+    <?php include __DIR__ . '/../includes/navbar.php'; ?>
 
 
     <!-- Hero -->
@@ -125,22 +140,22 @@ include '../includes/header.php';
                         <a href="<?= BASE_URL ?>/contact?service=APIs+Backend" class="btn btn-primary"><i
                                 class="fas fa-paper-plane"></i>Solicitar Orçamento</a>
                         <?php if ($whatsapp): ?>
-                        <a href="<?= e($whatsapp) ?>" target="_blank" class="btn btn-outline"><i
-                                class="fab fa-whatsapp"></i>WhatsApp</a>
+                        <a href="<?= e($whatsapp) ?>" target="_blank" rel="noopener noreferrer"
+                            class="btn btn-outline"><i class="fab fa-whatsapp"></i>WhatsApp</a>
                         <?php endif; ?>
                     </div>
-                    <div class="hero-stats-row">
+                    <div class="hero-stats-row" aria-label="Princípios do serviço">
                         <div class="hero-stat-mini">
-                            <div class="num">99.9%</div>
-                            <div class="lbl">Uptime</div>
+                            <div class="num">APIs</div>
+                            <div class="lbl">Integrações planeadas</div>
                         </div>
                         <div class="hero-stat-mini">
-                            <div class="num">&lt;200ms</div>
-                            <div class="lbl">Latência Média</div>
+                            <div class="num">Dados</div>
+                            <div class="lbl">Modelação adequada</div>
                         </div>
                         <div class="hero-stat-mini">
-                            <div class="num">10k+</div>
-                            <div class="lbl">Req/s Suportados</div>
+                            <div class="num">QA</div>
+                            <div class="lbl">Testes no escopo acordado</div>
                         </div>
                     </div>
                 </div>
@@ -173,12 +188,12 @@ include '../includes/header.php';
                 ];
                 foreach ($services as $svc): ?>
                 <div class="service-card reveal">
-                    <div class="icon-circle"><i class="fas <?= $svc['icon'] ?>"></i></div>
-                    <h3><?= $svc['title'] ?></h3>
-                    <p><?= $svc['desc'] ?></p>
+                    <div class="icon-circle"><i class="fas <?= e($svc['icon']) ?>"></i></div>
+                    <h3><?= e($svc['title']) ?></h3>
+                    <p><?= e($svc['desc']) ?></p>
                     <div class="tags">
                         <?php foreach ($svc['tags'] as $t): ?>
-                        <span class="tag-sm"><?= $t ?></span>
+                        <span class="tag-sm"><?= e($t) ?></span>
                         <?php endforeach; ?>
                     </div>
                 </div>
@@ -206,9 +221,9 @@ include '../includes/header.php';
                 ];
                 foreach ($archs as $arch): ?>
                 <div class="arch-card">
-                    <i class="fas <?= $arch['icon'] ?>"></i>
-                    <h4><?= $arch['title'] ?></h4>
-                    <p><?= $arch['desc'] ?></p>
+                    <i class="fas <?= e($arch['icon']) ?>"></i>
+                    <h4><?= e($arch['title']) ?></h4>
+                    <p><?= e($arch['desc']) ?></p>
                 </div>
                 <?php endforeach; ?>
             </div>
@@ -235,9 +250,9 @@ include '../includes/header.php';
                 ];
                 foreach ($steps as $step): ?>
                 <div class="process-step">
-                    <div class="step-number"><?= $step['num'] ?></div>
-                    <h4><?= $step['title'] ?></h4>
-                    <p><?= $step['desc'] ?></p>
+                    <div class="step-number"><?= (int)$step['num'] ?></div>
+                    <h4><?= e($step['title']) ?></h4>
+                    <p><?= e($step['desc']) ?></p>
                 </div>
                 <?php endforeach; ?>
             </div>
@@ -267,9 +282,9 @@ include '../includes/header.php';
                 ];
                 foreach ($techs as $tech): ?>
                 <div class="tech-card reveal">
-                    <i class="<?= $tech['icon'] ?>"></i>
-                    <h4><?= $tech['name'] ?></h4>
-                    <small><?= $tech['sub'] ?></small>
+                    <i class="<?= e($tech['icon']) ?>"></i>
+                    <h4><?= e($tech['name']) ?></h4>
+                    <small><?= e($tech['sub']) ?></small>
                 </div>
                 <?php endforeach; ?>
             </div>
@@ -280,97 +295,85 @@ include '../includes/header.php';
     <section class="section">
         <div class="container">
             <div class="section-head reveal">
-                <span class="tag">Garantias</span>
-                <h2 class="section-title">Por Que <span class="text-gradient">Trabalhar Comigo</span></h2>
-                <p class="section-sub">Compromisso com qualidade, segurança e performance em cada linha de código.</p>
+                <span class="tag">Critérios de trabalho</span>
+                <h2 class="section-title">Princípios do <span class="text-gradient">Desenvolvimento</span></h2>
+                <p class="section-sub">Os critérios técnicos são definidos conforme o escopo, os riscos e a
+                    infraestrutura de cada projecto.</p>
             </div>
             <div class="guarantees-grid reveal">
                 <?php
                 $guarantees = [
-                    ['icon' => 'fa-tachometer-alt', 'title' => 'Performance Otimizada', 'desc' => 'Queries, cache e arquitetura pensados para latência mínima.'],
-                    ['icon' => 'fa-shield-alt', 'title' => 'Segurança por Padrão', 'desc' => 'OWASP, encriptação e proteção contra ataques comuns.'],
-                    ['icon' => 'fa-book', 'title' => 'Documentação Completa', 'desc' => 'API docs interativas com exemplos reais de uso.'],
-                    ['icon' => 'fa-rocket', 'title' => 'Escalabilidade', 'desc' => 'Arquitetura pronta para crescimento sem reescrita.'],
+                    ['icon' => 'fa-tachometer-alt', 'title' => 'Performance Otimizada', 'desc' => 'Consultas, cache e estrutura técnica ajustados às necessidades reais da solução.'],
+                    ['icon' => 'fa-shield-alt', 'title' => 'Segurança por Padrão', 'desc' => 'Validação de dados e medidas de segurança adequadas ao risco e ao escopo contratado.'],
+                    ['icon' => 'fa-book', 'title' => 'Documentação Completa', 'desc' => 'Documentação e exemplos de utilização definidos no orçamento.'],
+                    ['icon' => 'fa-rocket', 'title' => 'Escalabilidade', 'desc' => 'Decisões de arquitectura que consideram o crescimento esperado e os limites do projecto.'],
                 ];
                 foreach ($guarantees as $g): ?>
                 <div class="guarantee-card">
-                    <i class="fas <?= $g['icon'] ?>"></i>
-                    <h4><?= $g['title'] ?></h4>
-                    <p><?= $g['desc'] ?></p>
+                    <i class="fas <?= e($g['icon']) ?>"></i>
+                    <h4><?= e($g['title']) ?></h4>
+                    <p><?= e($g['desc']) ?></p>
                 </div>
                 <?php endforeach; ?>
             </div>
         </div>
     </section>
 
-    <!-- Preços -->
+    <!-- Preços de referência em Kz -->
     <section class="section section-dark">
         <div class="container">
             <div class="section-head reveal">
                 <span class="tag">Investimento</span>
-                <h2 class="section-title">Planos <span class="text-gradient">Transparentes</span></h2>
-                <p class="section-sub">Escolha o plano ideal ou solicite um orçamento personalizado para o seu projecto.
-                </p>
+                <h2 class="section-title">Referências de <span class="text-gradient">Preço em Kz</span></h2>
+                <p class="section-sub">O valor final depende dos requisitos, da complexidade técnica e dos serviços
+                    externos necessários.</p>
             </div>
             <div class="pricing-grid reveal">
-                <!-- API Simples -->
                 <div class="pricing-card">
-                    <h3 style="font-family:var(--font-head)">API Simples</h3>
-                    <div class="price">$1,200<span>+ /projecto</span></div>
+                    <h3 style="font-family:var(--font-head)">Integração com API externa</h3>
+                    <div class="price">30.000–100.000 <span>Kz</span></div>
                     <ul>
-                        <li><i class="fas fa-check"></i>Até 5 endpoints</li>
-                        <li><i class="fas fa-check"></i>Autenticação JWT</li>
-                        <li><i class="fas fa-check"></i>CRUD básico</li>
-                        <li><i class="fas fa-check"></i>Documentação Swagger</li>
-                        <li><i class="fas fa-check"></i>Deploy em VPS</li>
-                        <li class="unavailable"><i class="fas fa-times"></i>CI/CD pipeline</li>
-                        <li class="unavailable"><i class="fas fa-times"></i>Cache avançado</li>
+                        <li><i class="fas fa-check"></i>Integração conforme a API do fornecedor</li>
+                        <li><i class="fas fa-check"></i>Tratamento de respostas e erros no escopo acordado</li>
+                        <li><i class="fas fa-check"></i>Testes de funcionamento acordados</li>
+                        <li><i class="fas fa-info-circle"></i>Autenticação complexa ou múltiplos serviços podem alterar
+                            o preço</li>
                     </ul>
                     <a href="<?= BASE_URL ?>/contact?service=APIs+Backend" class="btn btn-outline"
-                        style="width:100%">Começar</a>
+                        style="width:100%">Pedir orçamento</a>
                 </div>
-                <!-- API Profissional -->
                 <div class="pricing-card featured">
-                    <div
-                        style="position:absolute;top:-12px;left:50%;transform:translateX(-50%);background:var(--accent);color:#fff;padding:4px 16px;border-radius:999px;font-size:.72rem;font-weight:600">
-                        MAIS POPULAR</div>
-                    <h3 style="font-family:var(--font-head)">API Profissional</h3>
-                    <div class="price">$3,500<span>+ /projecto</span></div>
+                    <h3 style="font-family:var(--font-head)">Sistema CRUD com base de dados</h3>
+                    <div class="price">300.000–550.000 <span>Kz</span></div>
                     <ul>
-                        <li><i class="fas fa-check"></i>Até 20 endpoints</li>
-                        <li><i class="fas fa-check"></i>Autenticação avançada</li>
-                        <li><i class="fas fa-check"></i>Cache Redis</li>
-                        <li><i class="fas fa-check"></i>Rate limiting</li>
-                        <li><i class="fas fa-check"></i>CI/CD pipeline</li>
-                        <li><i class="fas fa-check"></i>Testes automatizados</li>
-                        <li><i class="fas fa-check"></i>Logging & monitoring</li>
-                        <li class="unavailable"><i class="fas fa-times"></i>Microserviços</li>
+                        <li><i class="fas fa-check"></i>Criação, consulta, actualização e eliminação de registos</li>
+                        <li><i class="fas fa-check"></i>Modelo de dados de acordo com os requisitos</li>
+                        <li><i class="fas fa-check"></i>Validação e tratamento de erros no escopo definido</li>
+                        <li><i class="fas fa-info-circle"></i>Permissões, relatórios e integrações podem aumentar o
+                            custo</li>
                     </ul>
                     <a href="<?= BASE_URL ?>/contact?service=APIs+Backend" class="btn btn-primary"
-                        style="width:100%">Começar</a>
+                        style="width:100%">Pedir orçamento</a>
                 </div>
-                <!-- Backend Completo -->
                 <div class="pricing-card">
-                    <h3 style="font-family:var(--font-head)">Backend Completo</h3>
-                    <div class="price">$7,000<span>+ /projecto</span></div>
+                    <h3 style="font-family:var(--font-head)">Aplicação web complexa</h3>
+                    <div class="price">A partir de 700.000 <span>Kz</span></div>
                     <ul>
-                        <li><i class="fas fa-check"></i>Endpoints ilimitados</li>
-                        <li><i class="fas fa-check"></i>Microserviços ou monolito</li>
-                        <li><i class="fas fa-check"></i>Cache em vários níveis</li>
-                        <li><i class="fas fa-check"></i>Filas e jobs</li>
-                        <li><i class="fas fa-check"></i>Admin dashboard</li>
-                        <li><i class="fas fa-check"></i>CI/CD completo</li>
-                        <li><i class="fas fa-check"></i>Load balancing</li>
-                        <li><i class="fas fa-check"></i>Suporte 3 meses</li>
+                        <li><i class="fas fa-check"></i>Análise técnica inicial</li>
+                        <li><i class="fas fa-check"></i>Arquitectura definida segundo os requisitos</li>
+                        <li><i class="fas fa-check"></i>Implementação faseada quando apropriado</li>
+                        <li><i class="fas fa-info-circle"></i>Preço final sob análise do projecto</li>
                     </ul>
                     <a href="<?= BASE_URL ?>/contact?service=APIs+Backend" class="btn btn-outline"
-                        style="width:100%">Começar</a>
+                        style="width:100%">Pedir orçamento</a>
                 </div>
             </div>
             <p style="text-align:center;margin-top:24px;color:var(--text-muted);font-size:.85rem">
-                * Preços de referência. <a href="<?= BASE_URL ?>/contact" style="color:var(--accent)">Entre em
-                    contacto</a>
-                para um orçamento detalhado baseado nos seus requisitos específicos.
+                Como referência adicional, uma funcionalidade extra num sistema começa em 25.000 Kz.
+                Domínio, alojamento, licenças, APIs pagas e outros serviços externos são discriminados à parte,
+                salvo indicação expressa na proposta. O preço definitivo é confirmado por escrito após a análise do
+                escopo.
+                <a href="<?= BASE_URL ?>/contact" style="color:var(--accent)">Contactar para orçamento</a>.
             </p>
         </div>
     </section>
@@ -385,18 +388,18 @@ include '../includes/header.php';
             <div class="faq-list reveal">
                 <?php
                 $faqs = [
-                    ['q' => 'REST ou GraphQL — qual escolher?', 'a' => 'Depende do caso de uso. REST é mais simples, com caching nativo HTTP e ampla compatibilidade. GraphQL é ideal quando precisa de consultas flexíveis para múltiplos clientes (web, mobile) com diferentes necessidades de dados. Posso ajudar a decidir.'],
-                    ['q' => 'Você trabalha com Laravel?', 'a' => 'Sim. Tenho experiência sólida com PHP/Laravel para APIs robustas. Também trabalho com Node.js (Express/Fastify) quando a stack exige JavaScript no backend.'],
-                    ['q' => 'A API será segura?', 'a' => 'Segurança é prioridade. Implemento OAuth2/JWT para autenticação, proteção CSRF, rate limiting, validação de entrada, headers de segurança, e sigo as recomendações OWASP. Testes de penetração podem ser incluídos.'],
-                    ['q' => 'Você também faz deploy e manutenção?', 'a' => 'Sim, entrego a solução completa: desenvolvimento, deploy em VPS ou cloud (AWS, DigitalOcean), configuração de Nginx/Apache, CI/CD e monitorização. Ofereço planos de manutenção contínua.'],
-                    ['q' => 'Preciso de um servidor dedicado?', 'a' => 'Nem sempre. APIs pequenas rodam muito bem em VPS de $10-20/mês. Para sistemas maiores, posso recomendar a melhor infraestrutura. Ajuda-o a escolher o plano ideal para o seu orçamento.'],
+                    ['q' => 'REST ou GraphQL — qual escolher?', 'a' => 'Depende dos consumidores da API, dos dados e dos requisitos de consulta. A escolha será recomendada durante a análise e descrita no escopo aprovado.'],
+                    ['q' => 'Quais tecnologias podem ser usadas?', 'a' => 'A escolha depende dos requisitos e da infraestrutura existente. PHP, Node.js e bases de dados relacionais podem ser avaliados durante a análise técnica; a tecnologia final é indicada na proposta.'],
+                    ['q' => 'Como é tratada a segurança?', 'a' => 'As medidas dependem do tipo de dados e dos riscos da aplicação. O orçamento deve indicar as medidas incluídas, os testes previstos e quaisquer auditorias especializadas contratadas à parte.'],
+                    ['q' => 'O deploy e a manutenção estão incluídos?', 'a' => 'Dependem do escopo contratado. A proposta deve especificar publicação, configuração do servidor, monitorização e eventual manutenção recorrente; custos de infraestrutura e serviços externos são separados salvo indicação expressa.'],
+                    ['q' => 'Preciso de um servidor dedicado?', 'a' => 'Nem sempre. A infraestrutura adequada depende da carga esperada, dos dados e dos requisitos de disponibilidade. Os custos do servidor são avaliados separadamente e apresentados em kwanzas com base no fornecedor escolhido.'],
                 ];
                 foreach ($faqs as $faq): ?>
                 <div class="faq-item">
                     <h4><i class="fas fa-question-circle"
-                            style="color:var(--accent);margin-right:8px"></i><?= $faq['q'] ?>
+                            style="color:var(--accent);margin-right:8px"></i><?= e($faq['q']) ?>
                     </h4>
-                    <p><?= $faq['a'] ?></p>
+                    <p><?= e($faq['a']) ?></p>
                 </div>
                 <?php endforeach; ?>
             </div>
@@ -420,7 +423,7 @@ include '../includes/header.php';
                         class="fas fa-paper-plane"></i>Solicitar
                     Orçamento</a>
                 <?php if ($whatsapp): ?>
-                <a href="<?= e($whatsapp) ?>" target="_blank" class="btn btn-secondary"><i
+                <a href="<?= e($whatsapp) ?>" target="_blank" rel="noopener noreferrer" class="btn btn-secondary"><i
                         class="fab fa-whatsapp"></i>Conversar no WhatsApp</a>
                 <?php endif; ?>
             </div>
@@ -430,8 +433,8 @@ include '../includes/header.php';
     <?php
     $inline_js = '';
     $page_scripts = [];
-    include '../includes/footer.php';
-    include '../includes/bottom-nav.php';
+    include __DIR__ . '/../includes/footer.php';
+    include __DIR__ . '/../includes/bottom-nav.php';
     ?>
 
 

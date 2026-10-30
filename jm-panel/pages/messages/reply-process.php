@@ -27,11 +27,16 @@ try {
 
     function buildEmailHtml(string $body, string $senderName, string $recipientName): string
 {
-    $bodyHtml = nl2br(htmlspecialchars($body, ENT_QUOTES, 'UTF-8'));
-    $year     = date('Y');
-    $siteUrl  = defined('BASE_URL') ? BASE_URL : '';
-    $siteName = defined('APP_NAME') ? constant('APP_NAME') : 'JMbenga Portfolio';
-    $initials = mb_substr($senderName, 0, 1);
+    $escape = static fn(string $value): string => htmlspecialchars($value, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
+    $bodyHtml = nl2br($escape($body));
+    $siteUrlRaw = defined('BASE_URL') ? (string) BASE_URL : '';
+    $siteNameRaw = defined('APP_NAME') ? (string) APP_NAME : 'JMbenga Portfolio';
+    $initialRaw = function_exists('mb_substr') ? mb_substr($senderName, 0, 1, 'UTF-8') : substr($senderName, 0, 1);
+    $initials = $escape($initialRaw);
+    $senderName = $escape($senderName);
+    $recipientName = $escape($recipientName);
+    $siteName = $escape($siteNameRaw);
+    $siteUrl = $escape($siteUrlRaw);
     $currentYear = date('Y');
 
     return <<<HTML
@@ -147,6 +152,7 @@ HTML;
     // ══════════════════════════════════════════════════════════════
 
     startAdminSession();
+    checkAdminRememberMe();
 
     // VERIFICAR LOGIN (sem redirect, JSON only)
     if (!isAdminLoggedIn()) {
@@ -184,9 +190,18 @@ HTML;
     }
 
     // ── Extrair campos ────────────────────────────────────────────
-    $id = (int) ($_POST['id_message'] ?? 0);
-    $replySubject = trim($_POST['reply_subject'] ?? '');
-    $replyBody = trim($_POST['reply_body'] ?? '');
+    $rawId = $_POST['id_message'] ?? 0;
+    $rawSubject = $_POST['reply_subject'] ?? '';
+    $rawBody = $_POST['reply_body'] ?? '';
+    if (!is_scalar($rawId) || !is_string($rawSubject) || !is_string($rawBody)) {
+        http_response_code(400);
+        ob_end_clean();
+        echo json_encode(['success' => false, 'message' => 'Dados enviados em formato inválido.']);
+        exit;
+    }
+    $id = (int) $rawId;
+    $replySubject = trim($rawSubject);
+    $replyBody = trim($rawBody);
 
     // ── Validações ────────────────────────────────────────────────
     if ($id <= 0) {
@@ -199,7 +214,8 @@ HTML;
         echo json_encode(['success' => false, 'message' => 'Assunto obrigatório.']);
         exit;
     }
-    if (empty($replyBody) || mb_strlen($replyBody) < 10) {
+    $replyBodyLength = function_exists('mb_strlen') ? mb_strlen($replyBody, 'UTF-8') : strlen($replyBody);
+    if ($replyBody === '' || $replyBodyLength < 10) {
         ob_end_clean();
         echo json_encode(['success' => false, 'message' => 'Resposta muito curta (mín. 10 caracteres).']);
         exit;
@@ -229,25 +245,27 @@ HTML;
         require_once __DIR__ . '/../../../includes/JmbengaMailer.php';
         
 
-        if (class_exists('\Jmbenga\Mailer')) {
-            $mailer = new \Jmbenga\Mailer();
-            $mailer->host = MAIL_HOST;
-            $mailer->port = MAIL_PORT;
-            $mailer->secure = MAIL_SECURE;
-            $mailer->username = MAIL_USER;
-            $mailer->password = MAIL_PASS;
-            $mailer->debug = (APP_ENV === 'development') ? 1 : 0;
-
-            $htmlBody = buildEmailHtml($replyBody, $adminName, $msg['name_msg']);
-
-            $mailer->setFrom($adminEmail, $adminName)
-                ->addAddress($msg['email_msg'], $msg['name_msg'])
-                ->setSubject($replySubject)
-                ->setBody($htmlBody, $replyBody)
-                ->send();
-
-            $sentViaEmail = true;
+        if (!class_exists('\\Jmbenga\\Mailer')) {
+            throw new RuntimeException('A classe Jmbenga\\Mailer não foi carregada a partir de includes/JmbengaMailer.php.');
         }
+
+        $mailer = new \Jmbenga\Mailer();
+        $mailer->host = MAIL_HOST;
+        $mailer->port = MAIL_PORT;
+        $mailer->secure = MAIL_SECURE;
+        $mailer->username = MAIL_USER;
+        $mailer->password = MAIL_PASS;
+        $mailer->debug = (APP_ENV === 'development') ? 1 : 0;
+
+        $htmlBody = buildEmailHtml($replyBody, $adminName, $msg['name_msg']);
+
+        $mailer->setFrom($adminEmail, $adminName)
+            ->addAddress($msg['email_msg'], $msg['name_msg'])
+            ->setSubject($replySubject)
+            ->setBody($htmlBody, $replyBody)
+            ->send();
+
+        $sentViaEmail = true;
     } catch (\Throwable $e) {
         $mailError = $e->getMessage();
         error_log('[REPLY MAIL] ' . $mailError);
@@ -255,19 +273,24 @@ HTML;
 
     // ── Guardar na BD ─────────────────────────────────────────────
     $existingCols = getTableColumns($db, '_contact_message');
+    // Só marcamos como 'replied' quando o mailer confirmou o envio.
+    // Em falha, guardamos a resposta como tentativa e deixamos a mensagem como lida.
+    $storedStatus = $sentViaEmail
+        ? 'replied'
+        : ((($msg['status_msg'] ?? '') === 'archived') ? 'archived' : 'read');
     $updateFields = ['status_msg = ?'];
-    $updateParams = ['replied'];
+    $updateParams = [$storedStatus];
 
-    if (in_array('replied_at', $existingCols)) $updateFields[] = 'replied_at = NOW()';
-    if (in_array('reply_subject', $existingCols)) {
+    if ($sentViaEmail && in_array('replied_at', $existingCols, true)) $updateFields[] = 'replied_at = NOW()';
+    if (in_array('reply_subject', $existingCols, true)) {
         $updateFields[] = 'reply_subject = ?';
         $updateParams[] = $replySubject;
     }
-    if (in_array('reply_body', $existingCols)) {
+    if (in_array('reply_body', $existingCols, true)) {
         $updateFields[] = 'reply_body = ?';
         $updateParams[] = $replyBody;
     }
-    if (in_array('replied_by', $existingCols)) {
+    if (in_array('replied_by', $existingCols, true)) {
         $updateFields[] = 'replied_by = ?';
         $updateParams[] = $adminId;
     }
@@ -285,7 +308,7 @@ HTML;
             '_contact_message',
             $id,
             json_encode(['status' => $msg['status_msg']]),
-            json_encode(['status' => 'replied', 'sent_email' => $sentViaEmail])
+            json_encode(['status' => $storedStatus, 'sent_email' => $sentViaEmail])
         );
     }
 
@@ -298,7 +321,7 @@ HTML;
         'message' => $sentViaEmail
             ? 'Resposta enviada com sucesso!'
             : 'Guardada, mas email não foi entregue.',
-        'mail_error' => APP_ENV === 'development' && $mailError ? $mailError : null,
+        'mail_error' => (defined('APP_ENV') && APP_ENV === 'development' && $mailError !== '') ? $mailError : null,
     ]);
     exit;
 } catch (\Throwable $e) {
@@ -308,7 +331,7 @@ HTML;
     echo json_encode([
         'success' => false,
         'message' => 'Erro ao processar resposta.',
-        'debug' => APP_ENV === 'development' ? $e->getMessage() : null,
+        'debug' => (defined('APP_ENV') && APP_ENV === 'development') ? $e->getMessage() : null,
     ]);
     exit;
 }

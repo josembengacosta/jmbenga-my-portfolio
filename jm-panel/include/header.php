@@ -1,51 +1,111 @@
 <?php
 // ── Notificações reais da BD ────────────────────────────────
 $_notifications = [];
-try {
-    $db = $GLOBALS['pdo'];
 
-    // Mensagens novas
+try {
+    $db = $GLOBALS['pdo'] ?? null;
+    if (!$db instanceof PDO) {
+        throw new RuntimeException('Ligação PDO indisponível para as notificações do painel.');
+    }
+
+    // Mensagens novas.
     $newMsgs = $db->query("
         SELECT id, name_msg AS actor, subject_msg AS detail, created_at AS ts, 'message' AS type
         FROM _contact_message
         WHERE status_msg = 'new'
         ORDER BY created_at DESC
         LIMIT 3
-    ")->fetchAll();
+    ")->fetchAll(PDO::FETCH_ASSOC);
 
-    // Actividade recente (login, edições, etc.)
+    // Actividade recente (login, edições, etc.).
     $recentActs = $db->query("
-        SELECT al.action, COALESCE(e.first_name, 'Sistema') AS actor,
+        SELECT al.action, COALESCE(NULLIF(e.first_name, ''), 'Sistema') AS actor,
                al.creat_log AS ts, 'activity' AS type
         FROM _audit_log al
         LEFT JOIN _employees e ON al.id_employees = e.id_employees
         ORDER BY al.creat_log DESC
         LIMIT 3
-    ")->fetchAll();
+    ")->fetchAll(PDO::FETCH_ASSOC);
 
-    $_notifications = array_slice(array_merge($newMsgs, $recentActs), 0, 5);
-
-    // Ordenar por data
-    usort($_notifications, fn($a, $b) => strtotime($b['ts']) - strtotime($a['ts']));
+    // Ordenar primeiro a lista completa; só depois limitar a cinco notificações.
+    $_notifications = array_merge($newMsgs, $recentActs);
+    usort($_notifications, static function (array $a, array $b): int {
+        $timeA = strtotime((string) ($a['ts'] ?? ''));
+        $timeB = strtotime((string) ($b['ts'] ?? ''));
+        return ($timeB === false ? 0 : $timeB) <=> ($timeA === false ? 0 : $timeA);
+    });
+    $_notifications = array_slice($_notifications, 0, 5);
 } catch (Throwable $_e) {
+    // Falhas das notificações não devem impedir o carregamento do painel.
     $_notifications = [];
 }
 
 $_notifCount = count($_notifications);
 
-// ── Breadcrumb (pode ser definido em cada página) ───────────
-// Ex.: $pageBreadcrumb = [['label' => 'Projectos', 'url' => '/jm-panel/projects'], ['label' => 'Editar']];
-$_breadcrumb  = $pageBreadcrumb ?? [];
-$_pageHeading = $pageHeading    ?? $pageTitle ?? 'Painel de Controlo';
+// ── Breadcrumb, título e perfil (dados opcionais da página) ──
+// get_defined_vars() permite ler valores fornecidos pela página sem
+// referenciar directamente variáveis que podem não ter sido declaradas.
+$_headerScope = get_defined_vars();
+
+$_breadcrumbCandidate = $_headerScope['pageBreadcrumb'] ?? null;
+$_headingCandidate = $_headerScope['pageHeading'] ?? null;
+$_titleCandidate = $_headerScope['pageTitle'] ?? null;
+$_providedAdminName = $_headerScope['adminName']
+    ?? ($_SESSION['admin_full_name'] ?? ($_SESSION['admin_name'] ?? null));
+$_providedAdminInitial = $_headerScope['adminInitial'] ?? null;
+$_providedAdminPhoto = $_headerScope['adminPhoto']
+    ?? ($_SESSION['admin_photo'] ?? ($_headerScope['currentAdmin']['photo_employees'] ?? null));
+
+$_breadcrumb = is_array($_breadcrumbCandidate) ? $_breadcrumbCandidate : [];
+$_pageHeading = is_string($_headingCandidate) && trim($_headingCandidate) !== ''
+    ? trim($_headingCandidate)
+    : (is_string($_titleCandidate) && trim($_titleCandidate) !== ''
+        ? trim($_titleCandidate)
+        : 'Painel de Controlo');
+
+$_adminNameDisplay = is_scalar($_providedAdminName) && trim((string) $_providedAdminName) !== ''
+    ? trim((string) $_providedAdminName)
+    : 'Administrador';
+
+if (is_string($_providedAdminInitial) && trim($_providedAdminInitial) !== '') {
+    $_adminInitialDisplay = trim($_providedAdminInitial);
+} else {
+    $_adminInitialDisplay = function_exists('mb_substr')
+        ? mb_substr($_adminNameDisplay, 0, 1, 'UTF-8')
+        : substr($_adminNameDisplay, 0, 1);
+}
+
+// Usa apenas o nome do ficheiro, nunca um caminho fornecido externamente.
+$_adminPhotoFile = is_string($_providedAdminPhoto)
+    ? basename(trim($_providedAdminPhoto))
+    : '';
+
+unset(
+    $_headerScope,
+    $_breadcrumbCandidate,
+    $_headingCandidate,
+    $_titleCandidate,
+    $_providedAdminName,
+    $_providedAdminInitial,
+    $_providedAdminPhoto
+);
 
 // ── Helper: tempo relativo ──────────────────────────────────
-function _timeAgo(string $datetime): string
-{
-    $diff = time() - strtotime($datetime);
-    if ($diff < 60)    return 'Agora';
-    if ($diff < 3600)  return floor($diff / 60) . ' min atrás';
-    if ($diff < 86400) return floor($diff / 3600) . ' h atrás';
-    return date('d/m', strtotime($datetime));
+if (!function_exists('_timeAgo')) {
+    function _timeAgo(string $datetime): string
+    {
+        $timestamp = strtotime($datetime);
+        if ($timestamp === false) {
+            return 'Data indisponível';
+        }
+
+        $diff = time() - $timestamp;
+        if ($diff < 0)       return 'Agora';
+        if ($diff < 60)      return 'Agora';
+        if ($diff < 3600)    return (string) floor($diff / 60) . ' min atrás';
+        if ($diff < 86400)   return (string) floor($diff / 3600) . ' h atrás';
+        return date('d/m', $timestamp);
+    }
 }
 ?>
 
@@ -53,24 +113,37 @@ function _timeAgo(string $datetime): string
 
     <!-- Esquerda: toggle + título / breadcrumb -->
     <div class="topbar-left">
-        <button class="menu-toggle" id="menuToggle" title="Menu (Alt+M)">
+        <button type="button" class="menu-toggle" id="menuToggle" title="Menu (Alt+M)" aria-label="Abrir menu lateral"
+            aria-controls="sidebar" aria-expanded="false">
             <i class="fas fa-bars"></i>
         </button>
 
         <div class="topbar-heading">
             <?php if (!empty($_breadcrumb)): ?>
             <nav class="breadcrumb" aria-label="Breadcrumb">
-                <a href="<?= BASE_URL ?>/jm-panel/home" class="breadcrumb-item">
+                <a href="<?= e(rtrim((string) BASE_URL, '/') . '/jm-panel/home') ?>" class="breadcrumb-item">
                     <i class="fas fa-home"></i>
                 </a>
                 <?php foreach ($_breadcrumb as $i => $crumb): ?>
+                <?php
+                    if (!is_array($crumb)) {
+                        continue;
+                    }
+                    $crumbLabel = is_scalar($crumb['label'] ?? null) ? (string) $crumb['label'] : '';
+                    $crumbPath = $crumb['url'] ?? null;
+                    $crumbHasInternalUrl = is_string($crumbPath)
+                        && str_starts_with($crumbPath, '/')
+                        && !str_starts_with($crumbPath, '//')
+                        && !preg_match('/[\r\n]/', $crumbPath);
+                    $crumbHref = $crumbHasInternalUrl ? rtrim((string) BASE_URL, '/') . $crumbPath : '';
+                ?>
                 <span class="breadcrumb-sep"><i class="fas fa-chevron-right"></i></span>
-                <?php if (isset($crumb['url']) && $i < count($_breadcrumb) - 1): ?>
-                <a href="<?= BASE_URL . e($crumb['url']) ?>" class="breadcrumb-item">
-                    <?= e($crumb['label']) ?>
+                <?php if ($crumbHref !== '' && $i < count($_breadcrumb) - 1): ?>
+                <a href="<?= e($crumbHref) ?>" class="breadcrumb-item">
+                    <?= e($crumbLabel) ?>
                 </a>
                 <?php else: ?>
-                <span class="breadcrumb-item breadcrumb-current"><?= e($crumb['label']) ?></span>
+                <span class="breadcrumb-item breadcrumb-current"><?= e($crumbLabel) ?></span>
                 <?php endif; ?>
                 <?php endforeach; ?>
             </nav>
@@ -88,20 +161,22 @@ function _timeAgo(string $datetime): string
 
         <!-- Pesquisa rápida (Ctrl+K) -->
         <div class="topbar-search" id="topbarSearch">
-            <button class="topbar-search-btn" id="searchToggle" title="Pesquisar (Ctrl+K)">
+            <button type="button" class="topbar-search-btn" id="searchToggle" title="Pesquisar (Ctrl+K)"
+                aria-label="Pesquisar projectos" aria-controls="searchBox" aria-expanded="false">
                 <i class="fas fa-search"></i>
             </button>
             <div class="topbar-search-box" id="searchBox">
                 <i class="fas fa-search search-icon-inner"></i>
-                <input type="text" id="searchInput" placeholder="Pesquisar projectos, mensagens…" autocomplete="off"
-                    spellcheck="false">
+                <input type="text" id="searchInput" placeholder="Pesquisar projectos…" autocomplete="off"
+                    spellcheck="false" data-search-url="<?= e(rtrim((string) BASE_URL, '/') . '/jm-panel/projects') ?>">
                 <kbd class="search-kbd">ESC</kbd>
             </div>
         </div>
 
         <!-- Notificações -->
         <div class="dropdown" id="notifDropdown">
-            <button class="icon-btn" id="notifBtn" title="Notificações">
+            <button type="button" class="icon-btn" id="notifBtn" title="Notificações" aria-label="Notificações"
+                aria-controls="notifMenu" aria-expanded="false">
                 <i class="fas fa-bell"></i>
                 <?php if ($_notifCount > 0): ?>
                 <span class="dot"></span>
@@ -112,39 +187,48 @@ function _timeAgo(string $datetime): string
                 <div class="notif-header">
                     <span class="notif-title">Notificações</span>
                     <?php if ($_notifCount > 0): ?>
-                    <span class="notif-count"><?= $_notifCount ?></span>
+                    <span class="notif-count"><?= (int) $_notifCount ?></span>
                     <?php endif; ?>
                 </div>
 
                 <?php if (!empty($_notifications)): ?>
                 <?php foreach ($_notifications as $n): ?>
                 <?php
-                        $isMsg = ($n['type'] === 'message');
-                        $icon  = $isMsg ? 'fa-envelope' : 'fa-circle-dot';
-                        $color = $isMsg ? 'var(--danger)' : 'var(--accent)';
-                        $label = $isMsg
-                            ? 'Nova mensagem de <strong>' . e($n['actor']) . '</strong>'
-                            : e(ucfirst(str_replace('_', ' ', $n['action'] ?? ''))) . ' — ' . e($n['actor']);
-                        $href = $isMsg
-                            ? BASE_URL . '/jm-panel/messages/view?id=' . $n['id']
-                            : BASE_URL . '/jm-panel/security';
-                        ?>
-                <a href="<?= $href ?>" class="dropdown-item notif-item">
-                    <span class="notif-icon" style="color:<?= $color ?>">
-                        <i class="fas <?= $icon ?>"></i>
+                    $isMsg = (($n['type'] ?? '') === 'message');
+                    $icon = $isMsg ? 'fa-envelope' : 'fa-circle-dot';
+                    $color = $isMsg ? 'var(--danger)' : 'var(--accent)';
+                    $actor = is_scalar($n['actor'] ?? null) ? (string) $n['actor'] : 'Sistema';
+                    $messageId = filter_var($n['id'] ?? null, FILTER_VALIDATE_INT);
+                    $href = $isMsg && $messageId !== false
+                        ? rtrim((string) BASE_URL, '/') . '/jm-panel/messages/view?id=' . (int) $messageId
+                        : rtrim((string) BASE_URL, '/') . ($isMsg ? '/jm-panel/messages' : '/jm-panel/security');
+                    $actionLabel = ucfirst(str_replace('_', ' ', (string) ($n['action'] ?? 'Actividade')));
+                    $detail = is_scalar($n['detail'] ?? null) ? trim((string) $n['detail']) : '';
+                    $detailShort = function_exists('mb_substr') ? mb_substr($detail, 0, 40, 'UTF-8') : substr($detail, 0, 40);
+                    $detailLength = function_exists('mb_strlen') ? mb_strlen($detail, 'UTF-8') : strlen($detail);
+                ?>
+                <a href="<?= e($href) ?>" class="dropdown-item notif-item">
+                    <span class="notif-icon" style="color:<?= e($color) ?>">
+                        <i class="fas <?= e($icon) ?>"></i>
                     </span>
                     <span class="notif-body">
-                        <span class="notif-label"><?= $label ?></span>
-                        <?php if ($isMsg && !empty($n['detail'])): ?>
-                        <span class="notif-sub"><?= e(mb_substr($n['detail'], 0, 40)) ?>…</span>
+                        <span class="notif-label">
+                            <?php if ($isMsg): ?>
+                            Nova mensagem de <strong><?= e($actor) ?></strong>
+                            <?php else: ?>
+                            <?= e($actionLabel) ?> — <?= e($actor) ?>
+                            <?php endif; ?>
+                        </span>
+                        <?php if ($isMsg && $detail !== ''): ?>
+                        <span class="notif-sub"><?= e($detailShort) ?><?= $detailLength > 40 ? '…' : '' ?></span>
                         <?php endif; ?>
-                        <span class="notif-time"><?= _timeAgo($n['ts']) ?></span>
+                        <span class="notif-time"><?= e(_timeAgo((string) ($n['ts'] ?? ''))) ?></span>
                     </span>
                 </a>
                 <?php endforeach; ?>
 
                 <div class="notif-footer">
-                    <a href="<?= BASE_URL ?>/jm-panel/messages">
+                    <a href="<?= e(rtrim((string) BASE_URL, '/') . '/jm-panel/messages') ?>">
                         Ver todas as mensagens <i class="fas fa-arrow-right"></i>
                     </a>
                 </div>
@@ -159,7 +243,8 @@ function _timeAgo(string $datetime): string
         </div>
 
         <!-- Mensagens (link directo) -->
-        <a href="<?= BASE_URL ?>/jm-panel/messages" class="icon-btn" title="Mensagens">
+        <a href="<?= e(rtrim((string) BASE_URL, '/') . '/jm-panel/messages') ?>" class="icon-btn" title="Mensagens"
+            aria-label="Mensagens">
             <i class="fas fa-envelope"></i>
             <?php if (($unreadMessages ?? 0) > 0): ?>
             <span class="dot"></span>
@@ -167,21 +252,22 @@ function _timeAgo(string $datetime): string
         </a>
 
         <!-- Alternar tema -->
-        <button class="theme-toggle" id="themeToggle" title="Alternar tema">
+        <button type="button" class="theme-toggle" id="themeToggle" title="Alternar tema" aria-label="Alternar tema">
             <i class="fas fa-moon" id="themeIcon"></i>
         </button>
 
         <!-- Perfil -->
-        <a href="<?= BASE_URL ?>/jm-panel/profile" class="user-menu">
+        <a href="<?= e(rtrim((string) BASE_URL, '/') . '/jm-panel/profile') ?>" class="user-menu">
             <div class="user-avatar">
-                <?php if (!empty($adminPhoto)): ?>
-                <img src="<?= BASE_URL ?>/assets/img/profile/<?= e($adminPhoto) ?>" alt="Foto de <?= e($adminName) ?>">
+                <?php if ($_adminPhotoFile !== '' && $_adminPhotoFile !== '.' && $_adminPhotoFile !== '..'): ?>
+                <img src="<?= e(rtrim((string) BASE_URL, '/') . '/assets/img/profile/' . rawurlencode($_adminPhotoFile)) ?>"
+                    alt="Foto de <?= e($_adminNameDisplay) ?>" loading="lazy">
                 <?php else: ?>
-                <?= e($adminInitial ?? 'A') ?>
+                <?= e($_adminInitialDisplay) ?>
                 <?php endif; ?>
             </div>
             <div class="user-info">
-                <div class="user-name"><?= e($adminName ?? 'Admin') ?></div>
+                <div class="user-name"><?= e($_adminNameDisplay) ?></div>
                 <div class="user-role">Super Admin</div>
             </div>
             <i class="fas fa-chevron-down user-chevron"></i>
@@ -451,11 +537,34 @@ function _timeAgo(string $datetime): string
     color: var(--text-muted);
     margin-left: .1rem
 }
+
+@media (max-width: 640px) {
+    .date-display {
+        display: none;
+    }
+
+    .topbar-search-box {
+        min-width: 0;
+        width: min(320px, calc(100vw - 2rem));
+        right: -3.25rem;
+    }
+
+    .notif-menu {
+        min-width: 0;
+        width: min(320px, calc(100vw - 2rem));
+        max-width: calc(100vw - 2rem);
+    }
+
+    .user-info,
+    .user-chevron {
+        display: none;
+    }
+}
 </style>
 
 <script>
 document.addEventListener('DOMContentLoaded', function() {
-    // ── Data ao vivo ───────────────────────────────────────────────
+    // Data apresentada no topo.
     (function() {
         var el = document.getElementById('liveDate');
         if (!el) return;
@@ -466,26 +575,45 @@ document.addEventListener('DOMContentLoaded', function() {
             .getFullYear();
     })();
 
-    // ── Dropdown notificações ──────────────────────────────────────
+    // Dropdown de notificações.
     (function() {
         var btn = document.getElementById('notifBtn');
         var menu = document.getElementById('notifMenu');
         if (!btn || !menu) return;
-        btn.addEventListener('click', function(e) {
-            e.stopPropagation();
-            menu.classList.toggle('show');
+
+        function closeMenu() {
+            menu.classList.remove('show');
+            btn.setAttribute('aria-expanded', 'false');
+        }
+
+        btn.addEventListener('click', function(event) {
+            event.stopPropagation();
+            var isOpen = menu.classList.toggle('show');
+            btn.setAttribute('aria-expanded', isOpen ? 'true' : 'false');
         });
-        document.addEventListener('click', function() {
-            menu.classList.remove('show')
+        menu.addEventListener('click', function(event) {
+            event.stopPropagation();
+        });
+        document.addEventListener('click', closeMenu);
+        document.addEventListener('keydown', function(event) {
+            if (event.key === 'Escape') closeMenu();
         });
     })();
 
-    // ── Menu toggle (mobile) ───────────────────────────────────────
-    document.getElementById('menuToggle').addEventListener('click', function() {
-        document.getElementById('sidebar').classList.toggle('open');
-    });
+    // Menu lateral em dispositivos móveis. O cabeçalho pode ser reutilizado
+    // em páginas que não carreguem sidebar, por isso verificamos ambos os elementos.
+    (function() {
+        var toggle = document.getElementById('menuToggle');
+        var sidebar = document.getElementById('sidebar');
+        if (!toggle || !sidebar) return;
 
-    // ── Pesquisa rápida (Ctrl+K / Alt+S) ──────────────────────────
+        toggle.addEventListener('click', function() {
+            var isOpen = sidebar.classList.toggle('open');
+            toggle.setAttribute('aria-expanded', isOpen ? 'true' : 'false');
+        });
+    })();
+
+    // Pesquisa rápida (Ctrl/Cmd+K). Esta caixa encaminha para a pesquisa de projectos.
     (function() {
         var btn = document.getElementById('searchToggle');
         var box = document.getElementById('searchBox');
@@ -494,84 +622,100 @@ document.addEventListener('DOMContentLoaded', function() {
 
         function openSearch() {
             box.classList.add('open');
-            input.focus()
+            btn.setAttribute('aria-expanded', 'true');
+            input.focus();
         }
 
-        function closeSearch() {
+        function closeSearch(clearValue) {
             box.classList.remove('open');
-            input.value = ''
+            btn.setAttribute('aria-expanded', 'false');
+            if (clearValue) input.value = '';
         }
 
-        btn.addEventListener('click', function(e) {
-            e.stopPropagation();
-            box.classList.contains('open') ? closeSearch() : openSearch();
+        btn.addEventListener('click', function(event) {
+            event.stopPropagation();
+            box.classList.contains('open') ? closeSearch(false) : openSearch();
         });
-        document.addEventListener('keydown', function(e) {
-            if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
-                e.preventDefault();
-                openSearch()
+        document.addEventListener('keydown', function(event) {
+            if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'k') {
+                event.preventDefault();
+                openSearch();
             }
-            if (e.key === 'Escape') closeSearch();
+            if (event.key === 'Escape') closeSearch(false);
         });
-        document.addEventListener('click', function(e) {
-            if (!box.contains(e.target) && e.target !== btn) closeSearch();
+        document.addEventListener('click', function(event) {
+            if (!box.contains(event.target) && event.target !== btn) closeSearch(false);
         });
-
-        // Pesquisa simples (redireciona com query)
-        input.addEventListener('keydown', function(e) {
-            if (e.key === 'Enter' && this.value.trim()) {
-                var q = encodeURIComponent(this.value.trim());
-                window.location.href = '<?= BASE_URL ?>/jm-panel/projects?q=' + q;
-            }
+        input.addEventListener('keydown', function(event) {
+            if (event.key !== 'Enter' || !this.value.trim()) return;
+            var baseUrl = input.getAttribute('data-search-url');
+            if (!baseUrl) return;
+            var query = encodeURIComponent(this.value.trim());
+            window.location.href = baseUrl + '?q=' + query;
         });
     })();
 
-    // ── Tema dark / light ──────────────────────────────────────────
+    // Tema claro/escuro com tolerância a navegadores que bloqueiem localStorage.
     (function() {
-        var h = document.documentElement;
-        var t = document.getElementById('themeToggle');
-        var i = document.getElementById('themeIcon');
+        var root = document.documentElement;
+        var toggle = document.getElementById('themeToggle');
+        var icon = document.getElementById('themeIcon');
+        var savedTheme = 'dark';
 
-        function applyTheme(v) {
-            h.dataset.theme = v;
-            if (i) i.className = v === 'dark' ? 'fas fa-moon' : 'fas fa-sun';
-            localStorage.setItem('jm_theme', v);
+        try {
+            var stored = window.localStorage.getItem('jm_theme');
+            if (stored === 'dark' || stored === 'light') savedTheme = stored;
+        } catch (error) {
+            // O tema continua funcional durante a sessão, mesmo sem armazenamento.
         }
-        applyTheme(localStorage.getItem('jm_theme') || 'dark');
-        if (t) t.addEventListener('click', function() {
-            applyTheme(h.dataset.theme === 'dark' ? 'light' : 'dark');
-        });
-    })();
 
-    // ── Modal de logout ────────────────────────────────────────────
-    var _logoutModal = document.getElementById('logoutModal');
-    var _sidebarLogoutBtn = document.getElementById('sidebarLogoutBtn');
-    var _closeModalBtn = document.getElementById('closeModal');
-    var _cancelLogoutBtn = document.getElementById('cancelLogout');
+        function applyTheme(theme) {
+            var safeTheme = theme === 'light' ? 'light' : 'dark';
+            root.dataset.theme = safeTheme;
+            if (icon) icon.className = safeTheme === 'dark' ? 'fas fa-moon' : 'fas fa-sun';
+            if (toggle) toggle.setAttribute('aria-label', safeTheme === 'dark' ? 'Activar tema claro' :
+                'Activar tema escuro');
+            try {
+                window.localStorage.setItem('jm_theme', safeTheme);
+            } catch (error) {
+                // Não bloquear os restantes controlos se o armazenamento estiver indisponível.
+            }
+        }
 
-    if (_logoutModal) {
-        var closeModal = function() {
-            _logoutModal.classList.remove('show');
-        };
-
-        if (_sidebarLogoutBtn) {
-            _sidebarLogoutBtn.addEventListener('click', function(e) {
-                e.preventDefault();
-                _logoutModal.classList.add('show');
+        applyTheme(savedTheme);
+        if (toggle) {
+            toggle.addEventListener('click', function() {
+                applyTheme(root.dataset.theme === 'dark' ? 'light' : 'dark');
             });
         }
-        if (_closeModalBtn) {
-            _closeModalBtn.addEventListener('click', closeModal);
+    })();
+
+    // Modal de logout.
+    (function() {
+        var modal = document.getElementById('logoutModal');
+        var openButton = document.getElementById('sidebarLogoutBtn');
+        var closeButton = document.getElementById('closeModal');
+        var cancelButton = document.getElementById('cancelLogout');
+        if (!modal) return;
+
+        function closeModal() {
+            modal.classList.remove('show');
         }
-        if (_cancelLogoutBtn) {
-            _cancelLogoutBtn.addEventListener('click', closeModal);
+
+        if (openButton) {
+            openButton.addEventListener('click', function(event) {
+                event.preventDefault();
+                modal.classList.add('show');
+            });
         }
-        _logoutModal.addEventListener('click', function(e) {
-            if (e.target === _logoutModal) closeModal();
+        if (closeButton) closeButton.addEventListener('click', closeModal);
+        if (cancelButton) cancelButton.addEventListener('click', closeModal);
+        modal.addEventListener('click', function(event) {
+            if (event.target === modal) closeModal();
         });
-        document.addEventListener('keydown', function(e) {
-            if (e.key === 'Escape') closeModal();
+        document.addEventListener('keydown', function(event) {
+            if (event.key === 'Escape') closeModal();
         });
-    }
+    })();
 });
 </script>

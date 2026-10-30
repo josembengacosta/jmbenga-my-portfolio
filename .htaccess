@@ -23,8 +23,8 @@ RewriteEngine On
 # ── LINHA CRÍTICA: mudar entre dev e prod ──────────────────
 # DEV (XAMPP): /portfolio-jmbenga/
 # PROD (domínio): /
- RewriteBase /
-# RewriteBase /portfolio-jmbenga/
+# RewriteBase /
+ RewriteBase /portfolio-jmbenga/
 
 # ── Redirecionar raiz para home ───────────────────────────────
 # SEM barra inicial -> relativo ao RewriteBase (funciona em dev e prod)
@@ -33,19 +33,20 @@ RewriteEngine On
 
 # ── Erros personalizados ──────────────────────────────────────
 # InfinityFree: ErrorDocument (aponta para o ficheiro real /status/xxx.php)
-ErrorDocument 403 /status/403.php
-ErrorDocument 404 /status/404.php
-ErrorDocument 500 /status/500.php
-ErrorDocument 503 /status/503.php
+# ErrorDocument 403 /status/403.php
+# ErrorDocument 404 /status/404.php
+# ErrorDocument 500 /status/500.php
+# ErrorDocument 503 /status/503.php
 
 # ── Erros personalizados (DEV - Comentar em Produção) ─────────
-# ErrorDocument 404 /portfolio-jmbenga/status/404.php
-# ErrorDocument 403 /portfolio-jmbenga/status/403.php
-# ErrorDocument 500 /portfolio-jmbenga/status/500.php
-# ErrorDocument 503 /portfolio-jmbenga/status/503.php
+ ErrorDocument 404 /portfolio-jmbenga/status/404.php
+ ErrorDocument 403 /portfolio-jmbenga/status/403.php
+ ErrorDocument 500 /portfolio-jmbenga/status/500.php
+ ErrorDocument 503 /portfolio-jmbenga/status/503.php
 
 
 # ── Bloquear ficheiros sensíveis ──────────────────────────────
+RewriteRule ^\.env(?:\..*)?$ - [NC,F,L]
 RewriteRule \.(sql|log|env|sh|bak|lock|md)$ - [F,L]
 
 # ── Bloquear pastas internas ──────────────────────────────────
@@ -67,22 +68,20 @@ RewriteRule ^contact/?$ contact.php [L]
 RewriteRule ^feedback/?$ feedback.php [L]
 RewriteRule ^projects/?$ projects.php [L]
 RewriteRule ^project/([a-z0-9-]+)/?$ project.php?slug=$1 [L,QSA]
+RewriteRule ^preview/([a-z0-9-]+)/?$ preview.php?slug=$1 [L,QSA]
 RewriteRule ^faq/?$ faq.php [L]
 RewriteRule ^cv/?$ cv.php [L]
 RewriteRule ^download/cv/?$ download/cv.php [L]
+RewriteRule ^servicos/?$ services/index.php [L]
 
 # ══════════════════════════════════════════════════════════════
 # PÁGINAS SERVICES
 # ══════════════════════════════════════════════════════════════
-RewriteRule ^services/mobile-apps/?$        services/mobile-apps.php [L]
-RewriteRule ^services/web-development/?$        services/web-development.php [L]
-RewriteRule ^services/api-backend/?$            services/api-backend.php [L]
-RewriteRule ^services/ui-ux-design/?$          services/ui-ux-design.php [L]
-RewriteRule ^services/maintenance/?$                 services/maintenance.php [L]
-RewriteRule ^services/hosting/?$             services/hosting.php [L]
-RewriteRule ^services/cms/?$                 services/cms.php [L]
-RewriteRule ^services/social-media/?$        services/social-media.php [L]
-
+RewriteRule ^services/mobile-apps/?$          services/mobile-apps.php [L]
+RewriteRule ^services/web-development/?$      services/web-development.php [L]
+RewriteRule ^services/api-backend/?$          services/api-backend.php [L]
+RewriteRule ^services/ui-ux-design/?$         services/ui-ux-design.php [L]
+RewriteRule ^services/maintenance/?$          services/maintenance.php [L]
 
 # ══════════════════════════════════════════════════════════════
 # API (endpoints JSON)

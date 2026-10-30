@@ -1,37 +1,89 @@
 <?php
-// ══════════════════════════════════════════════════════
+declare(strict_types=1);
+
 // JMbenga Portfolio — Página 404
-// ══════════════════════════════════════════════════════
-
-
+// A página deve continuar utilizável mesmo quando a base de dados falhar.
 http_response_code(404);
 
-// Tentar carregar configs da BD (se falhar, usar defaults)
-$site_name     = 'JMbenga';
-$accent_color  = '#2563eb' ;
-$contact_email = 'josembengadacosta@gmail.com';
-$is_logged_in  = false;
-
+$site_name = 'JMbenga';
+$accent_color = '#2563eb';
+$contact_email = '';
+$base_url = '';
 
 try {
+    // Carregar configuração global, sem depender de db.php,
+    // porque db.php pode redireccionar/terminar a execução em caso de falha.
     require_once __DIR__ . '/../includes/config.php';
-    require_once __DIR__ . '/../includes/db.php';
-    require_once __DIR__ . '/../includes/functions.php';
-    
-    if (isset($pdo)) {
-        $stmt = $pdo->query("SELECT config_key, config_value FROM _site_config WHERE config_key IN ('site_name','accent_color','email_contact')");
-        
-        $configs = $stmt->fetchAll(PDO::FETCH_KEY_PAIR);
-        
-        $site_name     = $configs['site_name']     ?? 'JMbenga';
-        $accent_color  = $configs['accent_color']  ?? '#2563eb';
-        $contact_email = $configs['email_contact'] ?? 'josembengadacosta@gmail.com';
-    }   
+
+    if (defined('BASE_URL')) {
+        $base_url = rtrim((string) BASE_URL, '/');
+    }
+
+    // Validar as constantes antes de tentar uma ligação opcional à BD.
+    if (
+        class_exists(PDO::class)
+        && defined('DB_HOST') && defined('DB_NAME')
+        && defined('DB_USER') && defined('DB_PASS')
+        && defined('DB_CHARSET')
+    ) {
+        try {
+            $dsn = sprintf(
+                'mysql:host=%s;dbname=%s;charset=%s',
+                DB_HOST,
+                DB_NAME,
+                DB_CHARSET
+            );
+
+            $errorPdo = new PDO($dsn, DB_USER, DB_PASS, [
+                PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
+                PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
+                PDO::ATTR_EMULATE_PREPARES => false,
+                PDO::ATTR_TIMEOUT => 2,
+            ]);
+
+            $stmt = $errorPdo->query(
+                "SELECT config_key, config_value FROM _site_config " .
+                "WHERE config_key IN ('site_name', 'accent_color', 'email_contact')"
+            );
+            $configs = $stmt->fetchAll(PDO::FETCH_KEY_PAIR);
+
+            $site_name = (string) ($configs['site_name'] ?? $site_name);
+            $accent_color = (string) ($configs['accent_color'] ?? $accent_color);
+            $contact_email = (string) ($configs['email_contact'] ?? $contact_email);
+        } catch (Throwable $e) {
+            // Não deixar uma falha de BD impedir a exibição da página 404.
+            error_log('[status/404] Configuração dinâmica indisponível; usando valores padrão.');
+        }
+    }
 } catch (Throwable $e) {
-    // BD indisponível — usar defaults
+    // A página de erro usa valores padrão se a configuração não puder ser carregada.
+    error_log('[status/404] Configuração global indisponível; usando valores padrão.');
 }
 
-$back_url = BASE_URL ?? '/';
+// Impedir que um valor inesperado seja injectado no CSS.
+if (!preg_match('/^#[0-9a-fA-F]{6}$/', $accent_color)) {
+    $accent_color = '#2563eb';
+}
+
+// Só apresentar um endereço válido como link de e-mail.
+if (!filter_var($contact_email, FILTER_VALIDATE_EMAIL)) {
+    $contact_email = '';
+}
+
+// BASE_URL pode ser vazio quando a configuração falha; os links continuam relativos à raiz.
+$base_url = rtrim($base_url, '/');
+$home_url = $base_url . '/home';
+$about_url = $base_url . '/about';
+$projects_url = $base_url . '/projects';
+$services_url = $base_url . '/servicos';
+$contact_url = $base_url . '/contact';
+$icon_url = $base_url . '/assets/img/icons/favicon.ico';
+
+$escape = static fn($value): string => htmlspecialchars(
+    (string) ($value ?? ''),
+    ENT_QUOTES | ENT_SUBSTITUTE,
+    'UTF-8'
+);
 ?>
 <!DOCTYPE html>
 <html lang="pt" data-theme="dark">
@@ -41,8 +93,8 @@ $back_url = BASE_URL ?? '/';
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="robots" content="noindex, nofollow">
     <meta name="theme-color" content="#0a0d14">
-    <link rel="shortcut icon" href="<?= BASE_URL ?>/assets/img/icons/favicon.ico">
-    <title>404 — Página Não Encontrada | <?php echo htmlspecialchars($site_name); ?></title>
+    <link rel="shortcut icon" href="<?= $escape($icon_url) ?>">
+    <title>404 — Página Não Encontrada | <?= $escape($site_name) ?></title>
 
     <!-- Fonts mínimas (apenas as necessárias) -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -54,10 +106,8 @@ $back_url = BASE_URL ?? '/';
 
     <style>
     :root {
-        --accent: <?php echo htmlspecialchars($accent_color);
-        ?>;
-        --accent-glow: <?php echo htmlspecialchars($accent_color);
-        ?>33;
+        --accent: <?=$escape($accent_color) ?>;
+        --accent-glow: <?=$escape($accent_color) ?>33;
         --bg: #0a0d14;
         --bg-2: #0f1623;
         --bg-card: #131b2e;
@@ -363,40 +413,57 @@ $back_url = BASE_URL ?? '/';
             Verifica o URL ou usa uma das opções abaixo para continuar.
         </p>
         <div class="fade-in action-row">
-            <a href="<?php echo $back_url; ?>" class="btn btn-primary"><i class="fas fa-house"></i> Página Inicial</a>
+            <a href="<?= $escape($home_url) ?>" class="btn btn-primary"><i class="fas fa-house"></i> Página Inicial</a>
             <button class="btn btn-ghost" onclick="history.back()"><i class="fas fa-arrow-left"></i> Voltar
                 Atrás</button>
         </div>
         <div class="fade-in quick-links">
-            <a href="<?php echo $back_url; ?>/home" class="quick-link">Home</a>
-            <a href="<?php echo $back_url; ?>/about" class="quick-link">Sobre</a>
-            <a href="<?php echo $back_url; ?>/projects" class="quick-link">Projectos</a>
-            <a href="<?php echo $back_url; ?>/contact" class="quick-link">Contacto</a>
+            <a href="<?= $escape($home_url) ?>" class="quick-link">Home</a>
+            <a href="<?= $escape($about_url) ?>" class="quick-link">Sobre</a>
+            <a href="<?= $escape($projects_url) ?>" class="quick-link">Projectos</a>
+            <a href="<?= $escape($services_url) ?>" class="quick-link">Serviços</a>
+            <a href="<?= $escape($contact_url) ?>" class="quick-link">Contacto</a>
         </div>
         <p class="fade-in footer-text">
-            &copy; <?php echo date('Y'); ?> <?php echo htmlspecialchars($site_name); ?> ·
-            <a
-                href="mailto:<?php echo htmlspecialchars($contact_email); ?>"><?php echo htmlspecialchars($contact_email); ?></a>
+            &copy; <?= date('Y') ?> <?= $escape($site_name) ?>
+            <?php if ($contact_email !== ''): ?>
+            · <a href="mailto:<?= $escape($contact_email) ?>"><?= $escape($contact_email) ?></a>
+            <?php endif; ?>
         </p>
     </div>
 
     <script>
     // Tema
     (function() {
-        var html = document.documentElement;
-        var toggle = document.getElementById('themeToggle');
-        var icon = document.getElementById('themeIcon');
-        var saved = localStorage.getItem('jm_theme') || 'dark';
+        const html = document.documentElement;
+        const toggle = document.getElementById('themeToggle');
+        const icon = document.getElementById('themeIcon');
+        let saved = 'dark';
 
-        function apply(t) {
-            html.dataset.theme = t;
-            if (icon) icon.className = t === 'dark' ? 'fas fa-moon' : 'fas fa-sun';
-            localStorage.setItem('jm_theme', t);
+        try {
+            const stored = localStorage.getItem('jm_theme');
+            if (stored === 'dark' || stored === 'light') saved = stored;
+        } catch (_) {
+            // O tema continua funcional mesmo se o armazenamento estiver bloqueado.
         }
+
+        function apply(theme) {
+            const safeTheme = theme === 'light' ? 'light' : 'dark';
+            html.dataset.theme = safeTheme;
+            if (icon) icon.className = safeTheme === 'dark' ? 'fas fa-moon' : 'fas fa-sun';
+            try {
+                localStorage.setItem('jm_theme', safeTheme);
+            } catch (_) {
+                // A alteração visual funciona mesmo sem persistência.
+            }
+        }
+
         apply(saved);
-        toggle.addEventListener('click', function() {
-            apply(html.dataset.theme === 'dark' ? 'light' : 'dark');
-        });
+        if (toggle) {
+            toggle.addEventListener('click', function() {
+                apply(html.dataset.theme === 'dark' ? 'light' : 'dark');
+            });
+        }
     })();
     </script>
 </body>

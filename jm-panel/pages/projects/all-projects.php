@@ -25,6 +25,10 @@ $pageBreadcrumb = [
     ['label' => 'Projectos'],
 ];
 
+// Manter main.css temporariamente: esta página ainda usa componentes partilhados
+// como .btn, .btn-primary e outros estilos globais. Retirar apenas após migração completa.
+$includeLegacyMainCss = true;
+
 // ── Contadores globais (sidebar/header) ─────────────────────
 $totalProjects  = (int) $db->query("SELECT COUNT(*) FROM _projects WHERE status_project = 'published'")->fetchColumn();
 $unreadMessages = (int) $db->query("SELECT COUNT(*) FROM _contact_message WHERE status_msg = 'new'")->fetchColumn();
@@ -114,7 +118,7 @@ function categoryColor(string $cat): string {
     <div class="main">
         <?php include __DIR__ . '/../../include/header.php'; ?>
 
-        <div class="content">
+        <div class="content projects-page">
 
             <!-- ═══ CABEÇALHO DA PÁGINA ════════════════════════════════ -->
             <div class="page-top">
@@ -361,8 +365,8 @@ function categoryColor(string $cat): string {
                                     </a>
 
                                     <?php if ($p['status_project'] === 'published'): ?>
-                                    <a href="<?= BASE_URL ?>/projects/<?= e($p['slug_project']) ?>" target="_blank"
-                                        class="btn-icon" title="Ver no site">
+                                    <a href="<?= BASE_URL ?>/project/<?= e(rawurlencode($p['slug_project'])) ?>"
+                                        target="_blank" class="btn-icon" title="Ver no site">
                                         <i class="fas fa-external-link-alt"></i>
                                     </a>
                                     <?php endif; ?>
@@ -403,359 +407,11 @@ function categoryColor(string $cat): string {
     <?php include __DIR__ . '/../../include/modal_logout.php'; ?>
 
     <!-- ═══ ESTILOS ESPECÍFICOS DESTA PÁGINA ══════════════════════ -->
-    <style>
-    /* ── Cabeçalho da página ─────────────────────────────────── */
-    .page-top {
-        display: flex;
-        justify-content: space-between;
-        align-items: flex-start;
-        flex-wrap: wrap;
-        gap: 1rem;
-        margin-bottom: 1.5rem;
-    }
 
-    .page-title {
-        font-family: var(--font-head);
-        font-size: 1.5rem;
-        font-weight: 800;
-        letter-spacing: -.02em;
-        margin-bottom: .2rem;
-    }
-
-    .page-sub {
-        font-size: .8rem;
-        color: var(--text-muted)
-    }
-
-    /* ── KPI mini-cards ──────────────────────────────────────── */
-    .kpi-row {
-        display: flex;
-        gap: .75rem;
-        flex-wrap: wrap;
-        margin-bottom: 1.25rem;
-    }
-
-    .kpi-card {
-        flex: 1;
-        min-width: 120px;
-        background: var(--bg-card);
-        border: 1px solid var(--border);
-        border-radius: var(--radius);
-        padding: .85rem 1rem;
-        display: flex;
-        align-items: center;
-        gap: .75rem;
-        text-decoration: none;
-        color: var(--text);
-        transition: all .22s var(--ease);
-        position: relative;
-        overflow: hidden;
-    }
-
-    .kpi-card:not([style*="cursor:default"]):hover {
-        transform: translateY(-2px);
-        border-color: var(--border-accent);
-        box-shadow: 0 6px 24px rgba(0, 0, 0, .25);
-    }
-
-    .kpi-card.kpi-active {
-        border-color: var(--accent);
-        background: var(--accent-soft);
-    }
-
-    .kpi-card.kpi-active::after {
-        content: '';
-        position: absolute;
-        bottom: 0;
-        left: 0;
-        right: 0;
-        height: 2px;
-        background: var(--accent);
-    }
-
-    .kpi-icon {
-        width: 36px;
-        height: 36px;
-        border-radius: 9px;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        font-size: .9rem;
-        flex-shrink: 0;
-    }
-
-    .kpi-val {
-        font-family: var(--font-head);
-        font-size: 1.35rem;
-        font-weight: 800;
-        letter-spacing: -.02em;
-        line-height: 1;
-    }
-
-    .kpi-lbl {
-        font-size: .68rem;
-        color: var(--text-muted);
-        margin-top: 2px;
-        white-space: nowrap;
-    }
-
-    /* ── Barra de filtros ────────────────────────────────────── */
-    .filter-bar {
-        display: flex;
-        align-items: center;
-        gap: .6rem;
-        flex-wrap: wrap;
-        margin-bottom: 1.25rem;
-        background: var(--bg-card);
-        border: 1px solid var(--border);
-        border-radius: var(--radius);
-        padding: .85rem 1rem;
-    }
-
-    .filter-search {
-        display: flex;
-        align-items: center;
-        gap: .5rem;
-        background: var(--bg);
-        border: 1px solid var(--border);
-        border-radius: 8px;
-        padding: .4rem .75rem;
-        flex: 1;
-        min-width: 180px;
-        transition: border-color .2s;
-    }
-
-    .filter-search:focus-within {
-        border-color: var(--accent)
-    }
-
-    .filter-search i {
-        color: var(--text-muted);
-        font-size: .85rem;
-        flex-shrink: 0
-    }
-
-    .filter-search input {
-        background: none;
-        border: none;
-        outline: none;
-        color: var(--text);
-        font-family: var(--font-body);
-        font-size: .84rem;
-        flex: 1;
-        min-width: 0;
-    }
-
-    .filter-search input::placeholder {
-        color: var(--text-muted)
-    }
-
-    .filter-clear-search {
-        background: none;
-        border: none;
-        color: var(--text-muted);
-        cursor: pointer;
-        font-size: .8rem;
-        padding: 0;
-        line-height: 1;
-        transition: color .2s;
-    }
-
-    .filter-clear-search:hover {
-        color: var(--danger)
-    }
-
-    .filter-select {
-        background: var(--bg);
-        border: 1px solid var(--border);
-        color: var(--text);
-        padding: .42rem .75rem;
-        border-radius: 8px;
-        font-size: .82rem;
-        font-family: var(--font-body);
-        outline: none;
-        cursor: pointer;
-        transition: border-color .2s;
-    }
-
-    .filter-select:focus {
-        border-color: var(--accent)
-    }
-
-    .filter-result {
-        font-size: .78rem;
-        color: var(--text-muted);
-        display: flex;
-        align-items: center;
-        gap: .35rem;
-        margin-left: auto;
-    }
-
-    .filter-result i {
-        font-size: .72rem
-    }
-
-    /* ── Tabela: células personalizadas ──────────────────────── */
-    .proj-thumb {
-        width: 34px;
-        height: 34px;
-        border-radius: 8px;
-        background: linear-gradient(135deg, var(--bg), var(--border));
-        border: 1px solid var(--border);
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        overflow: hidden;
-        font-family: var(--font-head);
-        font-weight: 800;
-        font-size: .85rem;
-        flex-shrink: 0;
-    }
-
-    .proj-thumb img {
-        width: 100%;
-        height: 100%;
-        object-fit: cover
-    }
-
-    .proj-title {
-        font-weight: 600;
-        font-size: .85rem;
-        line-height: 1.3
-    }
-
-    .proj-slug {
-        font-size: .68rem;
-        color: var(--text-muted);
-        font-family: var(--font-mono);
-        margin-top: 2px
-    }
-
-    /* Categoria tag */
-    .cat-tag {
-        display: inline-flex;
-        align-items: center;
-        gap: 4px;
-        padding: 3px 9px;
-        border-radius: 99px;
-        font-size: .68rem;
-        font-weight: 700;
-        background: color-mix(in srgb, var(--cat-color) 12%, transparent);
-        color: var(--cat-color);
-        border: 1px solid color-mix(in srgb, var(--cat-color) 25%, transparent);
-    }
-
-    /* Tech tags */
-    .tech-tags {
-        display: flex;
-        flex-wrap: wrap;
-        gap: 3px
-    }
-
-    .tech-tag {
-        display: inline-block;
-        background: var(--bg);
-        border: 1px solid var(--border);
-        padding: 2px 7px;
-        border-radius: 5px;
-        font-size: .67rem;
-        color: var(--text-dim);
-        font-family: var(--font-mono);
-        white-space: nowrap;
-    }
-
-    .tech-more {
-        font-size: .67rem;
-        color: var(--text-muted);
-        padding: 2px 5px;
-        font-family: var(--font-mono);
-    }
-
-    /* Ordem badge */
-    .order-badge {
-        display: inline-flex;
-        align-items: center;
-        justify-content: center;
-        width: 24px;
-        height: 24px;
-        border-radius: 6px;
-        background: var(--bg);
-        border: 1px solid var(--border);
-        font-size: .72rem;
-        font-family: var(--font-mono);
-        color: var(--text-dim);
-    }
-
-    /* Row actions */
-    .row-actions {
-        display: flex;
-        gap: .3rem;
-        align-items: center
-    }
-
-    .btn-icon-danger:hover {
-        background: var(--danger) !important;
-        border-color: var(--danger) !important;
-        color: #fff !important;
-    }
-
-    /* ── Estado vazio ──────────────────────────────────────────── */
-    .empty-state {
-        padding: 3.5rem 2rem;
-        text-align: center;
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        gap: .6rem;
-    }
-
-    .empty-icon {
-        width: 64px;
-        height: 64px;
-        border-radius: 18px;
-        background: var(--bg);
-        border: 1px solid var(--border);
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        font-size: 1.5rem;
-        color: var(--text-muted);
-        margin-bottom: .5rem;
-    }
-
-    .empty-state h3 {
-        font-family: var(--font-head);
-        font-size: 1.1rem;
-        font-weight: 700
-    }
-
-    .empty-state p {
-        font-size: .85rem;
-        color: var(--text-muted);
-        max-width: 360px
-    }
-
-    .empty-state a {
-        color: var(--accent)
-    }
-
-    /* Botão secundário */
-    .btn-secondary {
-        background: transparent;
-        border: 1px solid var(--border);
-        color: var(--text-dim);
-    }
-
-    .btn-secondary:hover {
-        background: var(--bg-hover);
-        border-color: var(--border-accent);
-        color: var(--text);
-    }
-    </style>
 
     <script>
-    const BASE = '<?= BASE_URL ?>';
-    const CSRF = '<?= $csrfToken ?>';
+    const BASE = <?= json_encode(BASE_URL, JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP) ?>;
+    const CSRF = <?= json_encode($csrfToken, JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP) ?>;
 
     // ── DataTable ─────────────────────────────────────────────────
     $(document).ready(function() {
@@ -816,10 +472,7 @@ function categoryColor(string $cat): string {
 
             Swal.fire({
                 title: 'Eliminar projecto?',
-                html: `<span style="color:var(--text-dim);font-size:.9rem">
-                       Vais eliminar permanentemente <strong style="color:var(--text)">"${title}"</strong>.
-                       <br>Esta ação não pode ser desfeita.
-                   </span>`,
+                text: `Vais eliminar permanentemente "${title}". Esta ação não pode ser desfeita.`,
                 icon: 'warning',
                 showCancelButton: true,
                 confirmButtonText: '<i class="fas fa-trash"></i> Sim, eliminar',
@@ -889,6 +542,7 @@ function categoryColor(string $cat): string {
                     // Reverter
                     icon.style.color = curr ? 'var(--warning)' : 'var(--text-muted)';
                     this.dataset.featured = curr ? '1' : '0';
+                    this.title = curr ? 'Remover destaque' : 'Marcar como destaque';
                     toast('error', 'Não foi possível actualizar');
                 } else {
                     toast('success', data.is_featured ? 'Adicionado ao destaque' :
@@ -897,6 +551,8 @@ function categoryColor(string $cat): string {
             } catch (err) {
                 icon.style.color = curr ? 'var(--warning)' : 'var(--text-muted)';
                 this.dataset.featured = curr ? '1' : '0';
+                this.title = curr ? 'Remover destaque' : 'Marcar como destaque';
+                toast('error', 'Erro de rede ao actualizar destaque');
             }
         });
     });

@@ -1,94 +1,131 @@
 <?php
-// ══════════════════════════════════════════════════════════════
-// JMbenga Portfolio — Página de Manutenção
+// JMbenga Portfolio — Página de manutenção
 // Ficheiro: status/maintenance.php
-// ══════════════════════════════════════════════════════════════
 http_response_code(503);
-header('Retry-After: 3600');
 
-$site_name     = 'JMbenga';
-$accent_color  = '#2563eb';
-$contact_email = 'josembengadacosta@gmail.com';
-$platform_ver  = '1.0';
-$maint_msg     = 'Estamos a realizar melhorias técnicas para lhe oferecer a melhor experiência.';
-$maint_end_ts  = null;
-$maint_start_ts = null;
-$services       = [];
-$cfg            = [];
+$site_name       = 'JMbenga';
+$contact_email   = 'josembengadacosta@gmail.com';
+$platform_ver    = '1.0';
+$maint_msg       = 'Estamos a realizar melhorias técnicas para lhe oferecer a melhor experiência.';
+$maint_end_ts    = null;
+$maint_start_ts  = null;
+$services        = [];
+$pdo             = null;
+$base_url        = '/';
 
-// ── Tentar carregar configurações da BD ──────────────────────
+// Normaliza BASE_URL para ficar com uma única barra final. Se a configuração
+// não estiver disponível, tenta reconhecer a instalação local em /status/.
+$resolveBaseUrl = static function (): string {
+    if (defined('BASE_URL') && is_string(BASE_URL) && BASE_URL !== '') {
+        $candidate = BASE_URL;
+    } else {
+        $scriptName = str_replace('\\', '/', (string) ($_SERVER['SCRIPT_NAME'] ?? ''));
+        if (preg_match('~^(.*?)/status/maintenance\.php$~i', $scriptName, $matches)) {
+            $candidate = ($matches[1] !== '' ? $matches[1] : '') . '/';
+        } else {
+            $candidate = '/';
+        }
+    }
+
+    $candidate = rtrim($candidate, '/') . '/';
+    return $candidate === '//' ? '/' : $candidate;
+};
+
+// Converte datas guardadas na BD em timestamps, interpretando datas sem fuso
+// explícito no horário local de Angola.
+$parseMaintenanceDate = static function ($value): ?int {
+    if (!is_string($value) || trim($value) === '') {
+        return null;
+    }
+    try {
+        $date = new DateTimeImmutable($value, new DateTimeZone('Africa/Luanda'));
+        return $date->getTimestamp();
+    } catch (Throwable $e) {
+        return null;
+    }
+};
+
 try {
     require_once __DIR__ . '/../includes/config.php';
+    $base_url = $resolveBaseUrl();
     require_once __DIR__ . '/../includes/db.php';
-    require_once __DIR__ . '/../includes/functions.php';
 
-    if (isset($pdo)) {
-        // Ler _platform
-        $pq = $pdo->query("SELECT * FROM _platform WHERE id_platform = 1 LIMIT 1");
-        $platform = $pq->fetch(PDO::FETCH_ASSOC);
-        if ($platform) {
-            // Se não estiver em manutenção, redirecionar para home
-            if ($platform['status'] !== 'maintenance') {
-                header('Location: ' . (BASE_URL ?? '/'));
+    if ($pdo instanceof PDO) {
+        $platformQuery = $pdo->query(
+            'SELECT status, version, maintenance_msg, maintenance_start, maintenance_end, maintenance_services
+             FROM _platform WHERE id_platform = 1 LIMIT 1'
+        );
+        $platform = $platformQuery->fetch(PDO::FETCH_ASSOC);
+
+        if (is_array($platform)) {
+            // Se a manutenção foi desativada, regressa ao site normal.
+            if (strtolower(trim((string) ($platform['status'] ?? ''))) !== 'maintenance') {
+                header('Location: ' . $base_url, true, 302);
                 exit;
             }
-            $platform_ver  = htmlspecialchars($platform['version'] ?? '1.0');
-            if (!empty($platform['maintenance_msg'])) {
-                $maint_msg = htmlspecialchars($platform['maintenance_msg']);
+
+            $platform_ver = (string) ($platform['version'] ?? '1.0');
+            if (isset($platform['maintenance_msg']) && is_string($platform['maintenance_msg'])
+                && trim($platform['maintenance_msg']) !== '') {
+                $maint_msg = $platform['maintenance_msg'];
             }
-            if (!empty($platform['maintenance_end'])) {
-                $maint_end_ts = strtotime($platform['maintenance_end']);
-            }
-            if (!empty($platform['maintenance_start'])) {
-                $maint_start_ts = strtotime($platform['maintenance_start']);
-            }
-            if (!empty($platform['maintenance_services'])) {
-                $decoded = json_decode($platform['maintenance_services'], true);
-                if (is_array($decoded)) $services = $decoded;
+            $maint_end_ts = $parseMaintenanceDate($platform['maintenance_end'] ?? null);
+            $maint_start_ts = $parseMaintenanceDate($platform['maintenance_start'] ?? null);
+
+            if (!empty($platform['maintenance_services']) && is_string($platform['maintenance_services'])) {
+                $decodedServices = json_decode($platform['maintenance_services'], true);
+                if (is_array($decodedServices)) {
+                    $services = $decodedServices;
+                }
             }
         }
 
-        // Ler _site_config
-        $cq = $pdo->query("SELECT config_key, config_value FROM _site_config WHERE config_key IN ('site_name','accent_color','email_contact')");
-        $configs = $cq->fetchAll(PDO::FETCH_KEY_PAIR);
-        $site_name     = htmlspecialchars($configs['site_name']     ?? 'JMbenga');
-        $accent_color  = $configs['accent_color']  ?? '#2563eb';
-        $contact_email = htmlspecialchars($configs['email_contact'] ?? 'josembengadacosta@gmail.com');
-        $cfg = $configs;
+        $configQuery = $pdo->query(
+            "SELECT config_key, config_value FROM _site_config
+             WHERE config_key IN ('site_name', 'email_contact')"
+        );
+        $siteConfigs = $configQuery->fetchAll(PDO::FETCH_KEY_PAIR);
+        $site_name = (string) ($siteConfigs['site_name'] ?? 'JMbenga');
+        $configuredEmail = (string) ($siteConfigs['email_contact'] ?? 'josembengadacosta@gmail.com');
+        if (filter_var($configuredEmail, FILTER_VALIDATE_EMAIL)) {
+            $contact_email = $configuredEmail;
+        }
     }
 } catch (Throwable $e) {
-    // BD indisponível — manter defaults
+    // Se a BD estiver indisponível, a página continua a mostrar a mensagem
+    // de manutenção com valores de reserva; o detalhe fica apenas no log.
     error_log('[maintenance] ' . $e->getMessage());
 }
 
-// ── Calcular countdown em segundos ───────────────────────────
+$base_url = $resolveBaseUrl();
+
+// O cabeçalho deve sugerir uma nova tentativa coerente com a previsão, quando
+// esta existe. Sem previsão válida, utiliza uma hora como intervalo indicativo.
 $now = time();
-$seconds_remaining = 0;
-$seconds_total     = 0;
-if ($maint_end_ts && $maint_end_ts > $now) {
-    $seconds_remaining = $maint_end_ts - $now;
-}
-if ($maint_start_ts && $maint_end_ts) {
-    $seconds_total = max(1, $maint_end_ts - $maint_start_ts);
+$seconds_remaining = ($maint_end_ts !== null && $maint_end_ts > $now)
+    ? $maint_end_ts - $now
+    : 0;
+$seconds_total = 0;
+if ($maint_start_ts !== null && $maint_end_ts !== null && $maint_end_ts > $maint_start_ts) {
+    $seconds_total = $maint_end_ts - $maint_start_ts;
 } elseif ($seconds_remaining > 0) {
     $seconds_total = $seconds_remaining;
 }
+header('Retry-After: ' . max(1, $seconds_remaining > 0 ? $seconds_remaining : 3600));
+header('Cache-Control: no-store, no-cache, must-revalidate');
+header('Pragma: no-cache');
 
-$maint_end_fmt = ($maint_end_ts && $maint_end_ts > $now)
-    ? date('d/m/Y \à\s H:i', $maint_end_ts) . ' (WAT)'
-    : 'Em breve';
-
-// ── Serviços padrão ──────────────────────────────────────────
-if (empty($services)) {
-    $services = [
-        'auth'          => 'ok',
-        'projects'      => 'working',
-        'contact'       => 'ok',
-        'database'      => 'working',
-        'api'           => 'ok',
-        'notifications' => 'pending',
-    ];
+$luandaTimezone = new DateTimeZone('Africa/Luanda');
+if ($maint_end_ts !== null && $maint_end_ts > $now) {
+    $maint_end_fmt = (new DateTimeImmutable('@' . $maint_end_ts))
+        ->setTimezone($luandaTimezone)
+        ->format('d/m/Y \\à\\s H:i') . ' (WAT)';
+} elseif ($maint_end_ts !== null && $maint_end_ts <= $now) {
+    $maint_end_fmt = 'Prazo previsto ultrapassado';
+} else {
+    $maint_end_fmt = 'Sem previsão definida';
 }
+
 $service_labels = [
     'auth'          => 'Autenticação',
     'projects'      => 'Projectos',
@@ -98,57 +135,70 @@ $service_labels = [
     'notifications' => 'Notificações',
 ];
 $state_map = [
-    'ok'      => ['dot' => 's-ok',      'badge' => 'badge-ok',      'icon' => 'fa-check',        'text' => 'Online'],
-    'working' => ['dot' => 's-working', 'badge' => 'badge-working', 'icon' => 'fa-sync-alt',     'text' => 'A actualizar'],
-    'pending' => ['dot' => 's-pending', 'badge' => 'badge-pending', 'icon' => 'fa-hourglass-half','text' => 'Pendente'],
-    'down'    => ['dot' => 's-down',    'badge' => 'badge-down',    'icon' => 'fa-times',        'text' => 'Indisponível'],
+    'ok'      => ['dot' => 's-ok',      'badge' => 'badge-ok',      'icon' => 'fa-check',         'text' => 'Online'],
+    'working' => ['dot' => 's-working', 'badge' => 'badge-working', 'icon' => 'fa-sync-alt',      'text' => 'A actualizar'],
+    'pending' => ['dot' => 's-pending', 'badge' => 'badge-pending', 'icon' => 'fa-hourglass-half', 'text' => 'Pendente'],
+    'down'    => ['dot' => 's-down',    'badge' => 'badge-down',    'icon' => 'fa-times',          'text' => 'Indisponível'],
 ];
 
-// ── Processar AJAX para registo de e-mail ────────────────────
-if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
+$escape = static function ($value): string {
+    return htmlspecialchars((string) $value, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
+};
+
+$sendJson = static function (array $payload, int $statusCode = 200): void {
+    http_response_code($statusCode);
     header('Content-Type: application/json; charset=utf-8');
-    $action = $_POST['action'];
+    echo json_encode($payload, JSON_UNESCAPED_UNICODE | JSON_INVALID_UTF8_SUBSTITUTE);
+    exit;
+};
+
+// Endpoints AJAX são tratados nesta página para preservar a instalação atual.
+if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST' && isset($_POST['action'])) {
+    $action = is_string($_POST['action']) ? $_POST['action'] : '';
+
+    if (!($pdo instanceof PDO)) {
+        $sendJson(['ok' => false, 'message' => 'O registo está temporariamente indisponível. Tenta novamente mais tarde.'], 503);
+    }
 
     if ($action === 'notify_register') {
-        $email = filter_var(trim($_POST['email'] ?? ''), FILTER_VALIDATE_EMAIL);
-        if (!$email) {
-            echo json_encode(['ok' => false, 'message' => 'E-mail inválido.']);
-            exit;
+        $emailInput = $_POST['email'] ?? '';
+        $emailInput = is_string($emailInput) ? trim($emailInput) : '';
+        if ($emailInput === '' || strlen($emailInput) > 254 || !filter_var($emailInput, FILTER_VALIDATE_EMAIL)) {
+            $sendJson(['ok' => false, 'message' => 'E-mail inválido.'], 422);
         }
-        $ip = $_SERVER['REMOTE_ADDR'] ?? '0.0.0.0';
+
+        $email = strtolower($emailInput);
+        $remoteIp = (string) ($_SERVER['REMOTE_ADDR'] ?? '');
+        $ip = filter_var($remoteIp, FILTER_VALIDATE_IP) ? $remoteIp : '0.0.0.0';
+
         try {
-            // Verificar se já existe
-            $check = $pdo->prepare("SELECT id_notify FROM _maintenance_notify WHERE email_notify = ?");
+            $check = $pdo->prepare('SELECT id_notify FROM _maintenance_notify WHERE email_notify = ? LIMIT 1');
             $check->execute([$email]);
-            if ($check->fetch()) {
-                echo json_encode(['ok' => true, 'message' => 'Este e-mail já está na lista de avisos.']);
-                exit;
+            if ($check->fetch(PDO::FETCH_ASSOC)) {
+                $sendJson(['ok' => true, 'message' => 'Este e-mail já está na lista de avisos.']);
             }
-            // Inserir
-            $ins = $pdo->prepare("INSERT INTO _maintenance_notify (email_notify, ip_notify) VALUES (?, ?)");
-            $ins->execute([$email, $ip]);
-            echo json_encode(['ok' => true, 'message' => 'Registado! Serás avisado quando o site regressar.']);
+
+            $insert = $pdo->prepare('INSERT INTO _maintenance_notify (email_notify, ip_notify) VALUES (?, ?)');
+            $insert->execute([$email, $ip]);
+            $sendJson(['ok' => true, 'message' => 'Registado! Serás avisado quando o site regressar.']);
         } catch (Throwable $e) {
-            echo json_encode(['ok' => false, 'message' => 'Erro ao registar. Tenta novamente.']);
+            error_log('[maintenance-notify-register] ' . $e->getMessage());
+            $sendJson(['ok' => false, 'message' => 'Erro ao registar. Tenta novamente.'], 500);
         }
-        exit;
     }
 
     if ($action === 'notify_count') {
         try {
-            $cnt = (int) $pdo->query("SELECT COUNT(*) FROM _maintenance_notify WHERE sent = 0")->fetchColumn();
-            echo json_encode(['ok' => true, 'count' => $cnt]);
+            $count = (int) $pdo->query('SELECT COUNT(*) FROM _maintenance_notify WHERE sent = 0')->fetchColumn();
+            $sendJson(['ok' => true, 'count' => max(0, $count)]);
         } catch (Throwable $e) {
-            echo json_encode(['ok' => false, 'count' => 0]);
+            error_log('[maintenance-notify-count] ' . $e->getMessage());
+            $sendJson(['ok' => false, 'count' => 0], 500);
         }
-        exit;
     }
 
-    echo json_encode(['ok' => false, 'message' => 'Acção inválida.']);
-    exit;
+    $sendJson(['ok' => false, 'message' => 'Acção inválida.'], 400);
 }
-
-$back_url = BASE_URL ?? '/';
 ?>
 <!DOCTYPE html>
 <html lang="pt" data-theme="dark">
@@ -158,9 +208,8 @@ $back_url = BASE_URL ?? '/';
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="robots" content="noindex, nofollow">
     <meta name="theme-color" content="#0a0d14">
-    <link rel="shortcut icon" href="<?= BASE_URL ?>/assets/img/icons/favicon.ico">
-    <title>Em Manutenção — <?= $site_name ?></title>
-    <link rel="icon" type="image/x-icon" href="<?= $back_url ?>assets/img/favicon.ico">
+    <link rel="icon" href="<?= $escape($base_url . 'assets/img/icons/favicon.ico') ?>">
+    <title>Em Manutenção — <?= $escape($site_name) ?></title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link
@@ -791,6 +840,18 @@ $back_url = BASE_URL ?? '/';
             flex-direction: column
         }
     }
+
+    @media (prefers-reduced-motion: reduce) {
+
+        *,
+        *::before,
+        *::after {
+            animation-duration: .01ms !important;
+            animation-iteration-count: 1 !important;
+            transition-duration: .01ms !important;
+            scroll-behavior: auto !important;
+        }
+    }
     </style>
 </head>
 
@@ -806,20 +867,20 @@ $back_url = BASE_URL ?? '/';
             id="themeIcon"></i></button>
 
     <div class="page-wrap">
-        <a class="brand" href="<?= $back_url ?>">
+        <a class="brand" href="<?= $escape($base_url) ?>">
             <span class="brand-dot"></span>
-            <?= $site_name ?>
+            <?= $escape($site_name) ?>
         </a>
 
         <div class="card">
             <div class="icon-wrap"><i class="fas fa-tools"></i></div>
             <div class="badge"><span class="live-dot"></span> Manutenção em curso</div>
             <h1 class="title">Melhorias em <span>Progresso</span></h1>
-            <p class="desc"><?= $maint_msg ?></p>
+            <p class="desc"><?= $escape($maint_msg) ?></p>
 
             <div class="endtime">
                 <i class="far fa-clock"></i>
-                Regresso previsto: <strong style="color:var(--text-dim)"><?= $maint_end_fmt ?></strong>
+                Regresso previsto: <strong style="color:var(--text-dim)"><?= $escape($maint_end_fmt) ?></strong>
             </div>
 
             <!-- Countdown -->
@@ -845,14 +906,14 @@ $back_url = BASE_URL ?? '/';
             <ul class="service-list">
                 <?php foreach ($services as $key => $state):
                 $label = $service_labels[$key] ?? ucfirst(str_replace('_', ' ', $key));
-                $state = array_key_exists($state, $state_map) ? $state : 'ok';
+                $state = is_string($state) && array_key_exists($state, $state_map) ? $state : 'pending';
                 $s = $state_map[$state];
             ?>
                 <li>
                     <span class="s-dot <?= $s['dot'] ?>"></span>
-                    <?= $label ?>
-                    <span class="s-badge <?= $s['badge'] ?>"><i
-                            class="fas <?= $s['icon'] ?> me-1"></i><?= $s['text'] ?></span>
+                    <?= $escape($label) ?>
+                    <span class="s-badge <?= $escape($s['badge']) ?>"><i
+                            class="fas <?= $escape($s['icon']) ?> me-1"></i><?= $escape($s['text']) ?></span>
                 </li>
                 <?php endforeach; ?>
             </ul>
@@ -863,21 +924,22 @@ $back_url = BASE_URL ?? '/';
                 regressarmos?</label>
             <div class="notify-group">
                 <input type="email" id="notifyEmail" class="notify-input" placeholder="O teu e-mail"
-                    autocomplete="email">
+                    autocomplete="email" maxlength="254" required>
                 <button class="btn-notify" id="btnNotify" type="button"><i class="fas fa-bell"></i> Avisar-me</button>
             </div>
-            <div class="notify-fb" id="notifyFb"></div>
+            <div class="notify-fb" id="notifyFb" aria-live="polite" role="status"></div>
             <div class="notify-count" id="notifyCount"></div>
 
             <!-- Botões -->
             <div class="action-row">
-                <a href="<?= $back_url ?>" class="btn btn-ghost"><i class="fas fa-home"></i> Tentar Aceder</a>
+                <a href="<?= $escape($base_url) ?>" class="btn btn-ghost"><i class="fas fa-home"></i> Tentar Aceder</a>
             </div>
         </div>
 
         <div class="footer">
-            &copy; <?= date('Y') ?> <?= $site_name ?> · Luanda, Angola · v<?= $platform_ver ?><br>
-            <a href="mailto:<?= $contact_email ?>"><?= $contact_email ?></a>
+            &copy; <?= date('Y', time()) ?> <?= $escape($site_name) ?> · Luanda, Angola ·
+            v<?= $escape($platform_ver) ?><br>
+            <a href="mailto:<?= $escape($contact_email) ?>"><?= $escape($contact_email) ?></a>
         </div>
     </div>
 
@@ -885,24 +947,37 @@ $back_url = BASE_URL ?? '/';
     // ── Dados vindos do PHP ──────────────────────────────────────
     var SECONDS_REMAINING = <?= (int)$seconds_remaining ?>;
     var SECONDS_TOTAL = <?= (int)max(1, $seconds_total ?: $seconds_remaining ?: 1) ?>;
-    var BASE_URL = '<?= $back_url ?>';
+    var BASE_URL = <?= json_encode($base_url, JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP) ?>;
 
     // ── Tema ─────────────────────────────────────────────────────
     (function() {
         var html = document.documentElement,
             toggle = document.getElementById('themeToggle'),
             icon = document.getElementById('themeIcon'),
+            saved = 'dark';
+        try {
             saved = localStorage.getItem('jm_theme') || 'dark';
+        } catch (e) {
+            // O tema padrão continua funcional quando o armazenamento é bloqueado.
+        }
 
         function apply(t) {
+            if (t !== 'dark' && t !== 'light') t = 'dark';
             html.dataset.theme = t;
             if (icon) icon.className = t === 'dark' ? 'fas fa-moon' : 'fas fa-sun';
-            localStorage.setItem('jm_theme', t);
+            try {
+                localStorage.setItem('jm_theme', t);
+            } catch (e) {
+                // Não impedir a página de funcionar por falha do localStorage.
+            }
         }
         apply(saved);
-        toggle.addEventListener('click', function() {
-            apply(html.dataset.theme === 'dark' ? 'light' : 'dark');
-        });
+        if (toggle) {
+            toggle.setAttribute('aria-label', 'Alternar tema claro/escuro');
+            toggle.addEventListener('click', function() {
+                apply(html.dataset.theme === 'dark' ? 'light' : 'dark');
+            });
+        }
     })();
 
     // ── Countdown ────────────────────────────────────────────────
@@ -930,23 +1005,25 @@ $back_url = BASE_URL ?? '/';
             return s + 's decorridos';
         }
 
+        if (!elH || !elM || !elS || !elFill || !elEl || !elPct) return;
+
         function tick() {
-            if (remaining < 0) return;
+            if (remaining <= 0) {
+                clearInterval(timer);
+                location.reload();
+                return;
+            }
             var h = Math.floor(remaining / 3600),
                 m = Math.floor((remaining % 3600) / 60),
                 s = remaining % 60;
             elH.textContent = pad(h);
             elM.textContent = pad(m);
             elS.textContent = pad(s);
-            var pct = SECONDS_TOTAL > 0 ? (remaining / SECONDS_TOTAL) * 100 : 0,
+            var pct = SECONDS_TOTAL > 0 ? Math.min(100, Math.max(0, (remaining / SECONDS_TOTAL) * 100)) : 0,
                 elapsed = SECONDS_TOTAL - remaining;
-            elFill.style.width = Math.max(0, pct).toFixed(1) + '%';
+            elFill.style.width = pct.toFixed(1) + '%';
             elEl.textContent = formatElapsed(Math.max(0, elapsed));
             elPct.textContent = Math.round(100 - pct) + '% concluído';
-            if (remaining === 0) {
-                clearInterval(timer);
-                location.reload();
-            }
             remaining--;
         }
         tick();
@@ -955,12 +1032,16 @@ $back_url = BASE_URL ?? '/';
 
     // ── Auto-verificação periódica ───────────────────────────────
     setInterval(function() {
-        fetch(window.location.pathname, {
+        fetch(window.location.href, {
                 method: 'GET',
-                redirect: 'follow'
+                redirect: 'follow',
+                cache: 'no-store',
+                headers: {
+                    'Accept': 'text/html'
+                }
             })
             .then(function(r) {
-                if (r.redirected && r.url.indexOf('maintenance') === -1) location.href = r.url;
+                if (r.redirected) window.location.assign(r.url);
             }).catch(function() {});
     }, 5 * 60 * 1000);
 
@@ -970,6 +1051,7 @@ $back_url = BASE_URL ?? '/';
             input = document.getElementById('notifyEmail'),
             fb = document.getElementById('notifyFb'),
             cntEl = document.getElementById('notifyCount');
+        if (!btn || !input || !fb || !cntEl) return;
 
         function showFb(msg, ok) {
             fb.textContent = msg;
@@ -984,7 +1066,7 @@ $back_url = BASE_URL ?? '/';
         function loadCount() {
             var fd = new FormData();
             fd.append('action', 'notify_count');
-            fetch(window.location.pathname, {
+            fetch(window.location.href, {
                     method: 'POST',
                     body: fd
                 })
@@ -998,7 +1080,7 @@ $back_url = BASE_URL ?? '/';
         }
         btn.addEventListener('click', function() {
             var email = input.value.trim();
-            if (!email) {
+            if (!email || email.length > 254) {
                 showFb('Introduz o teu e-mail.', false);
                 return;
             }
@@ -1011,7 +1093,7 @@ $back_url = BASE_URL ?? '/';
             var fd = new FormData();
             fd.append('action', 'notify_register');
             fd.append('email', email);
-            fetch(window.location.pathname, {
+            fetch(window.location.href, {
                     method: 'POST',
                     body: fd
                 })

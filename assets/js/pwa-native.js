@@ -1,17 +1,18 @@
 // ============================================
-// PWA NATIVE FEATURES - OTIMIZADO
+// PWA NATIVE FEATURES - OTIMIZADO  assets/js/pwa-native.js
 // ============================================
 
 class PWANativeManager {
   constructor() {
     this.isStandalone = window.matchMedia("(display-mode: standalone)").matches;
-    this.isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
+    this.isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) ||
+      (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
     this.isAndroid = /Android/.test(navigator.userAgent);
-    this.isPWA = window.navigator.standalone || this.isStandalone;
-    this.hasHaptic = "vibrate" in navigator;
-    this.hasShare = "share" in navigator;
-    this.hasClipboard = "clipboard" in navigator;
-    this.hasBadge = "setAppBadge" in navigator;
+    this.isPWA = Boolean(window.navigator.standalone || this.isStandalone);
+    this.hasHaptic = typeof navigator.vibrate === "function";
+    this.hasShare = typeof navigator.share === "function";
+    this.hasClipboard = Boolean(navigator.clipboard && typeof navigator.clipboard.writeText === "function");
+    this.hasBadge = typeof navigator.setAppBadge === "function";
 
     this.touchStart = { x: 0, y: 0, time: 0 };
     this.swipeThreshold = 100;
@@ -403,35 +404,26 @@ class PWANativeManager {
   setupClipboard() {
     if (!this.hasClipboard) return;
 
-    // Adicionar funcionalidade de copiar email
-    const emailElements = document.querySelectorAll('a[href^="mailto:"]');
+    // Nunca interceptar links mailto: o clique deve abrir o cliente de email.
+    // A cópia é activada apenas em elementos que declarem explicitamente o destino.
+    const copyElements = document.querySelectorAll(
+      "[data-copy-email], [data-copy-to-clipboard]"
+    );
 
-    emailElements.forEach((emailElement) => {
-      const originalText = emailElement.textContent;
-      const email = emailElement.getAttribute("href").replace("mailto:", "");
+    copyElements.forEach((element) => {
+      if (element.dataset.clipboardBound === "true") return;
+      element.dataset.clipboardBound = "true";
 
-      // Adicionar tooltip ou comportamento de cópia
-      emailElement.addEventListener("click", async (e) => {
-        if (e.ctrlKey || e.metaKey) return; // Permitir abrir normalmente com Ctrl+Click
+      element.addEventListener("click", async (event) => {
+        const value = element.dataset.copyEmail || element.dataset.copyToClipboard || "";
+        if (!value) return;
 
-        e.preventDefault();
-
+        event.preventDefault();
         try {
-          await navigator.clipboard.writeText(email);
-          this.showToast(`Email copiado: ${email}`, "success");
-
-          // Feedback visual
-          const originalHtml = emailElement.innerHTML;
-          emailElement.innerHTML = '<i class="fas fa-check"></i> Copiado!';
-          emailElement.style.color = "#10b981";
-
-          setTimeout(() => {
-            emailElement.innerHTML = originalHtml;
-            emailElement.style.color = "";
-          }, 2000);
-        } catch (error) {
-          // Fallback: abrir cliente de email
-          window.location.href = `mailto:${email}`;
+          await navigator.clipboard.writeText(value);
+          this.showToast("Copiado para a área de transferência.", "success");
+        } catch (_) {
+          this.showToast("Não foi possível copiar. Copie o texto manualmente.", "warning");
         }
       });
     });
@@ -442,8 +434,11 @@ class PWANativeManager {
 
     // Exemplo: Mostrar badge quando há novas mensagens
     // Você pode adaptar para notificações reais
-    window.setAppBadge = navigator.setAppBadge;
-    window.clearAppBadge = navigator.clearAppBadge;
+    window.setAppBadge = (count) => navigator.setAppBadge(count);
+    window.clearAppBadge = () =>
+      typeof navigator.clearAppBadge === "function"
+        ? navigator.clearAppBadge()
+        : Promise.resolve(false);
 
     // Exemplo: Verificar mensagens não lidas (simulado)
     this.checkUnreadMessages();
@@ -508,7 +503,7 @@ class PWANativeManager {
   // ========== NOTIFICATION SYSTEM ==========
 
   showToast(message, type = "info", duration = 3000) {
-    // Remover toast existente
+    // O conteúdo recebido é sempre texto, nunca HTML arbitrário.
     const existing = document.querySelector(".native-toast");
     if (existing) {
       existing.classList.add("hiding");
@@ -525,29 +520,31 @@ class PWANativeManager {
       info: "fas fa-info-circle",
     };
 
-    toast.innerHTML = `
-      <i class="${icons[type] || icons.info}"></i>
-      <span>${message}</span>
-    `;
+    const icon = document.createElement("i");
+    icon.className = icons[type] || icons.info;
+    icon.setAttribute("aria-hidden", "true");
 
-    // Posicionamento baseado na plataforma
-    if (this.isIOS) {
-      toast.style.bottom = `calc(80px + env(safe-area-inset-bottom))`;
-    } else {
-      toast.style.bottom = "80px";
-    }
+    const text = document.createElement("span");
+    text.textContent = String(message ?? "");
+
+    toast.append(icon, text);
+    toast.style.bottom = this.isIOS
+      ? "calc(80px + env(safe-area-inset-bottom))"
+      : "80px";
 
     document.body.appendChild(toast);
 
-    // Remover após duração
+    if (duration === 0) return;
+    const safeDuration = Number.isFinite(Number(duration))
+      ? Math.max(1000, Number(duration))
+      : 3000;
+
     setTimeout(() => {
       toast.classList.add("hiding");
       setTimeout(() => {
-        if (toast.parentNode) {
-          toast.remove();
-        }
+        if (toast.parentNode) toast.remove();
       }, 300);
-    }, duration);
+    }, safeDuration);
   }
 
   // ========== API GLOBAL ==========
@@ -571,10 +568,7 @@ class PWANativeManager {
       copyToClipboard: async (text) => {
         if (this.hasClipboard) {
           await navigator.clipboard.writeText(text);
-          this.showToast(
-            'Copiado para área de transferência! <i class="fas fa-clipboard-check"></i>',
-            "success"
-          );
+          this.showToast("Copiado para a área de transferência!", "success");
           return true;
         }
         return false;
@@ -633,7 +627,7 @@ document.addEventListener("DOMContentLoaded", () => {
 const nativeStyles = `
   .pwa-native {
     /* Estilos para modo app nativo */
-    tap-highlight-color: transparent;
+    -webkit-tap-highlight-color: transparent;
     touch-action: manipulation;
   }
   

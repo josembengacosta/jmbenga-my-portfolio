@@ -1,0 +1,975 @@
+/* JMbenga Portfolio — estilos específicos do módulo Skills.
+   Mantém os componentes administrativos limitados às páginas Skills. */
+
+/* ── Formulário de criação ───────────────────────────────────── */
+.skill-form-page .breadcrumb {display: flex;
+        align-items: center;
+        gap: .5rem;
+        font-size: .78rem;
+        color: var(--text-muted);
+        margin-bottom: .5rem}
+
+
+    
+.skill-form-page .breadcrumb a {color: var(--text-dim);
+        text-decoration: none;
+        transition: color .2s}
+
+
+    
+.skill-form-page .breadcrumb a:hover {color: var(--accent)}
+
+
+    
+.skill-form-page .breadcrumb i {font-size: .6rem}
+
+
+    
+.skill-form-page .page-top {display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        flex-wrap: wrap;
+        gap: 1rem;
+        margin-bottom: 1.5rem}
+
+
+    
+.skill-form-page .page-title {font-family: var(--font-head);
+        font-size: 1.5rem;
+        font-weight: 800;
+        letter-spacing: -.02em;
+        margin-bottom: .2rem}
+
+
+    
+.skill-form-page .page-sub {font-size: .8rem;
+        color: var(--text-muted)}
+
+
+    
+.skill-form-page .alert {padding: 1rem 1.2rem;
+        border-radius: var(--radius);
+        margin-bottom: 1.5rem;
+        display: flex;
+        align-items: flex-start;
+        gap: .75rem;
+        font-size: .85rem}
+
+
+    
+.skill-form-page .alert-danger {background: rgba(239, 68, 68, .1);
+        border: 1px solid rgba(239, 68, 68, .3);
+        color: #f87171}
+
+
+    
+.skill-form-page .alert-close {margin-left: auto;
+        background: none;
+        border: none;
+        color: inherit;
+        cursor: pointer;
+        opacity: .6;
+        font-size: .9rem}
+
+
+    
+.skill-form-page .alert-close:hover {opacity: 1}
+
+
+    
+.skill-form-page .form-section {background: var(--bg-card);
+        border: 1px solid var(--border);
+        border-radius: var(--radius-lg);
+        padding: 1.8rem;
+        margin-bottom: 1.2rem;
+        transition: border-color .25s}
+
+
+    
+.skill-form-page .form-section:focus-within {border-color: var(--border-acc)}
+
+
+    
+.skill-form-page .section-header {display: flex;
+        align-items: flex-start;
+        gap: 1rem;
+        margin-bottom: 1.5rem;
+        padding-bottom: 1.2rem;
+        border-bottom: 1px solid var(--border)}
+
+
+    
+.skill-form-page .section-icon {width: 40px;
+        height: 40px;
+        border-radius: 10px;
+        background: var(--accent-glow);
+        border: 1px solid var(--border-acc);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: var(--accent);
+        font-size: .95rem;
+        flex-shrink: 0}
+
+
+    
+.skill-form-page .section-header h3 {font-family: var(--font-head);
+        font-size: 1rem;
+        font-weight: 700;
+        margin-bottom: .15rem}
+
+
+    
+.skill-form-page .section-header p {font-size: .78rem;
+        color: var(--text-muted)}
+
+
+    
+.skill-form-page .form-grid {display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 1.2rem}
+
+
+    
+@media (max-width:768px) {
+
+        
+.skill-form-page .form-grid {grid-template-columns: 1fr}
+
+
+        
+.skill-form-page .category-select-grid {grid-template-columns: repeat(3, 1fr)}
+
+    
+}
+
+
+    
+@media (max-width:480px) {
+
+        
+.skill-form-page .category-select-grid {grid-template-columns: repeat(2, 1fr)}
+
+    
+}
+
+
+    
+.skill-form-page .form-group {display: flex;
+        flex-direction: column;
+        gap: .35rem}
+
+
+    
+.skill-form-page .form-label {font-size: .75rem;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: .04em;
+        color: var(--text-dim)}
+
+
+    
+.skill-form-page .required {color: var(--danger)}
+
+
+    
+.skill-form-page .form-control {padding: .65rem .85rem;
+        background: var(--bg);
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        color: var(--text);
+        font-family: var(--font-body);
+        font-size: .88rem;
+        outline: none;
+        transition: border-color .2s, box-shadow .2s}
+
+
+    
+.skill-form-page .form-control:focus {border-color: var(--accent);
+        box-shadow: 0 0 0 3px var(--accent-glow)}
+
+
+    
+.skill-form-page .form-control::placeholder {color: var(--text-muted)}
+
+
+    
+.skill-form-page .form-hint {font-size: .7rem;
+        color: var(--text-muted);
+        margin-top: .15rem}
+
+
+    
+.skill-form-page .input-with-icon {position: relative;
+        display: flex;
+        align-items: center}
+
+
+    
+.skill-form-page .input-with-icon .form-control {padding-right: 2.5rem}
+
+
+    
+.skill-form-page .icon-preview {position: absolute;
+        right: .7rem;
+        color: var(--accent);
+        font-size: 1rem;
+        pointer-events: none}
+
+
+    
+.skill-form-page .percentage-input {display: flex;
+        align-items: center;
+        gap: 1rem}
+
+
+    
+.skill-form-page .range-slider {flex: 1;
+        -webkit-appearance: none;
+        appearance: none;
+        height: 6px;
+        background: var(--border);
+        border-radius: 3px;
+        outline: none}
+
+
+    
+.skill-form-page .range-slider::-webkit-slider-thumb {-webkit-appearance: none;
+        width: 18px;
+        height: 18px;
+        border-radius: 50%;
+        background: var(--accent);
+        cursor: pointer}
+
+
+    
+.skill-form-page .percentage-display {min-width: 45px;
+        text-align: right;
+        font-family: var(--font-mono);
+        font-size: .9rem;
+        color: var(--accent);
+        font-weight: 600}
+
+
+    
+.skill-form-page .category-select-grid {display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: .5rem}
+
+
+    
+.skill-form-page .category-option {display: flex;
+        align-items: center;
+        gap: .5rem;
+        padding: .6rem .8rem;
+        border-radius: 8px;
+        border: 1px solid var(--border);
+        cursor: pointer;
+        transition: all .2s;
+        position: relative}
+
+
+    
+.skill-form-page .category-option:hover {border-color: var(--border-acc)}
+
+
+    
+.skill-form-page .category-option.selected {border-color: var(--cat-color);
+        background: color-mix(in srgb, var(--cat-color) 10%, transparent)}
+
+
+    
+.skill-form-page .category-option input {
+        position: absolute;
+        width: 1px;
+        height: 1px;
+        margin: 0;
+        opacity: 0;
+        clip-path: inset(50%);
+        overflow: hidden;
+    }
+
+.skill-form-page .category-option:focus-within {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+}
+
+
+    
+.skill-form-page .category-option i {color: var(--cat-color);
+        font-size: .85rem;
+        width: 16px;
+        text-align: center}
+
+
+    
+.skill-form-page .category-option span {font-size: .82rem;
+        font-weight: 500}
+
+
+    
+.skill-form-page .switch {display: flex;
+        align-items: center;
+        gap: .75rem;
+        cursor: pointer}
+
+
+    
+.skill-form-page .switch input {
+        position: absolute;
+        width: 1px;
+        height: 1px;
+        margin: 0;
+        opacity: 0;
+        clip-path: inset(50%);
+        overflow: hidden;
+    }
+
+.skill-form-page .switch:focus-within .switch-slider {
+    outline: 2px solid var(--accent);
+    outline-offset: 3px;
+}
+
+
+    
+.skill-form-page .switch-slider {width: 42px;
+        height: 24px;
+        border-radius: 12px;
+        background: var(--border);
+        transition: background .25s;
+        position: relative;
+        flex-shrink: 0}
+
+
+    
+.skill-form-page .switch-slider::after {content: "";
+        position: absolute;
+        top: 3px;
+        left: 3px;
+        width: 18px;
+        height: 18px;
+        border-radius: 50%;
+        background: #fff;
+        transition: transform .25s}
+
+
+    
+.skill-form-page .switch input:checked+.switch-slider {background: var(--accent)}
+
+
+    
+.skill-form-page .switch input:checked+.switch-slider::after {transform: translateX(18px)}
+
+
+    
+.skill-form-page .switch-label {font-size: .82rem;
+        font-weight: 500}
+
+
+    
+.skill-form-page .number-input {display: flex;
+        align-items: center;
+        gap: .3rem}
+
+
+    
+.skill-form-page .num-btn {width: 32px;
+        height: 32px;
+        border-radius: 6px;
+        background: var(--bg);
+        border: 1px solid var(--border);
+        color: var(--text-dim);
+        cursor: pointer;
+        font-size: .9rem;
+        transition: all .15s;
+        display: flex;
+        align-items: center;
+        justify-content: center}
+
+
+    
+.skill-form-page .num-btn:hover {border-color: var(--accent);
+        color: var(--accent)}
+
+
+    
+.skill-form-page .num-field {width: 70px;
+        text-align: center;
+        -moz-appearance: textfield}
+
+
+    
+.skill-form-page .num-field::-webkit-outer-spin-button,
+.skill-form-page .num-field::-webkit-inner-spin-button {-webkit-appearance: none;
+        margin: 0}
+
+
+    
+.skill-form-page .btn {display: inline-flex;
+        align-items: center;
+        gap: .45rem;
+        padding: .55rem 1.1rem;
+        border-radius: 8px;
+        font-family: var(--font-body);
+        font-size: .83rem;
+        font-weight: 500;
+        cursor: pointer;
+        transition: all .2s;
+        text-decoration: none;
+        border: 1px solid var(--border);
+        white-space: nowrap}
+
+
+    
+.skill-form-page .btn-primary {background: var(--accent);
+        color: #fff;
+        border-color: var(--accent)}
+
+
+    
+.skill-form-page .btn-primary:hover {background: #1d4ed8;
+        transform: translateY(-1px);
+        box-shadow: 0 4px 16px var(--accent-glow)}
+
+
+    
+.skill-form-page .btn-secondary {background: transparent;
+        border: 1px solid var(--border);
+        color: var(--text-dim)}
+
+
+    
+.skill-form-page .btn-secondary:hover {background: var(--bg-hover);
+        border-color: var(--border-acc);
+        color: var(--text)}
+
+
+    
+.skill-form-page .btn-lg {padding: .7rem 1.5rem;
+        font-size: .9rem}
+
+
+    
+.skill-form-page .form-actions {display: flex;
+        gap: .75rem;
+        justify-content: flex-end;
+        margin-top: 1.5rem;
+        padding-top: 1.5rem;
+        border-top: 1px solid var(--border)}
+
+
+/* ── Gestão e listagem ──────────────────────────────────────── */
+/* ── Cabeçalho ──────────────────────────────────────────── */
+
+    
+.skills-list-page .page-top {display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        flex-wrap: wrap;
+        gap: 1rem;
+        margin-bottom: 1.5rem;}
+
+
+    
+.skills-list-page .breadcrumb {display: flex;
+        align-items: center;
+        gap: .5rem;
+        font-size: .78rem;
+        color: var(--text-muted);
+        margin-bottom: .5rem;}
+
+
+    
+.skills-list-page .breadcrumb a {color: var(--text-dim);
+        text-decoration: none;
+        transition: color .2s;}
+
+
+    
+.skills-list-page .breadcrumb a:hover {color: var(--accent);}
+
+
+    
+.skills-list-page .breadcrumb i {font-size: .6rem;}
+
+
+    
+.skills-list-page .page-title {font-family: var(--font-head);
+        font-size: 1.5rem;
+        font-weight: 800;
+        letter-spacing: -.02em;
+        margin-bottom: .2rem;}
+
+
+    
+.skills-list-page .page-sub {font-size: .8rem;
+        color: var(--text-muted);}
+
+
+    
+/* ── KPI mini-cards ─────────────────────────────────────── */
+
+    
+.skills-list-page .kpi-row {display: flex;
+        gap: .75rem;
+        flex-wrap: wrap;
+        margin-bottom: 1.25rem;}
+
+
+    
+.skills-list-page .kpi-card {flex: 1;
+        min-width: 120px;
+        background: var(--bg-card);
+        border: 1px solid var(--border);
+        border-radius: var(--radius);
+        padding: .85rem 1rem;
+        display: flex;
+        align-items: center;
+        gap: .75rem;
+        text-decoration: none;
+        color: var(--text);
+        transition: all .22s var(--ease);
+        position: relative;
+        overflow: hidden;}
+
+
+    
+.skills-list-page .kpi-card:not([style*="cursor:default"]):hover {transform: translateY(-2px);
+        border-color: var(--border-acc);
+        box-shadow: 0 6px 24px rgba(0, 0, 0, .25);}
+
+
+    
+.skills-list-page .kpi-card.kpi-active {border-color: var(--accent);
+        background: var(--accent-soft);}
+
+
+    
+.skills-list-page .kpi-card.kpi-active::after {content: "";
+        position: absolute;
+        bottom: 0;
+        left: 0;
+        right: 0;
+        height: 2px;
+        background: var(--accent);}
+
+
+    
+.skills-list-page .kpi-icon {width: 36px;
+        height: 36px;
+        border-radius: 9px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: .9rem;
+        flex-shrink: 0;}
+
+
+    
+.skills-list-page .kpi-val {font-family: var(--font-head);
+        font-size: 1.35rem;
+        font-weight: 800;
+        letter-spacing: -.02em;
+        line-height: 1;}
+
+
+    
+.skills-list-page .kpi-lbl {font-size: .68rem;
+        color: var(--text-muted);
+        margin-top: 2px;
+        white-space: nowrap;}
+
+
+    
+/* ── Filtros ────────────────────────────────────────────── */
+
+    
+.skills-list-page .filter-bar {display: flex;
+        align-items: center;
+        gap: .6rem;
+        flex-wrap: wrap;
+        margin-bottom: 1.25rem;
+        background: var(--bg-card);
+        border: 1px solid var(--border);
+        border-radius: var(--radius);
+        padding: .85rem 1rem;}
+
+
+    
+.skills-list-page .filter-search {display: flex;
+        align-items: center;
+        gap: .5rem;
+        background: var(--bg);
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        padding: .4rem .75rem;
+        flex: 1;
+        min-width: 180px;
+        transition: border-color .2s;}
+
+
+    
+.skills-list-page .filter-search:focus-within {border-color: var(--accent);}
+
+
+    
+.skills-list-page .filter-search i {color: var(--text-muted);
+        font-size: .85rem;
+        flex-shrink: 0;}
+
+
+    
+.skills-list-page .filter-search input {background: none;
+        border: none;
+        outline: none;
+        color: var(--text);
+        font-family: var(--font-body);
+        font-size: .84rem;
+        flex: 1;
+        min-width: 0;}
+
+
+    
+.skills-list-page .filter-search input::placeholder {color: var(--text-muted);}
+
+
+    
+.skills-list-page .filter-clear-search {background: none;
+        border: none;
+        color: var(--text-muted);
+        cursor: pointer;
+        font-size: .8rem;
+        padding: 0;
+        line-height: 1;
+        transition: color .2s;}
+
+
+    
+.skills-list-page .filter-clear-search:hover {color: var(--danger);}
+
+
+    
+.skills-list-page .filter-select {background: var(--bg);
+        border: 1px solid var(--border);
+        color: var(--text);
+        padding: .42rem .75rem;
+        border-radius: 8px;
+        font-size: .82rem;
+        font-family: var(--font-body);
+        outline: none;
+        cursor: pointer;
+        transition: border-color .2s;}
+
+
+    
+.skills-list-page .filter-select:focus {border-color: var(--accent);}
+
+
+    
+.skills-list-page .filter-result {font-size: .78rem;
+        color: var(--text-muted);
+        display: flex;
+        align-items: center;
+        gap: .35rem;
+        margin-left: auto;}
+
+
+    
+/* ── Tabela ─────────────────────────────────────────────── */
+
+    
+.skills-list-page .table-card {background: var(--bg-card);
+        border: 1px solid var(--border);
+        border-radius: var(--radius);
+        padding: 1.5rem;}
+
+
+    
+.skills-list-page table.dataTable {width: 100% !important;
+        border-collapse: collapse;}
+
+
+    
+.skills-list-page table.dataTable th,
+.skills-list-page table.dataTable td {padding: .7rem .8rem;
+        text-align: left;
+        border-bottom: 1px solid var(--border);
+        font-size: .85rem;}
+
+
+    
+.skills-list-page table.dataTable th {color: var(--text-dim);
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: .04em;
+        font-size: .7rem;}
+
+
+    
+.skills-list-page table.dataTable tbody tr:hover {background: rgba(255, 255, 255, .02);}
+
+
+    
+/* Células personalizadas */
+
+    
+.skills-list-page .skill-icon-cell {width: 34px;
+        height: 34px;
+        border-radius: 8px;
+        background: var(--bg);
+        border: 1px solid var(--border);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: .9rem;}
+
+
+    
+.skills-list-page .skill-name-cell {font-weight: 600;
+        font-size: .85rem;}
+
+
+    
+.skills-list-page .skill-bar-cell {display: flex;
+        align-items: center;
+        gap: .5rem;}
+
+
+    
+.skills-list-page .skill-bar-bg {height: 6px;
+        background: var(--border);
+        border-radius: 3px;
+        overflow: hidden;
+        flex: 1;
+        min-width: 60px;}
+
+
+    
+.skills-list-page .skill-bar-fill {height: 100%;
+        border-radius: 3px;
+        transition: width .3s;}
+
+
+    
+.skills-list-page .skill-bar-pct {font-family: var(--font-mono);
+        font-size: .75rem;
+        color: var(--text-dim);
+        min-width: 35px;
+        text-align: right;}
+
+
+    
+.skills-list-page .cat-tag {display: inline-flex;
+        align-items: center;
+        gap: 4px;
+        padding: 3px 9px;
+        border-radius: 99px;
+        font-size: .68rem;
+        font-weight: 700;
+        background: color-mix(in srgb, var(--cat-color) 12%, transparent);
+        color: var(--cat-color);
+        border: 1px solid color-mix(in srgb, var(--cat-color) 25%, transparent);}
+
+
+    
+.skills-list-page .icon-code {font-family: var(--font-mono);
+        font-size: .72rem;
+        background: var(--bg);
+        padding: 2px 6px;
+        border-radius: 4px;
+        color: var(--accent);}
+
+
+    
+.skills-list-page .order-badge {display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 24px;
+        height: 24px;
+        border-radius: 6px;
+        background: var(--bg);
+        border: 1px solid var(--border);
+        font-size: .72rem;
+        font-family: var(--font-mono);
+        color: var(--text-dim);}
+
+
+    
+.skills-list-page .row-actions {display: flex;
+        gap: .3rem;
+        align-items: center;}
+
+
+    
+.skills-list-page .btn-icon {width: 30px;
+        height: 30px;
+        border-radius: 6px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        background: transparent;
+        border: 1px solid var(--border);
+        color: var(--text-dim);
+        cursor: pointer;
+        transition: all .2s;
+        text-decoration: none;
+        font-size: .8rem;}
+
+
+    
+.skills-list-page .btn-icon:hover {background: var(--accent);
+        color: #fff;
+        border-color: var(--accent);}
+
+
+    
+.skills-list-page .btn-icon-danger:hover {background: var(--danger);
+        border-color: var(--danger);}
+
+
+    
+/* ── Botões genéricos ───────────────────────────────────── */
+
+    
+.skills-list-page .btn {display: inline-flex;
+        align-items: center;
+        gap: .45rem;
+        padding: .55rem 1.1rem;
+        border-radius: 8px;
+        font-family: var(--font-body);
+        font-size: .83rem;
+        font-weight: 500;
+        cursor: pointer;
+        transition: all .2s;
+        text-decoration: none;
+        border: 1px solid var(--border);
+        white-space: nowrap;}
+
+
+    
+.skills-list-page .btn-primary {background: var(--accent);
+        color: #fff;
+        border-color: var(--accent);}
+
+
+    
+.skills-list-page .btn-primary:hover {background: #1d4ed8;
+        transform: translateY(-1px);
+        box-shadow: 0 4px 16px var(--accent-glow);}
+
+
+    
+.skills-list-page .btn-secondary {background: transparent;
+        border: 1px solid var(--border);
+        color: var(--text-dim);}
+
+
+    
+.skills-list-page .btn-secondary:hover {background: var(--bg-hover);
+        border-color: var(--border-acc);
+        color: var(--text);}
+
+
+    
+/* ── Estado vazio ─────────────────────────────────────── */
+
+    
+.skills-list-page .empty-state {padding: 3.5rem 2rem;
+        text-align: center;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: .6rem;}
+
+
+    
+.skills-list-page .empty-icon {width: 64px;
+        height: 64px;
+        border-radius: 18px;
+        background: var(--bg);
+        border: 1px solid var(--border);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1.5rem;
+        color: var(--text-muted);
+        margin-bottom: .5rem;}
+
+
+    
+.skills-list-page .empty-state h3 {font-family: var(--font-head);
+        font-size: 1.1rem;
+        font-weight: 700;}
+
+
+    
+.skills-list-page .empty-state p {font-size: .85rem;
+        color: var(--text-muted);
+        max-width: 360px;}
+
+
+    
+.skills-list-page .empty-state a {color: var(--accent);}
+
+
+/* Estados de foco acessíveis para os controlos deste módulo. */
+.skill-form-page .btn:focus-visible,
+.skill-form-page .category-option:focus-within,
+.skill-form-page .num-btn:focus-visible,
+.skill-form-page .form-control:focus-visible,
+.skills-list-page .btn:focus-visible,
+.skills-list-page .btn-icon:focus-visible,
+.skills-list-page .filter-select:focus-visible,
+.skills-list-page .filter-search input:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .skill-form-page *,
+    .skills-list-page *,
+    .skill-form-page *::before,
+    .skills-list-page *::before,
+    .skill-form-page *::after,
+    .skills-list-page *::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+    }
+}
+
+
+/* Toasts do formulário de criação (o JS cria a estrutura dinamicamente). */
+.skill-form-page #toast-container {
+    position: fixed;
+    top: 1rem;
+    right: 1rem;
+    z-index: 9999;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: .5rem;
+    pointer-events: none;
+}
+.skill-form-page .toast {
+    display: flex;
+    align-items: center;
+    gap: .55rem;
+    max-width: min(420px, calc(100vw - 2rem));
+    padding: .75rem 1rem;
+    border-radius: 9px;
+    box-shadow: var(--shadow);
+    font-size: .84rem;
+    line-height: 1.45;
+    pointer-events: auto;
+    transition: opacity .3s, transform .3s;
+    background: var(--bg-card);
+}
+.skill-form-page .toast.toast-success {
+    color: #34d399;
+    border: 1px solid rgba(16, 185, 129, .35);
+}
+.skill-form-page .toast.toast-error {
+    color: #f87171;
+    border: 1px solid rgba(239, 68, 68, .35);
+}

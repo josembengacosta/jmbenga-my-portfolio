@@ -1,0 +1,774 @@
+/* ═══════════════════════════════════════════════════════════════════
+   FORMULÁRIO DE CRIAÇÃO DE PROJECTO — isolado de outras páginas
+   ═══════════════════════════════════════════════════════════════════ */
+/* ── Breadcrumb ─────────────────────────────────────────────── */
+    .project-form-page .breadcrumb{
+        display: flex;
+        align-items: center;
+        gap: .5rem;
+        font-size: .78rem;
+        color: var(--text-muted);
+        margin-bottom: .5rem;
+    }
+
+    .project-form-page .breadcrumb a{
+        color: var(--text-dim);
+        text-decoration: none;
+        transition: color .2s
+    }
+
+    .project-form-page .breadcrumb a:hover{
+        color: var(--accent)
+    }
+
+    .project-form-page .breadcrumb i{
+        font-size: .6rem
+    }
+
+    /* ── Cabeçalho ──────────────────────────────────────────────── */
+    .project-form-page .page-top{
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        flex-wrap: wrap;
+        gap: 1rem;
+        margin-bottom: 1.5rem;
+    }
+
+    .project-form-page .page-title{
+        font-family: var(--font-head);
+        font-size: 1.5rem;
+        font-weight: 800;
+        letter-spacing: -.02em;
+        margin-bottom: .2rem;
+    }
+
+    .project-form-page .page-sub{
+        font-size: .8rem;
+        color: var(--text-muted)
+    }
+
+    /* ── Alertas ────────────────────────────────────────────────── */
+    .project-form-page .alert{
+        padding: 1rem 1.2rem;
+        border-radius: var(--radius);
+        margin-bottom: 1.5rem;
+        display: flex;
+        align-items: flex-start;
+        gap: .75rem;
+        font-size: .85rem;
+    }
+
+    .project-form-page .alert-danger{
+        background: rgba(239, 68, 68, .1);
+        border: 1px solid rgba(239, 68, 68, .3);
+        color: #f87171;
+    }
+
+    .project-form-page .alert-close{
+        margin-left: auto;
+        background: none;
+        border: none;
+        color: inherit;
+        cursor: pointer;
+        opacity: .6;
+        font-size: .9rem;
+    }
+
+    .project-form-page .alert-close:hover{
+        opacity: 1
+    }
+
+    /* ── Secções do formulário ──────────────────────────────────── */
+    .project-form-page .form-section{
+        background: var(--bg-card);
+        border: 1px solid var(--border);
+        border-radius: var(--radius-lg);
+        padding: 1.8rem;
+        margin-bottom: 1.2rem;
+        transition: border-color .25s;
+    }
+
+    .project-form-page .form-section:focus-within{
+        border-color: var(--border-accent)
+    }
+
+    .project-form-page .section-header{
+        display: flex;
+        align-items: flex-start;
+        gap: 1rem;
+        margin-bottom: 1.5rem;
+        padding-bottom: 1.2rem;
+        border-bottom: 1px solid var(--border);
+    }
+
+    .project-form-page .section-icon{
+        width: 40px;
+        height: 40px;
+        border-radius: 10px;
+        background: var(--accent-glow);
+        border: 1px solid var(--border-accent);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: var(--accent);
+        font-size: .95rem;
+        flex-shrink: 0;
+    }
+
+    .project-form-page .section-header h3{
+        font-family: var(--font-head);
+        font-size: 1rem;
+        font-weight: 700;
+        margin-bottom: .15rem;
+    }
+
+    .project-form-page .section-header p{
+        font-size: .78rem;
+        color: var(--text-muted)
+    }
+
+    /* ── Grid do formulário ─────────────────────────────────────── */
+    .project-form-page .form-grid{
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 1.2rem;
+    }
+
+    .project-form-page .form-grid-3{
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 1.2rem;
+    }
+
+    @media (max-width: 768px) {
+
+        .project-form-page .form-grid,
+.project-form-page .form-grid-3{
+            grid-template-columns: 1fr
+        }
+
+        .project-form-page .category-select-grid{
+            grid-template-columns: repeat(3, 1fr)
+        }
+    }
+
+    @media (max-width: 480px) {
+        .project-form-page .category-select-grid{
+            grid-template-columns: repeat(2, 1fr)
+        }
+    }
+
+    /* ── Grupos de campo ────────────────────────────────────────── */
+    .project-form-page .form-group{
+        display: flex;
+        flex-direction: column;
+        gap: .35rem
+    }
+
+    .project-form-page .form-group.full-width{
+        grid-column: 1 / -1
+    }
+
+    .project-form-page .form-label{
+        font-size: .75rem;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: .04em;
+        color: var(--text-dim);
+    }
+
+    .project-form-page .required{
+        color: var(--danger)
+    }
+
+    /* ── Campos de formulário ───────────────────────────────────── */
+    .project-form-page .form-control{
+        padding: .65rem .85rem;
+        background: var(--bg);
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        color: var(--text);
+        font-family: var(--font-body);
+        font-size: .88rem;
+        outline: none;
+        transition: border-color .2s, box-shadow .2s;
+    }
+
+    .project-form-page .form-control:focus{
+        border-color: var(--accent);
+        box-shadow: 0 0 0 3px var(--accent-glow)
+    }
+
+    .project-form-page .form-control::placeholder{
+        color: var(--text-muted)
+    }
+
+    .project-form-page .form-hint{
+        font-size: .7rem;
+        color: var(--text-muted);
+        margin-top: .15rem
+    }
+
+    .project-form-page .textarea-lg{
+        resize: vertical;
+        min-height: 160px;
+        line-height: 1.7
+    }
+
+    /* Input com ícone */
+    .project-form-page .input-with-icon{
+        position: relative;
+        display: flex;
+        align-items: center
+    }
+
+    .project-form-page .input-with-icon .form-control{
+        flex: 1
+    }
+
+    .project-form-page .input-icon-btn{
+        position: absolute;
+        right: .5rem;
+        background: none;
+        border: none;
+        color: var(--text-muted);
+        cursor: pointer;
+        font-size: .85rem;
+        padding: .3rem;
+        transition: color .2s;
+    }
+
+    .project-form-page .input-icon-btn:hover{
+        color: var(--accent)
+    }
+
+    .project-form-page .input-icon-left{
+        position: absolute;
+        left: .7rem;
+        color: var(--text-muted);
+        font-size: .8rem;
+        pointer-events: none;
+        z-index: 1;
+    }
+
+    /* ── Categoria select grid ──────────────────────────────────── */
+    .project-form-page .category-select-grid{
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: .5rem;
+    }
+
+    .project-form-page .category-option{
+        display: flex;
+        align-items: center;
+        gap: .5rem;
+        padding: .6rem .8rem;
+        border-radius: 8px;
+        border: 1px solid var(--border);
+        cursor: pointer;
+        transition: all .2s;
+        position: relative;
+    }
+
+    .project-form-page .category-option:hover{
+        border-color: var(--border-accent)
+    }
+
+    .project-form-page .category-option.selected{
+        border-color: var(--cat-color);
+        background: color-mix(in srgb, var(--cat-color) 10%, transparent);
+    }
+
+    .project-form-page .category-option input{
+        display: none
+    }
+
+    .project-form-page .category-option i{
+        color: var(--cat-color);
+        font-size: .85rem;
+        width: 16px;
+        text-align: center
+    }
+
+    .project-form-page .category-option span{
+        font-size: .82rem;
+        font-weight: 500
+    }
+
+    /* ── Radio badges (estado) ──────────────────────────────────── */
+    .project-form-page .radio-group{
+        display: flex;
+        gap: .5rem;
+        flex-wrap: wrap
+    }
+
+    .project-form-page .radio-item input{
+        display: none
+    }
+
+    .project-form-page .radio-badge{
+        display: inline-flex;
+        align-items: center;
+        gap: .35rem;
+        padding: .5rem .85rem;
+        border-radius: 8px;
+        border: 1px solid var(--border);
+        font-size: .8rem;
+        font-weight: 500;
+        cursor: pointer;
+        transition: all .2s;
+    }
+
+    .project-form-page .radio-item input:checked+.radio-badge{
+        border-color: var(--accent);
+        background: var(--accent-glow);
+    }
+
+    .project-form-page .radio-badge:hover{
+        border-color: var(--border-accent)
+    }
+
+    /* ── Switch toggle ──────────────────────────────────────────── */
+    .project-form-page .switch{
+        display: flex;
+        align-items: center;
+        gap: .75rem;
+        cursor: pointer;
+    }
+
+    .project-form-page .switch input{
+        display: none
+    }
+
+    .project-form-page .switch-slider{
+        width: 42px;
+        height: 24px;
+        border-radius: 12px;
+        background: var(--border);
+        transition: background .25s;
+        position: relative;
+        flex-shrink: 0;
+    }
+
+    .project-form-page .switch-slider::after{
+        content: "";
+        position: absolute;
+        top: 3px;
+        left: 3px;
+        width: 18px;
+        height: 18px;
+        border-radius: 50%;
+        background: #fff;
+        transition: transform .25s;
+    }
+
+    .project-form-page .switch input:checked+.switch-slider{
+        background: var(--accent);
+    }
+
+    .project-form-page .switch input:checked+.switch-slider::after{
+        transform: translateX(18px);
+    }
+
+    .project-form-page .switch-label{
+        font-size: .82rem;
+        font-weight: 500
+    }
+
+    /* ── Number input ───────────────────────────────────────────── */
+    .project-form-page .number-input{
+        display: flex;
+        align-items: center;
+        gap: .3rem
+    }
+
+    .project-form-page .num-btn{
+        width: 32px;
+        height: 32px;
+        border-radius: 6px;
+        background: var(--bg);
+        border: 1px solid var(--border);
+        color: var(--text-dim);
+        cursor: pointer;
+        font-size: .9rem;
+        transition: all .15s;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+
+    .project-form-page .num-btn:hover{
+        border-color: var(--accent);
+        color: var(--accent)
+    }
+
+    .project-form-page .num-field{
+        width: 70px;
+        text-align: center;
+        appearance: textfield;
+    }
+
+    .project-form-page .num-field::-webkit-outer-spin-button,
+.project-form-page .num-field::-webkit-inner-spin-button{
+        -webkit-appearance: none;
+        margin: 0
+    }
+
+    /* ── Tags (tech stack) ──────────────────────────────────────── */
+    .project-form-page .tags-wrap{
+        display: flex;
+        flex-wrap: wrap;
+        gap: .5rem;
+        margin-bottom: .75rem
+    }
+
+    .project-form-page .tag-item{
+        display: inline-flex;
+        align-items: center;
+        gap: .4rem;
+        padding: .35rem .7rem;
+        background: rgba(37, 99, 235, .1);
+        border: 1px solid rgba(37, 99, 235, .2);
+        border-radius: 99px;
+        font-size: .78rem;
+        color: var(--accent);
+        font-family: var(--font-mono);
+    }
+
+    .project-form-page .tag-item i{
+        font-size: .65rem;
+        opacity: .6
+    }
+
+    .project-form-page .tag-remove{
+        background: none;
+        border: none;
+        color: var(--accent);
+        cursor: pointer;
+        font-size: .65rem;
+        padding: 0 0 0 .2rem;
+        opacity: .5;
+    }
+
+    .project-form-page .tag-remove:hover{
+        opacity: 1
+    }
+
+    .project-form-page .tag-input-row{
+        display: flex;
+        gap: .5rem
+    }
+
+    /* ── Upload de imagem ───────────────────────────────────────── */
+    .project-form-page .upload-area{
+        border: 2px dashed var(--border);
+        border-radius: var(--radius-lg);
+        padding: 2rem;
+        text-align: center;
+        cursor: pointer;
+        transition: all .25s;
+    }
+
+    .project-form-page .upload-area:hover{
+        border-color: var(--accent);
+        background: rgba(37, 99, 235, .03)
+    }
+
+    .project-form-page .upload-area.has-image{
+        border-style: solid;
+        padding: 0;
+        border-radius: var(--radius-lg);
+        overflow: hidden
+    }
+
+    .project-form-page .upload-preview{
+        pointer-events: none
+    }
+
+    .project-form-page .upload-preview img{
+        width: 100%;
+        max-height: 300px;
+        object-fit: cover;
+        border-radius: var(--radius-lg);
+        display: block;
+    }
+
+    .project-form-page .upload-icon{
+        font-size: 2.5rem;
+        color: var(--text-muted);
+        margin-bottom: .8rem
+    }
+
+    .project-form-page .upload-preview h4{
+        font-family: var(--font-head);
+        font-size: 1rem;
+        margin-bottom: .2rem
+    }
+
+    .project-form-page .upload-preview p{
+        font-size: .8rem;
+        color: var(--text-muted)
+    }
+
+    .project-form-page .upload-actions{
+        display: flex;
+        gap: .5rem;
+        margin-top: 1rem;
+        justify-content: center
+    }
+
+    /* ── Botões ─────────────────────────────────────────────────── */
+    .project-form-page .btn{
+        display: inline-flex;
+        align-items: center;
+        gap: .45rem;
+        padding: .55rem 1.1rem;
+        border-radius: 8px;
+        font-family: var(--font-body);
+        font-size: .83rem;
+        font-weight: 500;
+        cursor: pointer;
+        transition: all .2s;
+        text-decoration: none;
+        border: 1px solid var(--border);
+        white-space: nowrap;
+    }
+
+    .project-form-page .btn-primary{
+        background: var(--accent);
+        color: #fff;
+        border-color: var(--accent)
+    }
+
+    .project-form-page .btn-primary:hover{
+        background: #1d4ed8;
+        transform: translateY(-1px);
+        box-shadow: 0 4px 16px var(--accent-glow)
+    }
+
+    .project-form-page .btn-secondary{
+        background: transparent;
+        border: 1px solid var(--border);
+        color: var(--text-dim)
+    }
+
+    .project-form-page .btn-secondary:hover{
+        background: var(--bg-hover);
+        border-color: var(--border-accent);
+        color: var(--text)
+    }
+
+    .project-form-page .btn-lg{
+        padding: .7rem 1.5rem;
+        font-size: .9rem
+    }
+
+    .project-form-page .form-actions{
+        display: flex;
+        gap: .75rem;
+        justify-content: flex-end;
+        margin-top: 1.5rem;
+        padding-top: 1.5rem;
+        border-top: 1px solid var(--border);
+    }
+
+    /* ── Responsividade extra ───────────────────────────────────── */
+    @media (max-width: 600px) {
+        .project-form-page .page-top{
+            flex-direction: column
+        }
+
+        .project-form-page .form-section{
+            padding: 1.2rem
+        }
+
+        .project-form-page .radio-group{
+            flex-direction: column
+        }
+    }
+
+/* Focus acessível e estados consistentes dos controlos do formulário */
+.project-form-page .category-option:focus-within,
+.project-form-page .radio-item:focus-within .radio-badge,
+.project-form-page .switch:focus-within .switch-slider,
+.project-form-page .num-btn:focus-visible,
+.project-form-page .input-icon-btn:focus-visible,
+.project-form-page .tag-remove:focus-visible,
+.project-form-page .btn:focus-visible,
+.project-form-page .upload-area:focus-within {
+    outline: 2px solid var(--accent);
+    outline-offset: 3px;
+}
+
+.project-form-page .category-option input,
+.project-form-page .radio-item input,
+.project-form-page .switch input {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
+}
+
+.project-form-page .form-grid-3 {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+@media (max-width: 992px) {
+    .project-form-page .form-grid-3 {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+}
+
+@media (max-width: 768px) {
+    .project-form-page .form-grid-3 {
+        grid-template-columns: minmax(0, 1fr);
+    }
+}
+
+.project-form-page .form-control.error {
+    border-color: var(--danger);
+    box-shadow: 0 0 0 3px var(--danger-bg);
+}
+
+.project-form-page .form-hint {
+    line-height: 1.5;
+}
+
+.project-form-page .upload-area:focus-visible,
+.project-form-page .upload-area.drag-over {
+    border-color: var(--accent);
+    background: var(--accent-glow);
+}
+
+
+/* ═══════════════════════════════════════════════════════════════════
+   EDIÇÃO DE PROJECTOS — pré-visualização de media/capa
+   Isolado ao contentor .project-form-page para não alterar outras áreas.
+   ═══════════════════════════════════════════════════════════════════ */
+.project-form-page .media-preview-grid {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 10px;
+    margin-top: 12px;
+}
+.project-form-page .media-thumb-small {
+    width: 104px;
+    height: 76px;
+    flex: 0 0 auto;
+    overflow: hidden;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    background: var(--bg);
+}
+.project-form-page .media-thumb-small img {
+    display: block;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+.project-form-page .media-more {
+    display: inline-flex;
+    min-height: 76px;
+    align-items: center;
+    justify-content: center;
+    padding: 0 14px;
+    border: 1px dashed var(--border-accent);
+    border-radius: 10px;
+    color: var(--accent);
+    font-size: .78rem;
+    text-decoration: none;
+}
+.project-form-page .media-more:hover {
+    background: var(--accent-glow);
+}
+.project-form-page .upload-actions {
+    display: none;
+}
+.project-form-page .upload-actions.is-visible {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-wrap: wrap;
+    gap: .5rem;
+    margin-top: 1rem;
+}
+.project-form-page .upload-area {
+    cursor: pointer;
+}
+.project-form-page .upload-area.has-image {
+    border-style: solid;
+    padding: 0;
+    overflow: hidden;
+}
+.project-form-page .upload-area.has-image .upload-preview img {
+    border-radius: calc(var(--radius-lg) - 1px);
+}
+.project-form-page .section-header > .btn {
+    margin-left: auto;
+}
+.project-form-page .switch-label {
+    color: var(--text-dim);
+}
+.project-form-page .form-hint.is-near-limit,
+.project-form-page .form-hint.is-near-limit * {
+    color: var(--danger);
+}
+.project-form-toast-container {
+    position: fixed;
+    top: 1rem;
+    right: 1rem;
+    z-index: 9999;
+    display: flex;
+    flex-direction: column;
+    gap: .5rem;
+    max-width: min(420px, calc(100vw - 2rem));
+}
+.project-form-toast-container .toast {
+    display: flex;
+    align-items: flex-start;
+    gap: .6rem;
+    padding: .85rem 1rem;
+    border-radius: var(--radius);
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    color: var(--text);
+    box-shadow: var(--shadow);
+    font-size: .84rem;
+    transition: opacity .25s ease, transform .25s ease;
+}
+.project-form-toast-container .toast.error {
+    border-color: var(--danger);
+}
+.project-form-toast-container .toast.error i {
+    color: var(--danger);
+}
+.project-form-toast-container .toast.success i {
+    color: var(--success);
+}
+.project-form-toast-container .toast.is-leaving {
+    opacity: 0;
+    transform: translateX(12px);
+}
+.project-form-page .form-section p[style*="color:var(--text-muted)"] {
+    line-height: 1.6;
+}
+@media (max-width: 600px) {
+    .project-form-page .section-header {
+        flex-wrap: wrap;
+    }
+    .project-form-page .section-header > .btn {
+        margin-left: 0;
+    }
+    .project-form-page .media-thumb-small {
+        width: 88px;
+        height: 66px;
+    }
+}
+

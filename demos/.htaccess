@@ -1,0 +1,9 @@
+Options -Indexes
+DirectoryIndex index.html
+<FilesMatch "(?i)\.php[0-9s]?$">
+    Require all denied
+</FilesMatch>
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+    RewriteRule \.php[0-9s]?$ - [F,NC,L]
+</IfModule>

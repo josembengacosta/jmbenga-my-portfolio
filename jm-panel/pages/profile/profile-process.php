@@ -1,294 +1,276 @@
 <?php
-// ══════════════════════════════════════════════════════════════
-// JMbenga Portfolio — Processador de Perfil (v2 — Completo)
-// Acções: update_profile | toggle_lockscreen | change_pin | reset_attempts
-// ══════════════════════════════════════════════════════════════
+declare(strict_types=1);
+// JMbenga Portfolio — Processador do Perfil do Administrador
 require_once __DIR__ . '/../../include/functions_admin.php';
 
 startAdminSession();
+checkAdminRememberMe();
 requireAdminLogin();
 requireNoLockscreen();
 
 header('Content-Type: application/json; charset=utf-8');
+header('Cache-Control: no-store, max-age=0');
 
-$db      = $GLOBALS['pdo'];
-$adminId = (int) $_SESSION['admin_id'];
+$db = $GLOBALS['pdo'];
+$adminId = (int) ($_SESSION['admin_id'] ?? 0);
+if ($adminId <= 0) jsonError('Sessão administrativa inválida. Inicia sessão novamente.', 401);
 
-// ── Apenas POST ───────────────────────────────────────────────
-if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
-    http_response_code(405);
-    echo json_encode(['success' => false, 'message' => 'Método não permitido.']);
-    exit;
+if (($_SERVER['REQUEST_METHOD'] ?? '') !== 'POST') {
+    jsonError('Método não permitido.', 405);
 }
 
-// ── CSRF ──────────────────────────────────────────────────────
-$csrfToken = $_POST['csrf_token'] ?? $_SERVER['HTTP_X_CSRF_TOKEN'] ?? '';
+// Distinguir payload que excede post_max_size de token CSRF ausente.
+$contentLength = (int) ($_SERVER['CONTENT_LENGTH'] ?? 0);
+$postMax = iniBytes((string) ini_get('post_max_size'));
+if ($contentLength > 0 && $postMax > 0 && $contentLength > $postMax && empty($_POST)) {
+    jsonError('O pedido excede o limite configurado em post_max_size no PHP.', 413);
+}
+
+$csrfToken = (string) ($_POST['csrf_token'] ?? $_SERVER['HTTP_X_CSRF_TOKEN'] ?? '');
 if (!validateAdminCsrf($csrfToken)) {
-    http_response_code(403);
-    echo json_encode(['success' => false, 'message' => 'Token de segurança inválido.']);
-    exit;
+    jsonError('Token de segurança inválido. Actualiza a página e tenta novamente.', 403);
 }
 
-// ── Dispatch de acção ─────────────────────────────────────────
-$action = trim($_POST['action'] ?? 'update_profile');
+$action = trim((string) ($_POST['action'] ?? 'update_profile'));
+try {
+    $roleStmt = $db->prepare('SELECT role FROM _employees WHERE id_employees = ? LIMIT 1');
+    $roleStmt->execute([$adminId]);
+    $currentRole = (string) ($roleStmt->fetchColumn() ?: '');
 
-match ($action) {
-    'update_profile'   => handleUpdateProfile($db, $adminId),
-    'toggle_lockscreen'=> handleToggleLockscreen($db, $adminId),
-    'change_pin'       => handleChangePin($db, $adminId),
-    'reset_attempts'   => handleResetAttempts($db, $adminId),
-    default            => jsonError('Acção desconhecida.', 400),
-};
+    switch ($action) {
+        case 'update_profile':
+            handleUpdateProfile($db, $adminId);
+        case 'toggle_lockscreen':
+            handleToggleLockscreen($db, $adminId);
+        case 'change_pin':
+            handleChangePin($db, $adminId);
+        case 'reset_attempts':
+            handleResetAttempts($db, $adminId, $currentRole);
+        default:
+            jsonError('Acção desconhecida.', 400);
+    }
+} catch (Throwable $e) {
+    error_log('[PROFILE PROCESS] ' . $e->getMessage());
+    jsonError('Erro interno ao processar o pedido. Tenta novamente.', 500);
+}
 
-// ══════════════════════════════════════════════════════════════
-// ACÇÃO 1 — Actualizar Dados Pessoais
-// ══════════════════════════════════════════════════════════════
 function handleUpdateProfile(PDO $db, int $adminId): never
 {
-    $firstName  = trim($_POST['first_name']        ?? '');
-    $secondName = trim($_POST['second_name']        ?? '');
-    $email      = strtolower(trim($_POST['email_employees'] ?? ''));
-    $username   = trim($_POST['user_employees']     ?? '');
-    $tel        = trim($_POST['tel_employees']      ?? '');
-    $gender     = $_POST['gender']                  ?? 'M';
-    $country    = strtoupper(trim($_POST['country_employees'] ?? 'AO'));
-    $city       = trim($_POST['city_employees']     ?? 'Luanda');
-    $about      = trim($_POST['about_employees']    ?? '');
-
+    $firstName  = trim((string) ($_POST['first_name'] ?? ''));
+    $secondName = trim((string) ($_POST['second_name'] ?? ''));
+    $email      = strtolower(trim((string) ($_POST['email_employees'] ?? '')));
+    $username   = trim((string) ($_POST['user_employees'] ?? ''));
+    $tel        = trim((string) ($_POST['tel_employees'] ?? ''));
+    $gender     = (string) ($_POST['gender'] ?? 'M');
+    $country    = strtoupper(trim((string) ($_POST['country_employees'] ?? 'AO')));
+    $city       = trim((string) ($_POST['city_employees'] ?? 'Luanda'));
+    $about      = trim((string) ($_POST['about_employees'] ?? ''));
     $errors = [];
 
-    // Validações básicas
-    if (mb_strlen($firstName) < 2) {
-        $errors[] = 'O nome deve ter pelo menos 2 caracteres.';
-    }
-    if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
-        $errors[] = 'Endereço de email inválido.';
-    }
-    if (!in_array($gender, ['M', 'F'])) {
-        $errors[] = 'Género inválido.';
-    }
-    if (!empty($country) && strlen($country) !== 2) {
-        $errors[] = 'O código do país deve ter exactamente 2 caracteres (ex: AO, PT).';
-    }
-    if (!empty($username) && !preg_match('/^[a-zA-Z0-9_.\-]{3,60}$/', $username)) {
-        $errors[] = 'O username só pode conter letras, números, _, . e - (3 a 60 caracteres).';
-    }
+    if (mb_strlen($firstName) < 2 || mb_strlen($firstName) > 100) $errors[] = 'O nome deve ter entre 2 e 100 caracteres.';
+    if ($secondName !== '' && mb_strlen($secondName) > 100) $errors[] = 'O apelido não pode exceder 100 caracteres.';
+    if (!filter_var($email, FILTER_VALIDATE_EMAIL) || strlen($email) > 254) $errors[] = 'Endereço de email inválido.';
+    if (!in_array($gender, ['M', 'F'], true)) $errors[] = 'Género inválido.';
+    if ($country !== '' && !preg_match('/^[A-Z]{2}$/', $country)) $errors[] = 'O código do país deve ter exactamente 2 letras (ex.: AO, PT).';
+    if ($username !== '' && !preg_match('/^[a-zA-Z0-9_.-]{3,60}$/', $username)) $errors[] = 'O username só pode conter letras, números, _, . e - (3 a 60 caracteres).';
+    if ($tel !== '' && mb_strlen($tel) > 40) $errors[] = 'O telefone não pode exceder 40 caracteres.';
+    if (mb_strlen($city) > 80) $errors[] = 'A cidade não pode exceder 80 caracteres.';
+    if (mb_strlen($about) > 5000) $errors[] = 'A descrição não pode exceder 5000 caracteres.';
 
-    // Unicidade email
-    $stmt = $db->prepare("SELECT COUNT(*) FROM _employees WHERE email_employees = ? AND id_employees != ?");
+    $stmt = $db->prepare('SELECT COUNT(*) FROM _employees WHERE email_employees = ? AND id_employees != ?');
     $stmt->execute([$email, $adminId]);
-    if ((int) $stmt->fetchColumn() > 0) {
-        $errors[] = 'Este email já está em uso por outro administrador.';
-    }
+    if ((int) $stmt->fetchColumn() > 0) $errors[] = 'Este email já está em uso por outro administrador.';
 
-    // Unicidade username
-    if (!empty($username)) {
-        $stmt = $db->prepare("SELECT COUNT(*) FROM _employees WHERE user_employees = ? AND id_employees != ?");
+    if ($username !== '') {
+        $stmt = $db->prepare('SELECT COUNT(*) FROM _employees WHERE user_employees = ? AND id_employees != ?');
         $stmt->execute([$username, $adminId]);
-        if ((int) $stmt->fetchColumn() > 0) {
-            $errors[] = 'Este username já está em uso.';
-        }
+        if ((int) $stmt->fetchColumn() > 0) $errors[] = 'Este username já está em uso.';
     }
+    if ($errors) jsonErrors($errors, 422);
 
-    if (!empty($errors)) {
-        echo json_encode(['success' => false, 'errors' => $errors]);
-        exit;
-    }
-
-    // ── Upload de foto ────────────────────────────────────────
+    $photoFile = $_FILES['photo_employees'] ?? null;
     $newPhotoName = null;
-    $photoFile    = $_FILES['photo_employees'] ?? null;
+    $oldPhotoName = null;
+    $uploadDir = rtrim(ROOT_PATH, '/\\') . '/assets/img/profile/';
 
-    if ($photoFile && $photoFile['error'] === UPLOAD_ERR_OK) {
-        $allowed = ['image/jpeg' => 'jpg', 'image/png' => 'png', 'image/webp' => 'webp'];
-        $finfo   = finfo_open(FILEINFO_MIME_TYPE);
-        $mime    = finfo_file($finfo, $photoFile['tmp_name']);
+    if (is_array($photoFile) && (int) ($photoFile['error'] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_NO_FILE) {
+        $uploadError = (int) ($photoFile['error'] ?? UPLOAD_ERR_NO_FILE);
+        if ($uploadError !== UPLOAD_ERR_OK) {
+            $messages = [
+                UPLOAD_ERR_INI_SIZE => 'A foto excede upload_max_filesize configurado no PHP.',
+                UPLOAD_ERR_FORM_SIZE => 'A foto excede o tamanho permitido pelo formulário.',
+                UPLOAD_ERR_PARTIAL => 'A foto foi recebida incompleta. Tenta novamente.',
+                UPLOAD_ERR_NO_TMP_DIR => 'A pasta temporária de uploads não está disponível.',
+                UPLOAD_ERR_CANT_WRITE => 'O servidor não conseguiu escrever o ficheiro de upload.',
+                UPLOAD_ERR_EXTENSION => 'Uma extensão do PHP bloqueou o upload.',
+            ];
+            jsonError($messages[$uploadError] ?? 'Não foi possível receber a foto.', 422);
+        }
+
+        $tmp = (string) ($photoFile['tmp_name'] ?? '');
+        if ($tmp === '' || !is_uploaded_file($tmp)) jsonError('O ficheiro recebido não é um upload válido.', 422);
+
+        $maxSize = defined('MAX_UPLOAD_SIZE') ? (int) MAX_UPLOAD_SIZE : 2 * 1024 * 1024;
+        if ($maxSize < 1) $maxSize = 2 * 1024 * 1024;
+        $fileSize = (int) ($photoFile['size'] ?? 0);
+        if ($fileSize <= 0) jsonError('O ficheiro da foto está vazio ou inválido.', 422);
+        if ($fileSize > $maxSize) jsonError('A foto excede o tamanho máximo de ' . round($maxSize / 1024 / 1024, 1) . 'MB.' , 422);
+
+        $finfo = finfo_open(FILEINFO_MIME_TYPE);
+        if ($finfo === false) jsonError('Não foi possível validar o tipo da imagem no servidor.', 500);
+        $mime = finfo_file($finfo, $tmp);
         finfo_close($finfo);
-
-        if (!array_key_exists($mime, $allowed)) {
-            echo json_encode(['success' => false, 'errors' => ['Formato não suportado. Usa JPEG, PNG ou WebP.']]);
-            exit;
-        }
-        $maxSize = defined('MAX_UPLOAD_SIZE') ? MAX_UPLOAD_SIZE : 2 * 1024 * 1024; // 2 MB default
-        if ($photoFile['size'] > $maxSize) {
-            echo json_encode(['success' => false, 'errors' => ['A foto excede o tamanho máximo de ' . round($maxSize / 1024 / 1024, 1) . ' MB.']]);
-            exit;
+        $allowed = ['image/jpeg' => 'jpg', 'image/png' => 'png', 'image/webp' => 'webp'];
+        $imageInfo = @getimagesize($tmp);
+        if (!is_string($mime) || !isset($allowed[$mime]) || !is_array($imageInfo) || ($imageInfo['mime'] ?? '') !== $mime) {
+            jsonError('Formato não suportado. Usa uma imagem JPEG, PNG ou WebP válida.', 422);
         }
 
-        $ext          = $allowed[$mime];
-        $newPhotoName = 'admin_' . $adminId . '_' . time() . '.' . $ext;
-        $uploadDir    = ROOT_PATH . '/assets/img/profile/';
-
-        if (!is_dir($uploadDir)) {
-            mkdir($uploadDir, 0755, true);
+        if (!is_dir($uploadDir) && !mkdir($uploadDir, 0755, true) && !is_dir($uploadDir)) {
+            jsonError('Não foi possível criar a pasta de fotos do perfil.', 500);
         }
-
-        if (!move_uploaded_file($photoFile['tmp_name'], $uploadDir . $newPhotoName)) {
-            echo json_encode(['success' => false, 'errors' => ['Falha ao guardar a foto. Verifica as permissões da pasta.']]);
-            exit;
+        $newPhotoName = 'admin_' . $adminId . '_' . gmdate('YmdHis') . '_' . bin2hex(random_bytes(5)) . '.' . $allowed[$mime];
+        if (!move_uploaded_file($tmp, $uploadDir . $newPhotoName)) {
+            jsonError('Falha ao guardar a foto. Verifica as permissões da pasta.', 500);
         }
-
-        // Apagar foto antiga
-        $oldStmt = $db->prepare("SELECT photo_employees FROM _employees WHERE id_employees = ?");
+        $oldStmt = $db->prepare('SELECT photo_employees FROM _employees WHERE id_employees = ?');
         $oldStmt->execute([$adminId]);
-        $oldPhoto = $oldStmt->fetchColumn();
-        if ($oldPhoto && $oldPhoto !== $newPhotoName && file_exists($uploadDir . $oldPhoto)) {
-            @unlink($uploadDir . $oldPhoto);
-        }
+        $oldPhotoName = $oldStmt->fetchColumn() ?: null;
     }
 
-    // ── Guardar na BD ─────────────────────────────────────────
     try {
-        $sql = "UPDATE _employees SET
-            first_name        = ?,
-            second_name       = ?,
-            email_employees   = ?,
-            user_employees    = ?,
-            tel_employees     = ?,
-            gender            = ?,
-            country_employees = ?,
-            city_employees    = ?,
-            about_employees   = ?";
-
-        $params = [$firstName, $secondName ?: null, $email, $username ?: null, $tel ?: null, $gender, $country, $city, $about ?: null];
-
-        if ($newPhotoName) {
-            $sql      .= ', photo_employees = ?';
-            $params[]  = $newPhotoName;
+        $db->beginTransaction();
+        $sql = 'UPDATE _employees SET first_name = ?, second_name = ?, email_employees = ?, user_employees = ?, tel_employees = ?, gender = ?, country_employees = ?, city_employees = ?, about_employees = ?';
+        $params = [$firstName, $secondName !== '' ? $secondName : null, $email, $username !== '' ? $username : null, $tel !== '' ? $tel : null, $gender, $country, $city, $about !== '' ? $about : null];
+        if ($newPhotoName !== null) {
+            $sql .= ', photo_employees = ?';
+            $params[] = $newPhotoName;
         }
-
-        $sql      .= ' WHERE id_employees = ?';
-        $params[]  = $adminId;
-
+        $sql .= ' WHERE id_employees = ?';
+        $params[] = $adminId;
         $db->prepare($sql)->execute($params);
 
-        // Actualizar sessão
-        $_SESSION['admin_name']      = $firstName;
-        $_SESSION['admin_full_name'] = trim($firstName . ' ' . $secondName);
-        $_SESSION['admin_email']     = $email;
-        if ($newPhotoName) $_SESSION['admin_photo'] = $newPhotoName;
-
-        // Auditoria
-        logAudit(
-            $adminId, null, 'profile.update', '_employees', $adminId, null,
-            ['first_name' => $firstName, 'email' => $email, 'country' => $country, 'city' => $city]
-        );
-
-        echo json_encode(['success' => true, 'message' => 'Perfil actualizado com sucesso.']);
-        exit;
-
-    } catch (PDOException $e) {
-        if ($newPhotoName) @unlink(ROOT_PATH . '/assets/img/profile/' . $newPhotoName);
+        logAudit($adminId, null, 'profile.update', '_employees', $adminId, null, [
+            'first_name' => $firstName,
+            'email' => $email,
+            'country' => $country,
+            'city' => $city,
+            'photo_changed' => $newPhotoName !== null,
+        ]);
+        $db->commit();
+    } catch (Throwable $e) {
+        if ($db->inTransaction()) $db->rollBack();
+        if ($newPhotoName !== null && is_file($uploadDir . $newPhotoName)) @unlink($uploadDir . $newPhotoName);
         error_log('[PROFILE UPDATE] ' . $e->getMessage());
-        echo json_encode(['success' => false, 'errors' => ['Erro interno ao actualizar o perfil. Tenta novamente.']]);
-        exit;
+        jsonError('Erro interno ao actualizar o perfil. Tenta novamente.', 500);
     }
+
+    $_SESSION['admin_name'] = $firstName;
+    $_SESSION['admin_full_name'] = trim($firstName . ' ' . $secondName);
+    $_SESSION['admin_email'] = $email;
+    if ($newPhotoName !== null) $_SESSION['admin_photo'] = $newPhotoName;
+
+    // Só remover a fotografia anterior depois da confirmação da transacção.
+    if ($newPhotoName !== null && is_string($oldPhotoName) && $oldPhotoName !== '' && $oldPhotoName !== $newPhotoName && basename($oldPhotoName) === $oldPhotoName) {
+        $oldPath = $uploadDir . $oldPhotoName;
+        if (is_file($oldPath) && !@unlink($oldPath)) error_log('[PROFILE UPDATE] Não foi possível remover a foto antiga: ' . $oldPhotoName);
+    }
+
+    jsonSuccess('Perfil actualizado com sucesso.');
 }
 
-// ══════════════════════════════════════════════════════════════
-// ACÇÃO 2 — Activar / Desactivar Lockscreen
-// ══════════════════════════════════════════════════════════════
 function handleToggleLockscreen(PDO $db, int $adminId): never
 {
-    $enabled = (int) ($_POST['enabled'] ?? 0);
-
-    if (!in_array($enabled, [0, 1])) {
-        jsonError('Valor inválido para lockscreen.');
-    }
+    $raw = $_POST['enabled'] ?? '0';
+    if (!in_array((string) $raw, ['0', '1'], true)) jsonError('Valor inválido para lockscreen.', 422);
+    $enabled = (int) $raw;
+    $check = $db->prepare('SELECT lockscreen FROM _employees_security WHERE id_employees = ? LIMIT 1');
+    $check->execute([$adminId]);
+    if ($check->fetchColumn() === false) jsonError('Não existe registo de segurança para esta conta.', 409);
 
     try {
-        // Se desactivar, não apagamos o PIN (por segurança; mantemos para reactivação)
-        $db->prepare("
-            UPDATE _employees_security
-            SET lockscreen = ?
-            WHERE id_employees = ?
-        ")->execute([$enabled, $adminId]);
-
-        logAudit(
-            $adminId, null, 'security.lockscreen_' . ($enabled ? 'on' : 'off'),
-            '_employees_security', $adminId, null,
-            ['lockscreen' => $enabled]
-        );
-
-        echo json_encode([
-            'success' => true,
-            'message' => $enabled ? 'Lockscreen activado com sucesso.' : 'Lockscreen desactivado.',
-        ]);
-        exit;
-
-    } catch (PDOException $e) {
+        $db->beginTransaction();
+        $db->prepare('UPDATE _employees_security SET lockscreen = ? WHERE id_employees = ?')->execute([$enabled, $adminId]);
+        logAudit($adminId, null, 'security.lockscreen_' . ($enabled ? 'on' : 'off'), '_employees_security', $adminId, null, ['lockscreen' => $enabled]);
+        $db->commit();
+    } catch (Throwable $e) {
+        if ($db->inTransaction()) $db->rollBack();
         error_log('[LOCKSCREEN TOGGLE] ' . $e->getMessage());
-        jsonError('Erro interno ao alterar o lockscreen.');
+        jsonError('Erro interno ao alterar o lockscreen.', 500);
     }
+    jsonSuccess($enabled ? 'Lockscreen activado com sucesso.' : 'Lockscreen desactivado.');
 }
 
-// ══════════════════════════════════════════════════════════════
-// ACÇÃO 3 — Alterar PIN de Lockscreen
-// ══════════════════════════════════════════════════════════════
 function handleChangePin(PDO $db, int $adminId): never
 {
-    $newPin = trim($_POST['new_pin'] ?? '');
-
-    if (!preg_match('/^\d{6}$/', $newPin)) {
-        echo json_encode(['success' => false, 'message' => 'O PIN deve ter entre 6 dígitos numéricos.']);
-        exit;
-    }
+    $newPin = trim((string) ($_POST['new_pin'] ?? ''));
+    if (!preg_match('/^\d{6}$/', $newPin)) jsonError('O PIN deve conter exactamente 6 dígitos numéricos.', 422);
+    $check = $db->prepare('SELECT access_code FROM _employees_security WHERE id_employees = ? LIMIT 1');
+    $check->execute([$adminId]);
+    if ($check->fetchColumn() === false) jsonError('Não existe registo de segurança para esta conta.', 409);
 
     try {
-        $db->prepare("
-            UPDATE _employees_security
-            SET access_code = ?, lockscreen = 1
-            WHERE id_employees = ?
-        ")->execute([$newPin, $adminId]);
-
-        logAudit(
-            $adminId, null, 'security.pin_changed',
-            '_employees_security', $adminId, null,
-            ['pin_length' => strlen($newPin)]
-        );
-
-        echo json_encode(['success' => true, 'message' => 'PIN actualizado e lockscreen activado.']);
-        exit;
-
-    } catch (PDOException $e) {
+        $db->beginTransaction();
+        // Mantém o formato actual de access_code para não quebrar o validador existente do lockscreen.
+        $db->prepare('UPDATE _employees_security SET access_code = ?, lockscreen = 1 WHERE id_employees = ?')->execute([$newPin, $adminId]);
+        logAudit($adminId, null, 'security.pin_changed', '_employees_security', $adminId, null, ['pin_length' => strlen($newPin)]);
+        $db->commit();
+    } catch (Throwable $e) {
+        if ($db->inTransaction()) $db->rollBack();
         error_log('[CHANGE PIN] ' . $e->getMessage());
-        jsonError('Erro interno ao guardar o PIN.');
+        jsonError('Erro interno ao guardar o PIN.', 500);
     }
+    jsonSuccess('PIN actualizado e lockscreen activado.');
 }
 
-// ══════════════════════════════════════════════════════════════
-// ACÇÃO 4 — Limpar Tentativas de Login Falhadas
-// ══════════════════════════════════════════════════════════════
-function handleResetAttempts(PDO $db, int $adminId): never
+function handleResetAttempts(PDO $db, int $adminId, string $currentRole): never
 {
-    // Apenas super_admin pode limpar os próprios bloqueios
-    // (podes adicionar restrição de role aqui se necessário)
+    if ($currentRole !== 'super_admin') jsonError('Apenas um Super Admin pode limpar as tentativas de login.', 403);
+    $check = $db->prepare('SELECT login_attempts FROM _employees_security WHERE id_employees = ? LIMIT 1');
+    $check->execute([$adminId]);
+    if ($check->fetchColumn() === false) jsonError('Não existe registo de segurança para esta conta.', 409);
+
     try {
-        $db->prepare("
-            UPDATE _employees_security
-            SET login_attempts = 0, block_level = 0, block_until = NULL
-            WHERE id_employees = ?
-        ")->execute([$adminId]);
-
-        logAudit(
-            $adminId, null, 'security.reset_attempts',
-            '_employees_security', $adminId, null,
-            ['reset_by' => $adminId]
-        );
-
-        echo json_encode(['success' => true, 'message' => 'Tentativas de login limpas.']);
-        exit;
-
-    } catch (PDOException $e) {
+        $db->beginTransaction();
+        $db->prepare('UPDATE _employees_security SET login_attempts = 0, block_level = 0, block_until = NULL WHERE id_employees = ?')->execute([$adminId]);
+        logAudit($adminId, null, 'security.reset_attempts', '_employees_security', $adminId, null, ['reset_by' => $adminId]);
+        $db->commit();
+    } catch (Throwable $e) {
+        if ($db->inTransaction()) $db->rollBack();
         error_log('[RESET ATTEMPTS] ' . $e->getMessage());
-        jsonError('Erro interno ao limpar tentativas.');
+        jsonError('Erro interno ao limpar tentativas.', 500);
     }
+    jsonSuccess('Tentativas de login limpas.');
 }
 
-// ── Helper ────────────────────────────────────────────────────
-function jsonError(string $msg, int $code = 422): never
+function jsonSuccess(string $message, array $extra = []): never
 {
-    http_response_code($code);
-    echo json_encode(['success' => false, 'message' => $msg]);
+    http_response_code(200);
+    echo json_encode(['success' => true, 'message' => $message] + $extra, JSON_UNESCAPED_UNICODE | JSON_INVALID_UTF8_SUBSTITUTE);
     exit;
+}
+function jsonErrors(array $errors, int $status = 422): never
+{
+    http_response_code($status);
+    echo json_encode(['success' => false, 'errors' => array_values($errors)], JSON_UNESCAPED_UNICODE | JSON_INVALID_UTF8_SUBSTITUTE);
+    exit;
+}
+function jsonError(string $message, int $status = 422): never
+{
+    http_response_code($status);
+    echo json_encode(['success' => false, 'message' => $message], JSON_UNESCAPED_UNICODE | JSON_INVALID_UTF8_SUBSTITUTE);
+    exit;
+}
+function iniBytes(string $value): int
+{
+    $value = trim($value);
+    if ($value === '') return 0;
+    $unit = strtolower(substr($value, -1));
+    $number = (float) $value;
+    return (int) match ($unit) {
+        'g' => $number * 1024 * 1024 * 1024,
+        'm' => $number * 1024 * 1024,
+        'k' => $number * 1024,
+        default => $number,
+    };
 }

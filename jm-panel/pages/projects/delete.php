@@ -1,79 +1,76 @@
 <?php
-// ══════════════════════════════════════════════════════════════
 // JMbenga Portfolio — Eliminar projecto (AJAX)
-// ══════════════════════════════════════════════════════════════
 require_once __DIR__ . '/../../include/functions_admin.php';
 
 startAdminSession();
-requireAdminLogin();
-requireNoLockscreen();
-
+checkAdminRememberMe();
 header('Content-Type: application/json; charset=utf-8');
 
-$db = $GLOBALS['pdo'];
+$respond = static function (int $status, array $payload): never {
+    http_response_code($status);
+    echo json_encode($payload, JSON_UNESCAPED_UNICODE | JSON_INVALID_UTF8_SUBSTITUTE);
+    exit;
+};
 
-// ── Apenas POST ───────────────────────────────────────────────
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
-    http_response_code(405);
-    echo json_encode(['success' => false, 'message' => 'Método não permitido.']);
-    exit;
+    $respond(405, ['success' => false, 'message' => 'Método não permitido.']);
 }
 
-// ── CSRF ──────────────────────────────────────────────────────
-$token = $_SERVER['HTTP_X_CSRF_TOKEN'] ?? '';
-if (!validateAdminCsrf($token)) {
-    http_response_code(403);
-    echo json_encode(['success' => false, 'message' => 'Token de segurança inválido.']);
-    exit;
+$db = $GLOBALS['pdo'];
+if (empty($_SESSION['admin_id'])) {
+    $respond(401, ['success' => false, 'message' => 'A sessão expirou. Inicia sessão novamente.']);
 }
 
-// ── ID do projecto ────────────────────────────────────────────
-$id = (int)($_GET['id'] ?? 0);
-if ($id <= 0) {
-    http_response_code(400);
-    echo json_encode(['success' => false, 'message' => 'ID de projecto inválido.']);
-    exit;
+if (function_exists('isLockscreenActive') && isLockscreenActive()) {
+    $respond(423, ['success' => false, 'message' => 'O painel está bloqueado. Desbloqueia a sessão e tenta novamente.']);
 }
 
-// Verificar se o projecto existe
-$stmt = $db->prepare("SELECT * FROM _projects WHERE id_project = ?");
-$stmt->execute([$id]);
-$project = $stmt->fetch();
-
-if (!$project) {
-    http_response_code(404);
-    echo json_encode(['success' => false, 'message' => 'Projecto não encontrado.']);
-    exit;
-}
-
-// ── Apagar imagem de capa ─────────────────────────────────────
-if (!empty($project['cover_project'])) {
-    $coverPath = ROOT_PATH . '/assets/img/projects/' . $project['cover_project'];
-    if (file_exists($coverPath)) {
-        unlink($coverPath);
-    }
-}
-
-// ── Apagar imagens da galeria (media) ─────────────────────────
-$mediaStmt = $db->prepare("SELECT url_media FROM _projects_media WHERE id_project = ?");
-$mediaStmt->execute([$id]);
-while ($media = $mediaStmt->fetch()) {
-    $mediaPath = ROOT_PATH . '/assets/img/projects/' . $media['url_media'];
-    if (file_exists($mediaPath)) {
-        unlink($mediaPath);
-    }
-}
-// A tabela _projects_media tem ON DELETE CASCADE, mas vamos apagar manualmente para garantir
-// que os ficheiros são removidos antes do registo pai.
-// Após eliminar o projecto, as media são automaticamente removidas pela FK.
-
-// ── Eliminar projecto (a FK elimina as media em cascata) ──────
 try {
-    $db->prepare("DELETE FROM _projects WHERE id_project = ?")->execute([$id]);
+    $authStmt = $db->prepare('SELECT status_employees, role FROM _employees WHERE id_employees = ? LIMIT 1');
+    $authStmt->execute([(int) $_SESSION['admin_id']]);
+    $activeAdmin = $authStmt->fetch(PDO::FETCH_ASSOC);
+    if (!$activeAdmin || ($activeAdmin['status_employees'] ?? '') !== 'active') {
+        $respond(401, ['success' => false, 'message' => 'A conta administrativa já não está activa. Inicia sessão novamente.']);
+    }
+    $_SESSION['admin_role'] = (string) ($activeAdmin['role'] ?? '');
+} catch (Throwable $exception) {
+    error_log('[PROJECT AJAX AUTH] ' . $exception->getMessage());
+    $respond(500, ['success' => false, 'message' => 'Não foi possível validar a sessão administrativa.']);
+}
 
-    // Auditoria
+$token = $_SERVER['HTTP_X_CSRF_TOKEN'] ?? '';
+if (!validateAdminCsrf(is_string($token) ? $token : '')) {
+    $respond(403, ['success' => false, 'message' => 'Token de segurança inválido. Actualiza a página e tenta novamente.']);
+}
+
+$id = filter_var($_GET['id'] ?? null, FILTER_VALIDATE_INT, ['options' => ['min_range' => 1]]);
+if ($id === false || $id === null) {
+    $respond(400, ['success' => false, 'message' => 'ID de projecto inválido.']);
+}
+$id = (int) $id;
+try {
+    $db->beginTransaction();
+
+    $projectStmt = $db->prepare('SELECT id_project, title_project, cover_project FROM _projects WHERE id_project = ? FOR UPDATE');
+    $projectStmt->execute([$id]);
+    $project = $projectStmt->fetch(PDO::FETCH_ASSOC);
+    if (!$project) {
+        $db->rollBack();
+        $respond(404, ['success' => false, 'message' => 'Projecto não encontrado.']);
+    }
+
+    $mediaStmt = $db->prepare('SELECT url_media FROM _projects_media WHERE id_project = ?');
+    $mediaStmt->execute([$id]);
+    $mediaFiles = $mediaStmt->fetchAll(PDO::FETCH_COLUMN);
+
+    $deleteStmt = $db->prepare('DELETE FROM _projects WHERE id_project = ?');
+    $deleteStmt->execute([$id]);
+    if ($deleteStmt->rowCount() !== 1) {
+        throw new RuntimeException('O projecto não foi eliminado pela base de dados.');
+    }
+
     logAudit(
-        (int)$_SESSION['admin_id'],
+        (int) $_SESSION['admin_id'],
         null,
         'project.delete',
         '_projects',
@@ -82,12 +79,35 @@ try {
         null
     );
 
-    echo json_encode(['success' => true, 'message' => 'Projecto eliminado com sucesso.']);
-    exit;
-
-} catch (PDOException $e) {
-    error_log('[DELETE PROJECT] ' . $e->getMessage());
-    http_response_code(500);
-    echo json_encode(['success' => false, 'message' => 'Erro ao eliminar o projecto.']);
-    exit;
+    $db->commit();
+} catch (Throwable $exception) {
+    if ($db->inTransaction()) $db->rollBack();
+    error_log('[DELETE PROJECT] ' . $exception->getMessage());
+    $respond(500, ['success' => false, 'message' => 'Não foi possível eliminar o projecto. Os ficheiros foram preservados.']);
 }
+
+// Só depois do commit tentamos remover as imagens. Uma falha aqui não deve desfazer a resposta da BD.
+$filesToDelete = array_unique(array_filter(array_merge(
+    [(string) ($project['cover_project'] ?? '')],
+    array_map(static fn ($name): string => is_string($name) ? $name : '', $mediaFiles)
+)));
+foreach ($filesToDelete as $filename) {
+    if ($filename === '' || basename($filename) !== $filename || !preg_match('/\A[A-Za-z0-9][A-Za-z0-9._-]*\.(?:jpe?g|png|webp)\z/i', $filename)) {
+        continue;
+    }
+
+    // Não apagar um ficheiro ainda referenciado por outro projecto ou item de media.
+    $referenceStmt = $db->prepare(
+        'SELECT (SELECT COUNT(*) FROM _projects WHERE cover_project = ?) + '
+        . '(SELECT COUNT(*) FROM _projects_media WHERE url_media = ?)'
+    );
+    $referenceStmt->execute([$filename, $filename]);
+    if ((int) $referenceStmt->fetchColumn() > 0) continue;
+
+    $path = ROOT_PATH . '/assets/img/projects/' . $filename;
+    if (is_file($path) && !@unlink($path)) {
+        error_log('[DELETE PROJECT] Não foi possível remover o ficheiro de imagem: ' . $path);
+    }
+}
+
+$respond(200, ['success' => true, 'message' => 'Projecto eliminado com sucesso.']);

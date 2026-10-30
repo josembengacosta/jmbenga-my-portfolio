@@ -1,115 +1,93 @@
 <?php
-// ══════════════════════════════════════════════════════════════
-// JMbenga Portfolio — Processador Editar FAQ (AJAX)
-// ══════════════════════════════════════════════════════════════
+// JMbenga Portfolio — Editar FAQ (AJAX)
 require_once __DIR__ . '/../../include/functions_admin.php';
 
 startAdminSession();
+checkAdminRememberMe();
 requireAdminLogin();
 requireNoLockscreen();
 
 header('Content-Type: application/json; charset=utf-8');
+header('Cache-Control: no-store, max-age=0');
+header('X-Content-Type-Options: nosniff');
 
 $db = $GLOBALS['pdo'];
 
-// ── Apenas POST ───────────────────────────────────────────────
-if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
-    http_response_code(405);
-    echo json_encode(['success' => false, 'message' => 'Método não permitido.']);
-    exit;
-}
-
-// ── CSRF ──────────────────────────────────────────────────────
-$token = $_POST['csrf_token'] ?? $_SERVER['HTTP_X_CSRF_TOKEN'] ?? '';
-if (!validateAdminCsrf($token)) {
-    http_response_code(403);
-    echo json_encode(['success' => false, 'message' => 'Token de segurança inválido.']);
-    exit;
-}
-
-// ── Função auxiliar para retornar erros ───────────────────────
-$jsonError = function (array $errors, int $status = 422) {
+function faqJsonResponse(array $payload, int $status = 200): void {
     http_response_code($status);
-    echo json_encode(['success' => false, 'errors' => $errors]);
+    echo json_encode($payload, JSON_UNESCAPED_UNICODE | JSON_INVALID_UTF8_SUBSTITUTE);
     exit;
-};
-
-// ── ID da FAQ ─────────────────────────────────────────────────
-$id = (int)($_POST['id_faq'] ?? 0);
-if ($id <= 0) {
-    $jsonError(['ID de FAQ inválido.'], 400);
 }
 
-// Verificar se a FAQ existe
-$stmt = $db->prepare("SELECT * FROM _faq WHERE id_faq = ?");
-$stmt->execute([$id]);
-$old = $stmt->fetch();
-if (!$old) {
-    $jsonError(['FAQ não encontrada.'], 404);
+function faqPostString(string $key, string $default = ''): string {
+    $value = $_POST[$key] ?? $default;
+    return is_string($value) ? trim($value) : '';
 }
 
-// ── Capturar e sanitizar campos ───────────────────────────────
-$question     = trim($_POST['question']      ?? '');
-$answer       = trim($_POST['answer']        ?? '');
-$category     = trim($_POST['category_faq']  ?? 'Geral');
-$displayOrder = (int)($_POST['display_order'] ?? 0);
-$status       = ($_POST['status_faq'] ?? 'visible') === 'visible' ? 'visible' : 'hidden';
+function faqAuditSafely(...$args): void {
+    try {
+        logAudit(...$args);
+    } catch (Throwable $auditError) {
+        error_log('[FAQ AUDIT] ' . $auditError->getMessage());
+    }
+}
 
-// ── Validações ─────────────────────────────────────────────────
+if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+    faqJsonResponse(['success' => false, 'message' => 'Método não permitido.'], 405);
+}
+
+$csrfToken = $_SERVER['HTTP_X_CSRF_TOKEN'] ?? $_POST['csrf_token'] ?? '';
+if (!is_string($csrfToken) || !validateAdminCsrf($csrfToken)) {
+    faqJsonResponse(['success' => false, 'message' => 'Token de segurança inválido.'], 403);
+}
+
+$idRaw = $_POST['id_faq'] ?? '';
+$id = (is_string($idRaw) || is_int($idRaw)) ? filter_var((string)$idRaw, FILTER_VALIDATE_INT, ['options' => ['min_range' => 1]]) : false;
+if ($id === false) faqJsonResponse(['success' => false, 'message' => 'ID de FAQ inválido.'], 400);
+
+$question = faqPostString('question');
+$answer = faqPostString('answer');
+$category = faqPostString('category_faq', 'Geral');
+$orderRaw = $_POST['display_order'] ?? '0';
+$orderValue = is_string($orderRaw) || is_int($orderRaw) ? filter_var((string)$orderRaw, FILTER_VALIDATE_INT, ['options' => ['min_range' => 0, 'max_range' => 2147483647]]) : false;
+$statusRaw = $_POST['status_faq'] ?? null;
+$status = $statusRaw === 'visible' ? 'visible' : 'hidden';
+
 $errors = [];
+if (mb_strlen($question) < 5) $errors[] = 'A pergunta deve ter pelo menos 5 caracteres.';
+if (mb_strlen($question) > 500) $errors[] = 'A pergunta não pode ter mais de 500 caracteres.';
+if (mb_strlen($answer) < 10) $errors[] = 'A resposta deve ter pelo menos 10 caracteres.';
+if (mb_strlen($answer) > 5000) $errors[] = 'A resposta não pode ter mais de 5000 caracteres.';
+if (mb_strlen($category) < 2 || mb_strlen($category) > 100) $errors[] = 'A categoria deve ter entre 2 e 100 caracteres.';
+if ($orderValue === false) $errors[] = 'A ordem de exibição deve ser um número inteiro igual ou superior a zero.';
+if ($statusRaw !== null && $statusRaw !== 'visible') $errors[] = 'Estado da FAQ inválido.';
+if ($errors) faqJsonResponse(['success' => false, 'errors' => $errors], 422);
+$displayOrder = (int)$orderValue;
 
-if (mb_strlen($question) < 5) {
-    $errors[] = 'A pergunta deve ter pelo menos 5 caracteres.';
-}
-if (mb_strlen($question) > 500) {
-    $errors[] = 'A pergunta não pode ter mais de 500 caracteres.';
-}
-if (mb_strlen($answer) < 10) {
-    $errors[] = 'A resposta deve ter pelo menos 10 caracteres.';
-}
-if (mb_strlen($category) < 2) {
-    $errors[] = 'A categoria deve ter pelo menos 2 caracteres.';
-}
-
-// ── Verificar duplicados (mesma pergunta, excluindo a própria) ──
-$stmt = $db->prepare("SELECT COUNT(*) FROM _faq WHERE question = ? AND id_faq != ?");
-$stmt->execute([$question, $id]);
-if ((int)$stmt->fetchColumn() > 0) {
-    $errors[] = 'Já existe uma FAQ com esta pergunta. Escolhe uma pergunta diferente.';
-}
-
-if (!empty($errors)) {
-    $jsonError($errors);
-}
-
-// ── Actualizar na base de dados ───────────────────────────────
 try {
-    $stmt = $db->prepare("
-        UPDATE _faq SET
-            question      = ?,
-            answer        = ?,
-            category_faq  = ?,
-            display_order = ?,
-            status_faq    = ?
-        WHERE id_faq      = ?
-    ");
-    $stmt->execute([$question, $answer, $category, $displayOrder, $status, $id]);
+    $stmt = $db->prepare('SELECT * FROM _faq WHERE id_faq = ?');
+    $stmt->execute([(int)$id]);
+    $old = $stmt->fetch(PDO::FETCH_ASSOC);
+    if (!$old) faqJsonResponse(['success' => false, 'message' => 'FAQ não encontrada.'], 404);
 
-    // Auditoria
-    logAudit(
-        (int)$_SESSION['admin_id'],
-        null,
-        'faq.update',
-        '_faq',
-        $id,
-        $old,
-        ['question' => $question, 'category' => $category, 'status' => $status]
-    );
+    $stmt = $db->prepare('SELECT COUNT(*) FROM _faq WHERE question = ? AND id_faq <> ?');
+    $stmt->execute([$question, (int)$id]);
+    if ((int)$stmt->fetchColumn() > 0) {
+        faqJsonResponse(['success' => false, 'errors' => ['Já existe uma FAQ com esta pergunta. Escolhe uma pergunta diferente.']], 422);
+    }
 
-    echo json_encode(['success' => true, 'message' => 'FAQ actualizada com sucesso.']);
-    exit;
+    $stmt = $db->prepare('UPDATE _faq SET question = ?, answer = ?, category_faq = ?, display_order = ?, status_faq = ? WHERE id_faq = ?');
+    $stmt->execute([$question, $answer, $category, $displayOrder, $status, (int)$id]);
 
+    faqAuditSafely((int)$_SESSION['admin_id'], null, 'faq.update', '_faq', (int)$id, $old, [
+        'question' => $question,
+        'category' => $category,
+        'display_order' => $displayOrder,
+        'status' => $status
+    ]);
+
+    faqJsonResponse(['success' => true, 'message' => 'FAQ actualizada com sucesso.']);
 } catch (PDOException $e) {
     error_log('[EDIT FAQ] ' . $e->getMessage());
-    $jsonError(['Erro interno ao actualizar a FAQ. Tenta novamente.'], 500);
+    faqJsonResponse(['success' => false, 'message' => 'Erro interno ao actualizar a FAQ. Tenta novamente.'], 500);
 }

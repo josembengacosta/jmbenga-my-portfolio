@@ -4,192 +4,262 @@
 // ══════════════════════════════════════════════════════════════
 require_once __DIR__ . '/../../include/functions_admin.php';
 
+// Usa MAX_UPLOAD_SIZE quando configurado; caso contrário, respeita os limites PHP.
+if (!defined('MAX_UPLOAD_SIZE')) {
+    $jmbengaIniSizeToBytes = static function (string $value): int {
+        $value = trim($value);
+        if ($value === '' || !preg_match('/^([0-9]+(?:\.[0-9]+)?)\s*([KMG]?)B?$/i', $value, $matches)) {
+            return 0;
+        }
+        $number = (float) $matches[1];
+        $unit = strtoupper($matches[2] ?? '');
+        $factor = match ($unit) {
+            'G' => 1024 ** 3,
+            'M' => 1024 ** 2,
+            'K' => 1024,
+            default => 1,
+        };
+        return (int) min(PHP_INT_MAX, round($number * $factor));
+    };
+    $uploadLimit = $jmbengaIniSizeToBytes((string) ini_get('upload_max_filesize'));
+    $postLimit = $jmbengaIniSizeToBytes((string) ini_get('post_max_size'));
+    if ($postLimit > 262144) $postLimit -= 262144;
+    $limits = array_values(array_filter([$uploadLimit, $postLimit], static fn (int $size): bool => $size > 0));
+    define('MAX_UPLOAD_SIZE', $limits ? min($limits) : 5 * 1024 * 1024);
+}
+
 startAdminSession();
+checkAdminRememberMe();
 requireAdminLogin();
 requireNoLockscreen();
 
 header('Content-Type: application/json; charset=utf-8');
+header('Cache-Control: no-store, max-age=0');
+header('X-Content-Type-Options: nosniff');
 
 $db = $GLOBALS['pdo'];
-
-// ── Apenas POST ───────────────────────────────────────────────
-if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
-    http_response_code(405);
-    echo json_encode(['success' => false, 'message' => 'Método não permitido.']);
-    exit;
-}
-
-// ── CSRF ──────────────────────────────────────────────────────
-$token = $_POST['csrf_token'] ?? $_SERVER['HTTP_X_CSRF_TOKEN'] ?? '';
-if (!validateAdminCsrf($token)) {
-    http_response_code(403);
-    echo json_encode(['success' => false, 'message' => 'Token de segurança inválido.']);
-    exit;
-}
-
-// ── Função auxiliar para retornar erros ───────────────────────
-$jsonError = function (array $errors, int $status = 422) {
+$sendJson = static function (array $payload, int $status = 200): void {
     http_response_code($status);
-    echo json_encode(['success' => false, 'errors' => $errors]);
+    echo json_encode($payload, JSON_UNESCAPED_UNICODE | JSON_INVALID_UTF8_SUBSTITUTE);
     exit;
 };
+$jsonError = static function (array $errors, int $status = 422) use ($sendJson): void {
+    $sendJson(['success' => false, 'errors' => $errors], $status);
+};
+$postString = static function (string $key, string $default = ''): string {
+    $value = $_POST[$key] ?? $default;
+    return is_string($value) ? trim($value) : $default;
+};
 
-// ── ID do projecto ────────────────────────────────────────────
-$id = (int)($_POST['id_project'] ?? 0);
-if ($id <= 0) {
-    $jsonError(['ID de projecto inválido.'], 400);
+if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+    $sendJson(['success' => false, 'message' => 'Método não permitido.'], 405);
+}
+$tokenValue = $_POST['csrf_token'] ?? $_SERVER['HTTP_X_CSRF_TOKEN'] ?? '';
+$token = is_string($tokenValue) ? $tokenValue : '';
+if (!validateAdminCsrf($token)) {
+    $sendJson(['success' => false, 'message' => 'Token de segurança inválido. Actualiza a página e tenta novamente.'], 403);
 }
 
-// Verificar se o projecto existe
-$stmt = $db->prepare("SELECT * FROM _projects WHERE id_project = ?");
+$idRaw = $postString('id_project', '0');
+$idParsed = filter_var($idRaw, FILTER_VALIDATE_INT);
+$id = ($idParsed !== false && $idParsed > 0) ? (int) $idParsed : 0;
+if ($id <= 0) $jsonError(['ID de projecto inválido.'], 400);
+
+$stmt = $db->prepare('SELECT * FROM _projects WHERE id_project = ? LIMIT 1');
 $stmt->execute([$id]);
-$old = $stmt->fetch();
-if (!$old) {
-    $jsonError(['Projecto não encontrado.'], 404);
-}
+$old = $stmt->fetch(PDO::FETCH_ASSOC);
+if (!$old) $jsonError(['Projecto não encontrado.'], 404);
 
-// ── Capturar e sanitizar campos ───────────────────────────────
-$title        = trim($_POST['title_project']    ?? '');
-$slug         = trim($_POST['slug_project']     ?? '');
-$category     = $_POST['category_project']      ?? 'web';
-$status       = $_POST['status_project']        ?? 'draft';
-$summary      = trim($_POST['summary_project']  ?? '');
-$body         = trim($_POST['body_project']     ?? '');
-$techStack    = $_POST['tech_stack']            ?? '[]';
-$urlDemo      = trim($_POST['url_demo']         ?? '');
-$urlGithub    = trim($_POST['url_github']       ?? '');
-$urlLive      = trim($_POST['url_live']         ?? '');
-$isFeatured   = isset($_POST['is_featured']) ? 1 : 0;
-$displayOrder = (int)($_POST['display_order']   ?? 0);
+$title        = $postString('title_project');
+$slug         = $postString('slug_project');
+$category     = $postString('category_project', 'web');
+$status       = $postString('status_project', 'draft');
+$summary      = $postString('summary_project');
+$body         = $postString('body_project');
+$objectives   = $postString('objectives_project');
+$features     = $postString('features_project');
+$contribution = $postString('contribution_project');
+$techStack    = $postString('tech_stack', '[]');
+$urlDemo      = $postString('url_demo');
+$urlGithub    = $postString('url_github');
+$urlLive      = $postString('url_live');
+$previewMode  = $postString('preview_mode', 'disabled');
+$previewUrl   = $postString('preview_url');
+$previewEnabled = isset($_POST['preview_enabled']) ? 1 : 0;
+$isFeatured = isset($_POST['is_featured']) ? 1 : 0;
+$displayOrderRaw = $postString('display_order', '0');
+$displayOrderValidated = filter_var($displayOrderRaw, FILTER_VALIDATE_INT);
+$displayOrder = ($displayOrderValidated !== false && $displayOrderValidated >= 0) ? (int) $displayOrderValidated : 0;
 
-// ── Validações básicas ────────────────────────────────────────
 $errors = [];
+if (mb_strlen($title) < 2 || mb_strlen($title) > 200) $errors[] = 'O título deve ter entre 2 e 200 caracteres.';
+if (mb_strlen($slug) < 2 || mb_strlen($slug) > 200 || !preg_match('/\A[a-z0-9-]+\z/', $slug)) {
+    $errors[] = 'O slug deve ter entre 2 e 200 caracteres e conter apenas letras minúsculas, números e hífens.';
+}
+if (mb_strlen($summary) > 300) $errors[] = 'O resumo não pode exceder 300 caracteres.';
+if (mb_strlen($body) > 20000 || mb_strlen($objectives) > 10000 || mb_strlen($features) > 10000 || mb_strlen($contribution) > 10000) {
+    $errors[] = 'O conteúdo do estudo de caso excede o limite permitido.';
+}
+if ($displayOrderValidated === false || $displayOrderValidated < 0) $errors[] = 'A ordem de exibição deve ser um número inteiro igual ou superior a zero.';
+if (!in_array($category, ['web', 'mobile', 'api', 'desktop', 'design', 'other'], true)) $errors[] = 'Categoria inválida.';
+if (!in_array($status, ['published', 'draft', 'archived'], true)) $errors[] = 'Estado inválido.';
+if (!in_array($previewMode, ['external_embed', 'external_link', 'internal', 'gallery', 'disabled'], true)) $errors[] = 'Modo de preview inválido.';
+if (mb_strlen($previewUrl) > 500) $errors[] = 'O caminho do preview excede 500 caracteres.';
+if (in_array($previewMode, ['external_embed', 'external_link'], true)) {
+    $parts = parse_url($previewUrl);
+    if (!filter_var($previewUrl, FILTER_VALIDATE_URL) || !is_array($parts)
+        || !in_array(strtolower((string) ($parts['scheme'] ?? '')), ['http', 'https'], true)
+        || isset($parts['user']) || isset($parts['pass'])) {
+        $errors[] = 'A URL externa do preview deve ser HTTP(S) válida.';
+    }
+} elseif ($previewMode === 'internal'
+    && (!preg_match('#\A/demos/[a-zA-Z0-9/_-]+(?:\.html)?\z#', $previewUrl) || str_contains($previewUrl, '..'))) {
+    $errors[] = 'A demo interna deve apontar para um ficheiro estático em /demos/. PHP não é permitido.';
+}
+if ($previewMode === 'disabled') $previewEnabled = 0;
+foreach (['URL Demo' => $urlDemo, 'URL GitHub' => $urlGithub, 'URL Live' => $urlLive] as $label => $url) {
+    if ($url === '') continue;
+    $parts = parse_url($url);
+    if (!filter_var($url, FILTER_VALIDATE_URL) || !is_array($parts)
+        || !in_array(strtolower((string) ($parts['scheme'] ?? '')), ['http', 'https'], true)
+        || isset($parts['user']) || isset($parts['pass'])) {
+        $errors[] = $label . ' deve ser uma URL HTTP(S) válida.';
+    }
+}
 
-if (mb_strlen($title) < 2) {
-    $errors[] = 'O título deve ter pelo menos 2 caracteres.';
-}
-if (mb_strlen($slug) < 2) {
-    $errors[] = 'O slug deve ter pelo menos 2 caracteres.';
-}
-if (!preg_match('/^[a-z0-9-]+$/', $slug)) {
-    $errors[] = 'O slug só pode conter letras minúsculas, números e hífens.';
-}
-if (!in_array($category, ['web','mobile','api','desktop','design','other'])) {
-    $errors[] = 'Categoria inválida.';
-}
-if (!in_array($status, ['published','draft','archived'])) {
-    $errors[] = 'Estado inválido.';
-}
-
-// ── Unicidade do slug (excluindo o próprio registo) ───────────
-$stmt = $db->prepare("SELECT COUNT(*) FROM _projects WHERE slug_project = ? AND id_project != ?");
+$stmt = $db->prepare('SELECT COUNT(*) FROM _projects WHERE slug_project = ? AND id_project != ?');
 $stmt->execute([$slug, $id]);
-if ((int)$stmt->fetchColumn() > 0) {
-    $errors[] = 'Este slug já está em uso por outro projecto. Escolhe um diferente.';
-}
+if ((int) $stmt->fetchColumn() > 0) $errors[] = 'Este slug já está em uso por outro projecto. Escolhe um diferente.';
 
-// ── Validação do tech_stack (JSON válido) ────────────────────
 $techArray = json_decode($techStack, true);
-if (!is_array($techArray)) {
+if (!is_array($techArray) || !array_is_list($techArray)) {
     $errors[] = 'Formato inválido para o Tech Stack.';
-}
-
-if (!empty($errors)) {
-    $jsonError($errors);
-}
-
-// ── Tratar upload de nova capa (se enviada) ──────────────────
-$newCoverName = $old['cover_project']; // mantém a actual por padrão
-$coverFile    = $_FILES['cover_project'] ?? null;
-
-if ($coverFile && $coverFile['error'] === UPLOAD_ERR_OK) {
-    $allowedTypes = ['image/jpeg' => 'jpg', 'image/png' => 'png', 'image/webp' => 'webp'];
-    $finfo = finfo_open(FILEINFO_MIME_TYPE);
-    $mime  = finfo_file($finfo, $coverFile['tmp_name']);
-    finfo_close($finfo);
-
-    if (!array_key_exists($mime, $allowedTypes)) {
-        $errors[] = 'Formato de imagem não permitido. Usa JPEG, PNG ou WebP.';
-    } elseif ($coverFile['size'] > MAX_UPLOAD_SIZE) {
-        $errors[] = 'A imagem excede o tamanho máximo de ' . (MAX_UPLOAD_SIZE / 1024 / 1024) . ' MB.';
-    } else {
-        $ext         = $allowedTypes[$mime];
-        $newCoverName = 'project_' . time() . '_' . bin2hex(random_bytes(4)) . '.' . $ext;
-        $dest         = ROOT_PATH . '/assets/img/projects/' . $newCoverName;
-
-        if (!move_uploaded_file($coverFile['tmp_name'], $dest)) {
-            $errors[] = 'Falha ao guardar a nova imagem. Verifica as permissões da pasta.';
-        } else {
-            // Apagar imagem antiga (se existir)
-            $oldPath = ROOT_PATH . '/assets/img/projects/' . $old['cover_project'];
-            if ($old['cover_project'] && file_exists($oldPath)) {
-                unlink($oldPath);
-            }
+} else {
+    if (count($techArray) > 100) $errors[] = 'O Tech Stack não pode conter mais de 100 tecnologias.';
+    foreach ($techArray as $technology) {
+        if (!is_string($technology) || trim($technology) === '' || mb_strlen($technology) > 80) {
+            $errors[] = 'Cada tecnologia deve ter entre 1 e 80 caracteres.';
+            break;
         }
     }
 }
 
-// Se houve erro no upload, devolver
-if (!empty($errors)) {
-    $jsonError($errors);
+// A imagem é opcional na edição; sem um novo ficheiro, mantém a capa existente.
+$coverFile = $_FILES['cover_project'] ?? null;
+$allowedTypes = ['image/jpeg' => 'jpg', 'image/png' => 'png', 'image/webp' => 'webp'];
+$detectedMime = null;
+if (is_array($coverFile) && isset($coverFile['error'])) {
+    $uploadError = (int) $coverFile['error'];
+    if ($uploadError !== UPLOAD_ERR_NO_FILE && $uploadError !== UPLOAD_ERR_OK) {
+        $errors[] = match ($uploadError) {
+            UPLOAD_ERR_INI_SIZE, UPLOAD_ERR_FORM_SIZE => 'A nova imagem excede o limite de upload do servidor (' . round(MAX_UPLOAD_SIZE / 1024 / 1024, 2) . ' MB).',
+            UPLOAD_ERR_PARTIAL => 'O upload da nova imagem ficou incompleto. Tenta novamente.',
+            UPLOAD_ERR_NO_TMP_DIR => 'O servidor não tem uma pasta temporária para receber uploads.',
+            UPLOAD_ERR_CANT_WRITE => 'O servidor não conseguiu escrever o ficheiro enviado.',
+            UPLOAD_ERR_EXTENSION => 'Uma extensão do PHP interrompeu o upload da imagem.',
+            default => 'Não foi possível receber a nova imagem. Tenta novamente.',
+        };
+    } elseif ($uploadError === UPLOAD_ERR_OK) {
+        $tmpName = isset($coverFile['tmp_name']) && is_string($coverFile['tmp_name']) ? $coverFile['tmp_name'] : '';
+        $fileSize = isset($coverFile['size']) ? (int) $coverFile['size'] : 0;
+        if ($fileSize <= 0 || $fileSize > MAX_UPLOAD_SIZE) {
+            $errors[] = 'A nova imagem deve ter entre 1 byte e ' . round(MAX_UPLOAD_SIZE / 1024 / 1024, 2) . ' MB.';
+        }
+        if ($tmpName === '' || !is_uploaded_file($tmpName)) {
+            $errors[] = 'O ficheiro de imagem recebido não é válido.';
+        } elseif (!function_exists('finfo_open')) {
+            $errors[] = 'A validação de imagens não está disponível no servidor.';
+        } else {
+            $finfo = finfo_open(FILEINFO_MIME_TYPE);
+            if ($finfo === false) {
+                $errors[] = 'Não foi possível validar o formato da imagem no servidor.';
+            } else {
+                $mime = finfo_file($finfo, $tmpName);
+                unset($finfo); // finfo_close() is deprecated as of PHP 8.5.
+                if (!is_string($mime) || !array_key_exists($mime, $allowedTypes)) {
+                    $errors[] = 'Formato de imagem não permitido. Usa JPEG, PNG ou WebP.';
+                } else {
+                    $detectedMime = $mime;
+                }
+            }
+        }
+    }
+} elseif ($coverFile !== null) {
+    $errors[] = 'Os dados da imagem enviada não são válidos.';
 }
 
-// ── Actualizar na base de dados ───────────────────────────────
+if (!empty($errors)) $jsonError($errors);
+
+$oldCoverName = basename((string) ($old['cover_project'] ?? ''));
+$newCoverName = $oldCoverName;
+$newCoverPath = null;
+$coverWasReplaced = false;
+if ($detectedMime !== null) {
+    $extension = $allowedTypes[$detectedMime];
+    $newCoverName = 'project_' . time() . '_' . bin2hex(random_bytes(4)) . '.' . $extension;
+    $uploadDirectory = ROOT_PATH . '/assets/img/projects';
+    $newCoverPath = $uploadDirectory . '/' . $newCoverName;
+    if (!is_dir($uploadDirectory) || !is_writable($uploadDirectory)) {
+        $jsonError(['A pasta de imagens do projecto não existe ou não permite escrita.'], 500);
+    }
+    if (!move_uploaded_file((string) $coverFile['tmp_name'], $newCoverPath)) {
+        $jsonError(['Falha ao guardar a nova imagem. Verifica as permissões da pasta.'], 500);
+    }
+    $coverWasReplaced = true;
+}
+
 try {
-    $stmt = $db->prepare("
+    $db->beginTransaction();
+    $stmt = $db->prepare(<<<'SQL'
         UPDATE _projects SET
-            title_project   = ?,
-            slug_project    = ?,
+            title_project = ?,
+            slug_project = ?,
             summary_project = ?,
-            body_project    = ?,
+            body_project = ?,
+            objectives_project = ?,
+            features_project = ?,
+            contribution_project = ?,
             category_project = ?,
-            tech_stack      = ?,
-            cover_project   = ?,
-            url_demo        = ?,
-            url_github      = ?,
-            url_live        = ?,
-            is_featured     = ?,
-            display_order   = ?,
-            status_project  = ?
-        WHERE id_project   = ?
-    ");
+            tech_stack = ?,
+            cover_project = ?,
+            url_demo = ?,
+            url_github = ?,
+            url_live = ?,
+            preview_mode = ?,
+            preview_url = ?,
+            preview_enabled = ?,
+            is_featured = ?,
+            display_order = ?,
+            status_project = ?
+        WHERE id_project = ?
+        SQL);
     $stmt->execute([
-        $title,
-        $slug,
-        $summary,
-        $body,
-        $category,
-        $techStack,
-        $newCoverName,
-        $urlDemo,
-        $urlGithub,
-        $urlLive,
-        $isFeatured,
-        $displayOrder,
-        $status,
-        $id,
+        $title, $slug, $summary, $body, $objectives, $features, $contribution,
+        $category, json_encode(array_values($techArray), JSON_UNESCAPED_UNICODE | JSON_INVALID_UTF8_SUBSTITUTE),
+        $newCoverName, $urlDemo, $urlGithub, $urlLive, $previewMode,
+        $previewUrl !== '' ? $previewUrl : null, $previewEnabled, $isFeatured,
+        $displayOrder, $status, $id,
     ]);
 
-    // Auditoria
     logAudit(
-        (int)$_SESSION['admin_id'],
-        null,
-        'project.update',
-        '_projects',
-        $id,
-        $old,
+        (int) ($_SESSION['admin_id'] ?? 0), null,
+        'project.update', '_projects', $id, $old,
         ['title' => $title, 'slug' => $slug, 'category' => $category, 'status' => $status]
     );
-
-    echo json_encode(['success' => true, 'message' => 'Projecto actualizado com sucesso.']);
-    exit;
-
-} catch (PDOException $e) {
-    // Remover nova imagem se houve erro (rollback manual)
-    if ($newCoverName !== $old['cover_project']) {
-        $newPath = ROOT_PATH . '/assets/img/projects/' . $newCoverName;
-        if (file_exists($newPath)) unlink($newPath);
-    }
-    error_log('[EDIT PROJECT] ' . $e->getMessage());
+    $db->commit();
+} catch (Throwable $exception) {
+    if ($db->inTransaction()) $db->rollBack();
+    if ($newCoverPath !== null && is_file($newCoverPath)) @unlink($newCoverPath);
+    error_log('[EDIT PROJECT] ' . $exception->getMessage());
     $jsonError(['Erro interno ao actualizar o projecto. Tenta novamente.'], 500);
 }
+
+// Apaga a capa antiga só depois de a actualização ter sido confirmada.
+if ($coverWasReplaced && $oldCoverName !== '' && $oldCoverName !== $newCoverName) {
+    $oldPath = ROOT_PATH . '/assets/img/projects/' . $oldCoverName;
+    if (is_file($oldPath) && !@unlink($oldPath)) {
+        error_log('[EDIT PROJECT] Não foi possível remover a capa antiga: ' . $oldCoverName);
+    }
+}
+
+$sendJson(['success' => true, 'message' => 'Projecto actualizado com sucesso.']);

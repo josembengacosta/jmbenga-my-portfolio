@@ -23,6 +23,7 @@ if (!$msg) redirect('/jm-panel/messages?msg=notfound');
 // Marcar como lida automaticamente ao abrir
 if ($msg['status_msg'] === 'new') {
     $db->prepare("UPDATE _contact_message SET status_msg = 'read' WHERE id = ?")->execute([$id]);
+    logAudit((int) ($_SESSION['admin_id'] ?? 0), null, 'message.open_mark_read', '_contact_message', $id, ['status' => 'new'], ['status' => 'read']);
     $msg['status_msg'] = 'read';
 }
 
@@ -38,7 +39,7 @@ $nextId = $nextStmt->fetchColumn();
 // ── Admin ─────────────────────────────────────────────────────
 $adminName  = $_SESSION['admin_full_name'] ?? $_SESSION['admin_name'] ?? 'Admin';
 $adminEmail = $_SESSION['admin_email'] ?? '';
-$csrfToken  = $_SESSION['admin_csrf_token'];
+$csrfToken  = is_string($_SESSION['admin_csrf_token'] ?? null) ? $_SESSION['admin_csrf_token'] : '';
 
 // ── Parsing UA do remetente (guardado na BD, não do admin) ────
 $ua      = $msg['user_agent'] ?? '';
@@ -47,8 +48,13 @@ $os      = parseOSFromUA($ua);
 
 // ── Iniciais do remetente ─────────────────────────────────────
 $parts    = explode(' ', trim($msg['name_msg']));
-$initials = strtoupper(mb_substr($parts[0], 0, 1));
-if (isset($parts[1])) $initials .= strtoupper(mb_substr($parts[1], 0, 1));
+$firstPart = (string) ($parts[0] ?? '');
+$initials = strtoupper(function_exists('mb_substr') ? mb_substr($firstPart, 0, 1, 'UTF-8') : substr($firstPart, 0, 1));
+if (isset($parts[1])) {
+    $secondPart = (string) $parts[1];
+    $initials .= strtoupper(function_exists('mb_substr') ? mb_substr($secondPart, 0, 1, 'UTF-8') : substr($secondPart, 0, 1));
+}
+if ($initials === '') $initials = 'M';
 
 // ── Estado: classes consistentes com inbox.php ────────────────
 function statusInfo(string $s): array {
@@ -63,7 +69,7 @@ function statusInfo(string $s): array {
 $si = statusInfo($msg['status_msg']);
 ?>
 <!DOCTYPE html>
-<html lang="pt" data-theme="dark" data-base-url="<?= BASE_URL ?>">
+<html lang="pt" data-theme="dark" data-base-url="<?= e(BASE_URL) ?>">
 <?php include __DIR__ . '/../../include/head.php'; ?>
 </head>
 
@@ -626,8 +632,8 @@ $si = statusInfo($msg['status_msg']);
                         <span style="color:var(--border)">·</span>
                         <span><?= date('d/m/Y H:i', strtotime($msg['created_at'])) ?></span>
                         <span style="color:var(--border)">·</span>
-                        <span class="badge-status <?= $si['cls'] ?>" id="statusBadge">
-                            <i class="fas <?= $si['icon'] ?>"></i> <?= $si['label'] ?>
+                        <span class="badge-status <?= e($si['cls']) ?>" id="statusBadge">
+                            <i class="fas <?= e($si['icon']) ?>"></i> <?= e($si['label']) ?>
                         </span>
                         <?php if (!empty($msg['is_starred']) && $msg['is_starred']): ?>
                         <span style="color:#f59e0b;font-size:.8rem"><i class="fas fa-star"></i></span>
@@ -647,7 +653,7 @@ $si = statusInfo($msg['status_msg']);
                         <span><?= ($msg['is_starred'] ?? 0) ? 'Favorito' : 'Marcar' ?></span>
                     </button>
                     <button class="btn btn-secondary" id="readBtn" data-id="<?= $id ?>"
-                        data-status="<?= $msg['status_msg'] ?>">
+                        data-status="<?= e($msg['status_msg']) ?>">
                         <i class="fas fa-<?= $msg['status_msg'] === 'new' ? 'check' : 'envelope' ?>"></i>
                         <span><?= $msg['status_msg'] === 'new' ? 'Marcar lida' : 'Não lida' ?></span>
                     </button>
@@ -918,8 +924,9 @@ $si = statusInfo($msg['status_msg']);
     <?php include __DIR__ . '/../../include/modal_logout.php'; ?>
 
     <script>
-    const BASE = '<?= BASE_URL ?>';
-    const CSRF = '<?= $csrfToken ?>';
+    const BASE =
+        <?= json_encode(BASE_URL, JSON_UNESCAPED_SLASHES | JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP) ?>;
+    const CSRF = <?= json_encode($csrfToken, JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP) ?>;
     const MSG_ID = <?= $id ?>;
 
     // ── Toast ─────────────────────────────────────────────────────
@@ -932,7 +939,14 @@ $si = statusInfo($msg['status_msg']);
             error: 'circle-xmark',
             info: 'circle-info'
         };
-        t.innerHTML = `<i class="fas fa-${icons[type] || 'circle-info'}"></i> ${msg}`;
+        const icon = document.createElement('i');
+        icon.className = `fas fa-${icons[type] || 'circle-info'}`;
+        icon.setAttribute('aria-hidden', 'true');
+        const text = document.createElement('span');
+        text.textContent = String(msg ?? '');
+        t.setAttribute('role', 'status');
+        t.setAttribute('aria-live', 'polite');
+        t.append(icon, text);
         c.appendChild(t);
         setTimeout(() => {
             t.style.opacity = '0';
@@ -979,10 +993,20 @@ $si = statusInfo($msg['status_msg']);
             method: 'POST',
             headers: {
                 'X-Requested-With': 'XMLHttpRequest',
-                'X-CSRF-Token': CSRF
-            }
+                'X-CSRF-Token': CSRF,
+                'Accept': 'application/json'
+            },
+            credentials: 'same-origin'
         });
-        return res.json();
+        const contentType = res.headers.get('content-type') || '';
+        if (!contentType.includes('application/json')) {
+            throw new Error('Resposta inválida do servidor. Atualiza a página e tenta novamente.');
+        }
+        const data = await res.json();
+        if (!res.ok && !data.message) {
+            data.message = `O pedido falhou (HTTP ${res.status}).`;
+        }
+        return data;
     }
 
     // ── Favorito ──────────────────────────────────────────────────
@@ -1040,12 +1064,9 @@ $si = statusInfo($msg['status_msg']);
     document.getElementById('archiveBtn').addEventListener('click', async function() {
         const icon = this.querySelector('i');
         const span = this.querySelector('span');
-        const isArchived = this.dataset.archived === '1';
-
-        // Usar endpoints distintos
-        const endpoint = isArchived ?
-            '/jm-panel/messages/unarchive?id=' + MSG_ID :
-            '/jm-panel/messages/archive?id=' + MSG_ID;
+        // A rota /messages/archive alterna entre arquivar e restaurar.
+        // Não existe rota /messages/unarchive no .htaccess actual.
+        const endpoint = '/jm-panel/messages/archive?id=' + MSG_ID;
 
         try {
             const data = await apiPost(endpoint);
@@ -1090,7 +1111,7 @@ $si = statusInfo($msg['status_msg']);
         }
         Swal.fire({
             title: 'Eliminar mensagem?',
-            html: `<span style="color:var(--text-dim);font-size:.9rem">Vais eliminar permanentemente a mensagem de <strong style="color:var(--text)">"${title}"</strong>.<br>Esta ação não pode ser desfeita.</span>`,
+            text: `Vais eliminar permanentemente a mensagem de "${title}". Esta ação não pode ser desfeita.`,
             icon: 'warning',
             showCancelButton: true,
             confirmButtonText: '<i class="fas fa-trash"></i> Sim, eliminar',
@@ -1105,18 +1126,19 @@ $si = statusInfo($msg['status_msg']);
 
     // ── Atalhos de teclado ────────────────────────────────────────
     document.addEventListener('keydown', e => {
-        if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
+        if (e.target.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT', 'BUTTON'].includes(e.target.tagName))
+            return;
         <?php if ($prevId): ?>
-        if (e.key === 'ArrowLeft') window.location.href =
-            '<?= BASE_URL ?>/jm-panel/messages/view?id=<?= $prevId ?>';
+        if (e.key === 'ArrowLeft') window.location.href = BASE +
+            '/jm-panel/messages/view?id=<?= (int) $prevId ?>';
         <?php endif; ?>
         <?php if ($nextId): ?>
-        if (e.key === 'ArrowRight') window.location.href =
-            '<?= BASE_URL ?>/jm-panel/messages/view?id=<?= $nextId ?>';
+        if (e.key === 'ArrowRight') window.location.href = BASE +
+            '/jm-panel/messages/view?id=<?= (int) $nextId ?>';
         <?php endif; ?>
-        if (e.key === 'r' || e.key === 'R') window.location.href =
-            '<?= BASE_URL ?>/jm-panel/messages/reply?id=<?= $id ?>';
-        if (e.key === 'Backspace') window.location.href = '<?= BASE_URL ?>/jm-panel/messages';
+        if (e.key === 'r' || e.key === 'R') window.location.href = BASE + '/jm-panel/messages/reply?id=' +
+            MSG_ID;
+        if (e.key === 'Backspace') window.location.href = BASE + '/jm-panel/messages';
     });
     </script>
 </body>

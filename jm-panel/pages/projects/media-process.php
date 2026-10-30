@@ -5,12 +5,35 @@
 require_once __DIR__ . '/../../include/functions_admin.php';
 
 startAdminSession();
+checkAdminRememberMe();
 requireAdminLogin();
 requireNoLockscreen();
 
 header('Content-Type: application/json; charset=utf-8');
 
 $db = $GLOBALS['pdo'];
+
+// Limite efectivo do upload: respeita a configuração da aplicação e os limites do PHP.
+$iniBytes = static function (string $value): int {
+    $value = trim($value);
+    if ($value === '') return 0;
+    $unit = strtolower(substr($value, -1));
+    $number = (float) $value;
+    switch ($unit) {
+        case 'g': $number *= 1024; // fall through
+        case 'm': $number *= 1024; // fall through
+        case 'k': $number *= 1024;
+    }
+    return (int) $number;
+};
+$uploadLimits = [
+    defined('MAX_UPLOAD_SIZE') ? (int) MAX_UPLOAD_SIZE : 0,
+    $iniBytes((string) ini_get('upload_max_filesize')),
+    $iniBytes((string) ini_get('post_max_size')),
+];
+$uploadLimits = array_values(array_filter($uploadLimits, static fn (int $bytes): bool => $bytes > 0));
+$maxUploadSize = $uploadLimits ? min($uploadLimits) : 5 * 1024 * 1024;
+
 
 // ── Apenas POST ───────────────────────────────────────────────
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
@@ -49,20 +72,37 @@ if (!$stmt->fetch()) {
 
 // ── Validar ficheiro ──────────────────────────────────────────
 $file = $_FILES['media'] ?? null;
-if (!$file || $file['error'] !== UPLOAD_ERR_OK) {
-    $jsonError(['Seleciona um ficheiro para upload.']);
+if (!$file) {
+    $jsonError(['Não foi recebido nenhum ficheiro. Selecciona uma imagem.']);
+}
+if (($file['error'] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_OK) {
+    $uploadError = (int) $file['error'];
+    $messages = [
+        UPLOAD_ERR_INI_SIZE => 'A imagem excede o limite upload_max_filesize configurado no PHP.',
+        UPLOAD_ERR_FORM_SIZE => 'A imagem excede o limite permitido pelo formulário.',
+        UPLOAD_ERR_PARTIAL => 'O upload ficou incompleto. Tenta novamente.',
+        UPLOAD_ERR_NO_FILE => 'Selecciona uma imagem para carregar.',
+        UPLOAD_ERR_NO_TMP_DIR => 'O servidor não tem uma pasta temporária de upload configurada.',
+        UPLOAD_ERR_CANT_WRITE => 'O servidor não conseguiu escrever o ficheiro no disco.',
+        UPLOAD_ERR_EXTENSION => 'Uma extensão do PHP interrompeu o upload.',
+    ];
+    $jsonError([$messages[$uploadError] ?? 'Falha desconhecida ao receber o ficheiro.'], 422);
+}
+
+if (empty($file['tmp_name']) || !is_uploaded_file($file['tmp_name'])) {
+    $jsonError(['O ficheiro recebido não é um upload válido.']);
+}
+if ((int) ($file['size'] ?? 0) > $maxUploadSize) {
+    $jsonError(['Ficheiro excede o tamanho máximo de ' . number_format($maxUploadSize / 1024 / 1024, 1, ',', '') . ' MB.']);
 }
 
 $allowedTypes = ['image/jpeg' => 'jpg', 'image/png' => 'png', 'image/webp' => 'webp'];
 $finfo = finfo_open(FILEINFO_MIME_TYPE);
-$mime  = finfo_file($finfo, $file['tmp_name']);
-finfo_close($finfo);
-
-if (!array_key_exists($mime, $allowedTypes)) {
-    $jsonError(['Formato não permitido. Usa JPEG, PNG ou WebP.']);
-}
-if ($file['size'] > MAX_UPLOAD_SIZE) {
-    $jsonError(['Ficheiro excede o tamanho máximo de ' . (MAX_UPLOAD_SIZE / 1024 / 1024) . ' MB.']);
+$mime = $finfo ? finfo_file($finfo, $file['tmp_name']) : false;
+if ($finfo) finfo_close($finfo);
+$imageInfo = @getimagesize($file['tmp_name']);
+if (!is_string($mime) || !array_key_exists($mime, $allowedTypes) || !$imageInfo || !in_array($imageInfo['mime'] ?? '', array_keys($allowedTypes), true)) {
+    $jsonError(['Formato de imagem não permitido ou ficheiro inválido. Usa JPEG, PNG ou WebP.']);
 }
 
 // ── Upload ────────────────────────────────────────────────────
@@ -74,33 +114,38 @@ if (!move_uploaded_file($file['tmp_name'], $dest)) {
     $jsonError(['Falha ao guardar o ficheiro. Verifica as permissões.'], 500);
 }
 
-// ── Inserir na BD ─────────────────────────────────────────────
+// ── Inserir na base de dados ──────────────────────────────────
 $caption = trim($_POST['caption_media'] ?? '');
+if (mb_strlen($caption) > 255) {
+    $jsonError(['A legenda não pode exceder 255 caracteres.']);
+}
 
 try {
     $db->prepare("
         INSERT INTO _projects_media (id_project, url_media, caption_media)
         VALUES (?, ?, ?)
     ")->execute([$projectId, $fileName, $caption]);
-
-    $newId = $db->lastInsertId();
-
-    logAudit(
-        (int)$_SESSION['admin_id'],
-        null,
-        'project_media.create',
-        '_projects_media',
-        (int)$newId,
-        null,
-        ['id_project' => $projectId, 'url' => $fileName]
-    );
-
-    echo json_encode(['success' => true, 'message' => 'Imagem adicionada com sucesso.']);
-    exit;
-
-} catch (PDOException $e) {
-    // Remover ficheiro se a inserção falhar
-    if (file_exists($dest)) unlink($dest);
+    $newId = (int) $db->lastInsertId();
+} catch (Throwable $e) {
+    if (isset($dest) && is_file($dest)) @unlink($dest);
     error_log('[MEDIA UPLOAD] ' . $e->getMessage());
     $jsonError(['Erro ao guardar na base de dados.'], 500);
 }
+
+// A falha do registo de auditoria não deve invalidar a imagem já guardada.
+try {
+    logAudit(
+        (int) ($_SESSION['admin_id'] ?? 0),
+        null,
+        'project_media.create',
+        '_projects_media',
+        $newId,
+        null,
+        ['id_project' => $projectId, 'url' => $fileName]
+    );
+} catch (Throwable $e) {
+    error_log('[MEDIA UPLOAD AUDIT] ' . $e->getMessage());
+}
+
+echo json_encode(['success' => true, 'message' => 'Imagem adicionada com sucesso.'], JSON_UNESCAPED_UNICODE | JSON_INVALID_UTF8_SUBSTITUTE);
+exit;

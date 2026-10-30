@@ -7,13 +7,27 @@ declare(strict_types=1);
  * Rate limiting, validação de histórico, cache de contexto, anti-injection, logs.
  */
 
-// 3. Headers HTTP de segurança e CORS
-header("Content-Type: application/json; charset=UTF-8");
-header("Access-Control-Allow-Origin: https://jmbenga.freedev.app");
-header("Access-Control-Allow-Methods: POST");
-header("Access-Control-Allow-Headers: Content-Type, Access-Control-Allow-Headers, Authorization, X-Requested-With");
+// Headers HTTP e CORS. Só autoriza o domínio público conhecido.
+header('Content-Type: application/json; charset=utf-8');
+header('X-Content-Type-Options: nosniff');
+header('Cache-Control: no-store');
 
-// 4. Inclusão dos ficheiros do sistema
+$origin = (string) ($_SERVER['HTTP_ORIGIN'] ?? '');
+$allowedOrigins = ['https://jmbenga.freedev.app'];
+if ($origin !== '' && in_array($origin, $allowedOrigins, true)) {
+    header('Access-Control-Allow-Origin: ' . $origin);
+    header('Vary: Origin');
+    header('Access-Control-Allow-Methods: POST, OPTIONS');
+    header('Access-Control-Allow-Headers: Content-Type, Authorization, X-Requested-With');
+}
+
+// Responder ao preflight antes de validar o Content-Type.
+if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'OPTIONS') {
+    http_response_code(($origin === '' || in_array($origin, $allowedOrigins, true)) ? 204 : 403);
+    exit;
+}
+
+// Inclusão dos ficheiros do sistema
 require_once dirname(__DIR__) . '/includes/config.php';
 require_once dirname(__DIR__) . '/includes/db.php';
 require_once dirname(__DIR__) . '/includes/functions.php';
@@ -27,9 +41,13 @@ const CHAT_CONTEXT_CACHE_TTL   = 300;  // 5 minutos
 const CHAT_MAX_HISTORY_ITEMS   = 10;
 const CHAT_MAX_HISTORY_AGE     = 1800; // 30 minutos
 
-// ── Headers ─────────────────────────────────────────────────
-header('Content-Type: application/json; charset=utf-8');
-header('X-Content-Type-Options: nosniff');
+// ── Validação do pedido ─────────────────────────────────────
+if (($_SERVER['REQUEST_METHOD'] ?? 'GET') !== 'POST') {
+    http_response_code(405);
+    header('Allow: POST, OPTIONS');
+    echo json_encode(['error' => 'Método não permitido.'], JSON_UNESCAPED_UNICODE);
+    exit;
+}
 
 $contentType = $_SERVER['CONTENT_TYPE'] ?? '';
 if (!str_contains($contentType, 'application/json')) {
@@ -38,48 +56,70 @@ if (!str_contains($contentType, 'application/json')) {
     exit;
 }
 
-if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
-    http_response_code(405);
-    header('Allow: POST');
-    echo json_encode(['error' => 'Método não permitido.'], JSON_UNESCAPED_UNICODE);
-    exit;
-}
-
-// ── Rate Limiting (por IP, via sessão/ficheiro) ───────────
-function checkRateLimit(): ?string
+// ── Rate limiting por IP, guardado fora da pasta pública ───
+function checkRateLimit(string $ip): array
 {
     $now = time();
+    $path = rtrim(sys_get_temp_dir(), DIRECTORY_SEPARATOR)
+        . DIRECTORY_SEPARATOR . 'jmbenga-chat-rate-' . hash('sha256', $ip) . '.json';
+    $handle = @fopen($path, 'c+');
 
-    // Inicializa a estrutura de rate limit na sessão se não existir ou se o tempo expirou
-    if (!isset($_SESSION['chat_rate_limit']) || $_SESSION['chat_rate_limit']['reset'] < $now) {
-        $_SESSION['chat_rate_limit'] = [
-            'count' => 0,
-            'reset' => $now + CHAT_RATE_LIMIT_WINDOW
-        ];
+    // Se o armazenamento não estiver disponível, falhar em segurança.
+    if ($handle === false) {
+        return ['ok' => false, 'limited' => false, 'retry_after' => 0];
+    }
+    if (!flock($handle, LOCK_EX)) {
+        fclose($handle);
+        return ['ok' => false, 'limited' => false, 'retry_after' => 0];
     }
 
-    // Incrementa o contador para a sessão atual
-    $_SESSION['chat_rate_limit']['count']++;
-
-    // Verifica se ultrapassou o limite definido nas constantes
-    if ($_SESSION['chat_rate_limit']['count'] > CHAT_RATE_LIMIT_REQUESTS) {
-        $remaining = max(0, $_SESSION['chat_rate_limit']['reset'] - $now);
-        return "Muitas mensagens. Aguarde {$remaining}s.";
+    $raw = stream_get_contents($handle);
+    $state = is_string($raw) ? json_decode($raw, true) : null;
+    if (!is_array($state) || !isset($state['reset'], $state['count']) || (int) $state['reset'] <= $now) {
+        $state = ['count' => 0, 'reset' => $now + CHAT_RATE_LIMIT_WINDOW];
     }
 
-    return null;
+    $state['count'] = max(0, (int) $state['count']) + 1;
+    $retryAfter = max(1, (int) $state['reset'] - $now);
+    rewind($handle);
+    ftruncate($handle, 0);
+    $written = fwrite($handle, json_encode($state));
+    fflush($handle);
+    flock($handle, LOCK_UN);
+    fclose($handle);
+
+    if ($written === false) {
+        return ['ok' => false, 'limited' => false, 'retry_after' => 0];
+    }
+
+    return [
+        'ok' => true,
+        'limited' => $state['count'] > CHAT_RATE_LIMIT_REQUESTS,
+        'retry_after' => $retryAfter,
+    ];
 }
 
-$rateLimitError = checkRateLimit();
-if ($rateLimitError) {
+$clientIp = (string) ($_SERVER['REMOTE_ADDR'] ?? '0.0.0.0');
+$rateLimit = checkRateLimit($clientIp);
+if (!$rateLimit['ok']) {
+    http_response_code(503);
+    echo json_encode(['error' => 'O assistente está temporariamente indisponível. Tente novamente.'], JSON_UNESCAPED_UNICODE);
+    exit;
+}
+if ($rateLimit['limited']) {
     http_response_code(429);
-    header('Retry-After: ' . CHAT_RATE_LIMIT_WINDOW);
-    echo json_encode(['error' => $rateLimitError], JSON_UNESCAPED_UNICODE);
+    header('Retry-After: ' . $rateLimit['retry_after']);
+    echo json_encode(['error' => 'Muitas mensagens num curto período. Aguarde antes de tentar novamente.'], JSON_UNESCAPED_UNICODE);
     exit;
 }
 
 // ── Input parsing ───────────────────────────────────────────
 $rawBody = file_get_contents('php://input');
+if (!is_string($rawBody) || strlen($rawBody) > 32768) {
+    http_response_code(413);
+    echo json_encode(['error' => 'Pedido demasiado grande.'], JSON_UNESCAPED_UNICODE);
+    exit;
+}
 $input = json_decode($rawBody, true);
 
 if (!is_array($input)) {
@@ -88,9 +128,21 @@ if (!is_array($input)) {
     exit;
 }
 
-$userMessage = trim((string) ($input['message'] ?? ''));
+if (!isset($input['message']) || !is_string($input['message'])) {
+    http_response_code(400);
+    echo json_encode(['error' => 'O campo message deve ser texto.'], JSON_UNESCAPED_UNICODE);
+    exit;
+}
+
+$userMessage = trim($input['message']);
 $clientHistory = $input['history'] ?? [];
-$streamMode = !empty($input['stream']);
+// Este endpoint mantém o contrato JSON síncrono. O modo stream só deve ser
+// activado depois de o cliente JavaScript e o GeminiClient suportarem SSE.
+if (!is_array($clientHistory)) {
+    http_response_code(400);
+    echo json_encode(['error' => 'O histórico da conversa é inválido.'], JSON_UNESCAPED_UNICODE);
+    exit;
+}
 
 if ($userMessage === '') {
     http_response_code(400);
@@ -98,7 +150,7 @@ if ($userMessage === '') {
     exit;
 }
 
-if (mb_strlen($userMessage) > CHAT_MAX_INPUT_LENGTH) {
+if ((function_exists('mb_strlen') ? mb_strlen($userMessage, 'UTF-8') : strlen($userMessage)) > CHAT_MAX_INPUT_LENGTH) {
     http_response_code(400);
     echo json_encode(['error' => 'Mensagem muito longa. Máximo ' . CHAT_MAX_INPUT_LENGTH . ' caracteres.'], JSON_UNESCAPED_UNICODE);
     exit;
@@ -137,8 +189,8 @@ function sanitizeHistory(array $history): array
 
         $text = trim((string) ($item['text'] ?? $item['content'] ?? $item['message'] ?? ''));
         if ($text === '') continue;
-        if (mb_strlen($text) > 2000) {
-            $text = mb_substr($text, 0, 1997) . '...';
+        if ((function_exists('mb_strlen') ? mb_strlen($text, 'UTF-8') : strlen($text)) > 2000) {
+            $text = (function_exists('mb_substr') ? mb_substr($text, 0, 1997, 'UTF-8') : substr($text, 0, 1997)) . '...';
         }
         $out[] = ['role' => $role, 'text' => $text];
     }
@@ -158,9 +210,9 @@ function getContextCacheKey(PDO $pdo): string
             (int) $pdo->query("SELECT COUNT(*) FROM _faq WHERE status_faq = 'visible'")->fetchColumn(),
             (int) $pdo->query("SELECT COUNT(*) FROM _config WHERE 1")->fetchColumn(),
         ];
-        return 'chatbot_ctx_' . md5(implode(':', $counts));
+        return 'chatbot_ctx_v3_' . md5(implode(':', $counts));
     } catch (PDOException $e) {
-        return 'chatbot_ctx_' . time();
+        return 'chatbot_ctx_v3_' . time();
     }
 }
 
@@ -223,25 +275,23 @@ function chatbot_build_context(PDO $pdo): string
         return get_config($pdo, $key, $default);
     };
 
-    $years = (int) $cfg('years_experience', '3');
-    $clients = (int) $cfg('clients_count', '100');
-    $projectCount = (int) $cfg('projects_count', '50');
-
+    // Usar dados confirmados: não inventar anos de experiência, clientes ou
+    // contagens promocionais quando os valores não estiverem comprovados.
+    $publishedProjects = 0;
     try {
         $publishedProjects = (int) $pdo->query("SELECT COUNT(*) FROM _projects WHERE status_project = 'published'")->fetchColumn();
-        $projectCount = max($projectCount, $publishedProjects);
     } catch (PDOException $e) {
-        error_log('[chatbot] ' . $e->getMessage());
+        error_log('[chatbot] Não foi possível contar projectos publicados: ' . $e->getMessage());
     }
 
     $aboutSummary = $cfg(
         'about_summary',
-        "Sou Jose Mbenga, desenvolvedor Full Stack com mais de {$years} anos de experiencia a criar solucoes digitais inovadoras."
+        'Sou José Mbenga, também conhecido como JMbenga, e desenvolvo soluções digitais para necessidades concretas.'
     );
 
     $aboutLong = $cfg(
         'about_long',
-        "Jose Mbenga da Costa e um desenvolvedor Full Stack de Luanda, Angola. Comecou com HTML e CSS, evoluiu para JavaScript, PHP e MySQL, e tambem trabalha com React e Node.js."
+        'José Mbenga da Costa é o responsável pelo portfólio JMbenga, com foco em desenvolvimento web, backend e design de interfaces.'
     );
 
     $skills = chatbot_fetch_all(
@@ -272,20 +322,22 @@ function chatbot_build_context(PDO $pdo): string
     );
 
     $services = [
-        'Desenvolvimento Web: sites profissionais, landing pages, sistemas web e plataformas responsivas.',
-        'Aplicacoes Web/PWA: experiencias instalaveis, rapidas e com comportamento proximo de app nativo.',
-        'APIs e Backend: PHP, MySQL, arquitetura de servidores, integracoes e bases de dados.',
-        'UI/UX Design: interfaces modernas, intuitivas e focadas na experiencia do utilizador.',
-        'Manutencao e melhoria: correcao de bugs, optimizacao, seguranca e evolucao de sistemas existentes.',
+        'Desenvolvimento Web: sites profissionais, landing pages, sites institucionais, lojas online e sistemas web responsivos.',
+        'Aplicações Mobile: desenvolvimento de aplicações móveis; o preço é definido por orçamento personalizado.',
+        'APIs e Backend: PHP, MySQL, APIs, integrações e bases de dados. Integração de API: referência de 30.000 a 100.000 Kz; CRUD com base de dados: 300.000 a 550.000 Kz; funcionalidade adicional: a partir de 25.000 Kz; aplicações complexas: a partir de 700.000 Kz.',
+        'UI/UX Design: desenho de interfaces e experiência do utilizador. Redesign de site existente: referência de 60.000 a 180.000 Kz; outros trabalhos de design são orçamentados conforme o escopo.',
+        'Manutenção e melhoria: correcção de bugs, actualizações e evolução de sistemas existentes. JMbenga Care Basic: 15.000 Kz/mês; Care Business: 35.000 Kz/mês; Care Pro: 70.000 Kz/mês, sujeitos às condições do plano.',
+        'Pacotes de Desenvolvimento Web: JMbenga Start: 75.000 a 100.000 Kz; JMbenga Business: 180.000 a 280.000 Kz; JMbenga Custom: a partir de 300.000 Kz.',
+        'Outras referências de Desenvolvimento Web: landing page: 60.000 a 100.000 Kz; portfólio profissional: 90.000 a 160.000 Kz; site institucional de 4 a 5 páginas: 180.000 a 280.000 Kz; site empresarial: 280.000 a 450.000 Kz; loja online: 300.000 a 650.000 Kz.',
     ];
 
     $lines = [
         'IDENTIDADE DO PORTFOLIO',
         '- Nome: Jose Mbenga da Costa, também apresentado como JMbenga.',
-        '- Perfil: Desenvolvedor Full Stack e UI/UX Designer.',
-        '- Localizacao: ' . chatbot_clean_text($cfg('location', 'Luanda, Angola'), 120) . '.',
-        "- Experiencia: mais de {$years} anos em desenvolvimento web full stack.",
-        "- Historico: mais de {$projectCount} projectos e mais de {$clients} clientes/colaboracoes.",
+        '- Perfil: Desenvolvedor Full Stack com foco em soluções web, backend e interfaces.',
+        '- Localização: ' . chatbot_clean_text($cfg('location', 'Luanda, Angola'), 120) . '.',
+        '- Projectos publicados na base de dados: ' . $publishedProjects . '.',
+        '- Não afirmar número de clientes, anos de experiência, taxa de satisfação ou métricas de desempenho sem confirmação explícita.',
         '- Resumo: ' . chatbot_clean_text($aboutSummary, 900),
         '- Biografia: ' . chatbot_clean_text($aboutLong, 1200),
         '',
@@ -296,6 +348,13 @@ function chatbot_build_context(PDO $pdo): string
         $lines[] = '- ' . $service;
     }
 
+    $lines[] = '';
+    $lines[] = 'REGRAS COMERCIAIS';
+    $lines[] = '- Os valores acima são referências comerciais do portfólio; confirmar sempre o escopo e o orçamento final antes de prometer um preço.';
+    $lines[] = '- Não inventar preços para Aplicações Mobile, UI/UX Design geral ou serviços que não tenham valor de referência definido; encaminhar para orçamento personalizado.';
+    $lines[] = '- Domínio, alojamento, licenças e serviços de terceiros são despesas separadas, salvo indicação expressa na proposta.';
+    $lines[] = '- Condição habitual proposta: 50% para iniciar e 50% antes da entrega/publicação; projectos maiores podem ter pagamentos por fases.';
+    $lines[] = '- O escopo e as revisões devem ficar descritos na proposta. Funcionalidades adicionais não estão automaticamente incluídas em manutenção.';
     $lines[] = '';
     $lines[] = 'SKILLS VISIVEIS';
 
@@ -346,11 +405,84 @@ function chatbot_build_system_prompt(PDO $pdo): string
     return implode("\n\n", [
         'Voce e o assistente virtual oficial do portfolio JMbenga.',
         'Responda sempre em portugues claro, natural, util e com acentuacao correta.',
-        'Nao use markdown pesado, negrito com asteriscos ou titulos exagerados; prefira texto simples que fique bem dentro do balao do chat.',
+        'FORMATO OBRIGATORIO: a interface do chat apresenta texto simples e transforma apenas URLs em links. Nao use Markdown: nunca escreva **negrito**, titulos com #, tabelas Markdown ou blocos de codigo. Organize respostas com titulos curtos em MAIUSCULAS, listas com o marcador • e uma linha em branco entre secoes. Prefira frases curtas e evite paragrafos longos.',
+        'Quando listar varias opcoes, agrupe-as por categoria, ponha primeiro a informacao mais relevante e evite repetir o mesmo preco em secoes diferentes. Termine com no maximo uma pergunta util para orientar o visitante.',
         'Use apenas os factos do CONTEXTO DO PORTFOLIO e do historico da conversa. Nao invente dados, certificacoes, empresas, cargos, datas ou tecnologias que nao estejam no contexto.',
+        'Para precos, use exclusivamente as referencias comerciais presentes no contexto. Identifique-os como referencias, nao como orcamento definitivo. Se nao houver preco indicado para um servico, explique que requer orcamento personalizado.',
+        'Nao afirme numeros de clientes, anos de experiencia, testemunhos, classificacoes, garantias de resultado ou metricas que nao estejam expressamente confirmados no contexto.',
         'Nunca use placeholders como [mencione], [insira], [exemplo] ou texto de template. Se uma informacao nao estiver disponivel, diga isso de forma transparente e sugira visitar a pagina adequada ou entrar em contacto.',
         'Se o utilizador responder apenas "sim", "ok", "quero" ou algo parecido, continue a partir da ultima pergunta do historico e aprofunde o assunto anterior.',
         "CONTEXTO DO PORTFOLIO:\n" . buildContextWithCache($pdo),
+    ]);
+}
+
+/** Detecta perguntas gerais sobre a lista de precos para devolver um resumo consistente. */
+function chatbot_is_general_price_question(string $message): bool
+{
+    $text = function_exists('mb_strtolower') ? mb_strtolower($message, 'UTF-8') : strtolower($message);
+    if (function_exists('iconv')) {
+        $ascii = iconv('UTF-8', 'ASCII//TRANSLIT//IGNORE', $text);
+        if (is_string($ascii)) {
+            $text = strtolower($ascii);
+        }
+    }
+    $hasPrice = (bool) preg_match('/\b(preco|precos|valor|valores|custo|custos)\b/', $text);
+    if (!$hasPrice) {
+        return false;
+    }
+    return (bool) preg_match(
+        '/\b(servico|servicos|pacote|pacotes|catalogo)\b|\b(como sao os precos|quais sao os precos|quais os precos|tabela geral de precos|lista geral de precos|precos em geral)\b/',
+        $text
+    );
+}
+
+/** Resposta curta e organizada para perguntas gerais sobre os precos. */
+function chatbot_build_price_overview(): string
+{
+    return implode("\n", [
+        'PREÇOS DE REFERÊNCIA — JMbenga',
+        'Os valores abaixo são referências em Kz. O preço final depende do escopo confirmado.',
+        '',
+        '1. DESENVOLVIMENTO WEB',
+        'Pacotes:',
+        '• JMbenga Start — 75.000 a 100.000 Kz',
+        '• JMbenga Business — 180.000 a 280.000 Kz',
+        '• JMbenga Custom — a partir de 300.000 Kz',
+        'Projectos comuns:',
+        '• Landing page — 60.000 a 100.000 Kz',
+        '• Portfólio profissional — 90.000 a 160.000 Kz',
+        '• Site institucional (4–5 páginas) — 180.000 a 280.000 Kz',
+        '• Site empresarial — 280.000 a 450.000 Kz',
+        '• Loja online — 300.000 a 650.000 Kz',
+        '• Site de evento — 70.000 a 130.000 Kz',
+        '• Painel informativo — 150.000 a 250.000 Kz',
+        '• Painel dinâmico — 250.000 a 450.000 Kz',
+        '',
+        '2. APIs E BACKEND',
+        '• Integração de API — 30.000 a 100.000 Kz',
+        '• CRUD com base de dados — 300.000 a 550.000 Kz',
+        '• Funcionalidade adicional — a partir de 25.000 Kz',
+        '• Aplicação complexa — a partir de 700.000 Kz',
+        '',
+        '3. UI/UX DESIGN',
+        '• Redesign de site existente — 60.000 a 180.000 Kz',
+        '• Outros trabalhos de UI/UX — orçamento personalizado',
+        '',
+        '4. MANUTENÇÃO (MENSAL)',
+        '• Care Basic — 15.000 Kz/mês',
+        '• Care Business — 35.000 Kz/mês',
+        '• Care Pro — 70.000 Kz/mês',
+        'O âmbito e as horas incluídas dependem das condições de cada plano.',
+        '',
+        '5. APLICAÇÕES MOBILE',
+        '• Orçamento personalizado, conforme as funcionalidades e a complexidade.',
+        '',
+        'CONDIÇÕES IMPORTANTES',
+        '• Os preços são indicativos, não uma proposta definitiva.',
+        '• Domínio, alojamento, licenças e serviços de terceiros são cobrados à parte, salvo indicação na proposta.',
+        '• A condição habitual é 50% para iniciar e 50% antes da entrega/publicação; projectos maiores podem ser pagos por fases.',
+        '',
+        'Qual destes serviços pretende explorar primeiro?'
     ]);
 }
 
@@ -363,7 +495,7 @@ function logChatbot(string $ip, string $userMessage, string $botResponse, int $d
         if (!$pdo) return;
 
         $pdo->prepare("INSERT INTO _chatbot_logs (ip_address, user_message, bot_response, duration_ms, status, user_agent, created_at) VALUES (?, ?, ?, ?, ?, ?, NOW())")
-            ->execute([$ip, mb_substr($userMessage, 0, 2000), mb_substr($botResponse, 0, 4000), $durationMs, $status, $ua]);
+            ->execute([$ip, function_exists('mb_substr') ? mb_substr($userMessage, 0, 2000, 'UTF-8') : substr($userMessage, 0, 2000), function_exists('mb_substr') ? mb_substr($botResponse, 0, 4000, 'UTF-8') : substr($botResponse, 0, 4000), $durationMs, $status, $ua]);
     } catch (Throwable $e) {
         error_log('[CHATBOT LOG] ' . $e->getMessage());
     }
@@ -374,13 +506,22 @@ $startTime = hrtime(true);
 $clientIp = $_SERVER['REMOTE_ADDR'] ?? '0.0.0.0';
 
 try {
-    $client = new GeminiClient();
-    $result = $client->generate($userMessage, $history, [
-        'system_prompt' => chatbot_build_system_prompt($pdo),
-        'temperature' => 0.35,
-        'max_output_tokens' => 900,
-        'max_history_items' => CHAT_MAX_HISTORY_ITEMS,
-    ]);
+    if (chatbot_is_general_price_question($userMessage)) {
+        // Para uma pergunta geral de preços, usar uma resposta comercial única e consistente.
+        $result = [
+            'ok' => true,
+            'text' => chatbot_build_price_overview(),
+            'http_code' => 200,
+        ];
+    } else {
+        $client = new \GeminiClient();
+        $result = $client->generate($userMessage, $history, [
+            'system_prompt' => chatbot_build_system_prompt($pdo),
+            'temperature' => 0.35,
+            'max_output_tokens' => 900,
+            'max_history_items' => CHAT_MAX_HISTORY_ITEMS,
+        ]);
+    }
 
     $durationMs = (int) round((hrtime(true) - $startTime) / 1e6);
 
@@ -396,8 +537,13 @@ try {
     }
 
     logChatbot($clientIp, $userMessage, '', $durationMs, 'error: ' . $result['error']);
-    http_response_code($httpCode);
-    echo json_encode(['error' => $result['error']], JSON_UNESCAPED_UNICODE);
+    error_log('[CHATBOT] Falha do provedor: ' . (string) ($result['error'] ?? 'erro desconhecido'));
+    http_response_code($httpCode >= 500 ? 502 : $httpCode);
+    echo json_encode([
+        'error' => $httpCode >= 500
+            ? 'O assistente não conseguiu responder agora. Tente novamente dentro de instantes.'
+            : 'Não foi possível processar a mensagem. Reveja o pedido e tente novamente.'
+    ], JSON_UNESCAPED_UNICODE);
 } catch (Throwable $e) {
     $durationMs = (int) round((hrtime(true) - $startTime) / 1e6);
     logChatbot($clientIp, $userMessage, '', $durationMs, 'exception: ' . $e->getMessage());

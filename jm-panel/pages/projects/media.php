@@ -11,6 +11,28 @@ requireNoLockscreen();
 
 $db = $GLOBALS['pdo'];
 
+// Limite efectivo do upload: respeita a configuração da aplicação e os limites do PHP.
+$iniBytes = static function (string $value): int {
+    $value = trim($value);
+    if ($value === '') return 0;
+    $unit = strtolower(substr($value, -1));
+    $number = (float) $value;
+    switch ($unit) {
+        case 'g': $number *= 1024; // fall through
+        case 'm': $number *= 1024; // fall through
+        case 'k': $number *= 1024;
+    }
+    return (int) $number;
+};
+$uploadLimits = [
+    defined('MAX_UPLOAD_SIZE') ? (int) MAX_UPLOAD_SIZE : 0,
+    $iniBytes((string) ini_get('upload_max_filesize')),
+    $iniBytes((string) ini_get('post_max_size')),
+];
+$uploadLimits = array_values(array_filter($uploadLimits, static fn (int $bytes): bool => $bytes > 0));
+$maxUploadSize = $uploadLimits ? min($uploadLimits) : 5 * 1024 * 1024;
+
+
 // ── ID do projecto ────────────────────────────────────────────
 $projectId = (int)($_GET['id'] ?? 0);
 if ($projectId <= 0) {
@@ -66,7 +88,7 @@ $mediaItems = $mediaItems->fetchAll();
     <div class="main">
         <?php include __DIR__ . '/../../include/header.php'; ?>
 
-        <div class="content">
+        <div class="content project-media-page">
 
             <!-- ═══ CABEÇALHO + BREADCRUMB ════════════════════════════════ -->
             <div class="page-top">
@@ -81,7 +103,7 @@ $mediaItems = $mediaItems->fetchAll();
                     <h1 class="page-title">Media do Projecto</h1>
                     <p class="page-sub">
                         <strong><?= e($project['title_project']) ?></strong> &nbsp;·&nbsp;
-                        <?= count($mediaItems) ?> imagem(ns)
+                        <span id="mediaCount"><?= count($mediaItems) ?> imagem(ns)</span>
                     </p>
                 </div>
                 <div style="display:flex;gap:.6rem;align-items:center">
@@ -97,17 +119,21 @@ $mediaItems = $mediaItems->fetchAll();
                     <span class="section-icon"><i class="fas fa-cloud-upload-alt"></i></span>
                     <div>
                         <h3>Adicionar Nova Imagem</h3>
-                        <p>Formatos aceites: JPEG, PNG, WebP. Máximo: <?= MAX_UPLOAD_SIZE / 1024 / 1024 ?> MB.</p>
+                        <p>Formatos aceites: JPEG, PNG, WebP. Máximo:
+                            <?= number_format($maxUploadSize / 1024 / 1024, 1, ',', '') ?> MB.</p>
                     </div>
                 </div>
-                <form id="uploadForm" enctype="multipart/form-data" novalidate>
-                    <input type="hidden" name="csrf_token" id="csrf_token" value="<?= $_SESSION['admin_csrf_token'] ?>">
+                <form id="uploadForm" enctype="multipart/form-data" novalidate
+                    data-max-bytes="<?= (int) $maxUploadSize ?>">
+                    <input type="hidden" name="csrf_token" id="csrf_token"
+                        value="<?= e($_SESSION['admin_csrf_token'] ?? '') ?>">
                     <input type="hidden" name="id_project" value="<?= $projectId ?>">
 
                     <div class="upload-row">
                         <div class="form-group" style="flex:1">
                             <label class="form-label">Imagem</label>
-                            <div class="upload-area-small" id="uploadAreaSmall">
+                            <div class="upload-area-small" id="uploadAreaSmall" role="button" tabindex="0"
+                                aria-label="Escolher imagem para carregar">
                                 <input type="file" id="mediaFile" name="media" accept="image/jpeg,image/png,image/webp"
                                     hidden required>
                                 <div class="upload-placeholder" id="uploadPlaceholder">
@@ -177,446 +203,180 @@ $mediaItems = $mediaItems->fetchAll();
 
     <?php include __DIR__ . '/../../include/modal_logout.php'; ?>
 
-    <style>
-    .breadcrumb {
-        display: flex;
-        align-items: center;
-        gap: .5rem;
-        font-size: .78rem;
-        color: var(--text-muted);
-        margin-bottom: .5rem
-    }
-
-    .breadcrumb a {
-        color: var(--text-dim);
-        text-decoration: none;
-        transition: color .2s
-    }
-
-    .breadcrumb a:hover {
-        color: var(--accent)
-    }
-
-    .breadcrumb i {
-        font-size: .6rem
-    }
-
-    .page-top {
-        display: flex;
-        justify-content: space-between;
-        align-items: flex-start;
-        flex-wrap: wrap;
-        gap: 1rem;
-        margin-bottom: 1.5rem
-    }
-
-    .page-title {
-        font-family: var(--font-head);
-        font-size: 1.5rem;
-        font-weight: 800;
-        letter-spacing: -.02em;
-        margin-bottom: .2rem
-    }
-
-    .page-sub {
-        font-size: .8rem;
-        color: var(--text-muted)
-    }
-
-    .form-section {
-        background: var(--bg-card);
-        border: 1px solid var(--border);
-        border-radius: var(--radius-lg);
-        padding: 1.8rem;
-        margin-bottom: 1.2rem
-    }
-
-    .section-header {
-        display: flex;
-        align-items: flex-start;
-        gap: 1rem;
-        margin-bottom: 1.5rem;
-        padding-bottom: 1.2rem;
-        border-bottom: 1px solid var(--border)
-    }
-
-    .section-icon {
-        width: 40px;
-        height: 40px;
-        border-radius: 10px;
-        background: var(--accent-glow);
-        border: 1px solid var(--border-acc);
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        color: var(--accent);
-        font-size: .95rem;
-        flex-shrink: 0
-    }
-
-    .section-header h3 {
-        font-family: var(--font-head);
-        font-size: 1rem;
-        font-weight: 700;
-        margin-bottom: .15rem
-    }
-
-    .section-header p {
-        font-size: .78rem;
-        color: var(--text-muted)
-    }
-
-    .form-group {
-        display: flex;
-        flex-direction: column;
-        gap: .35rem
-    }
-
-    .form-label {
-        font-size: .75rem;
-        font-weight: 600;
-        text-transform: uppercase;
-        letter-spacing: .04em;
-        color: var(--text-dim)
-    }
-
-    .form-control {
-        padding: .65rem .85rem;
-        background: var(--bg);
-        border: 1px solid var(--border);
-        border-radius: 8px;
-        color: var(--text);
-        font-family: var(--font-body);
-        font-size: .88rem;
-        outline: none;
-        transition: border-color .2s, box-shadow .2s
-    }
-
-    .form-control:focus {
-        border-color: var(--accent);
-        box-shadow: 0 0 0 3px var(--accent-glow)
-    }
-
-    .upload-row {
-        display: flex;
-        gap: 1.2rem;
-        align-items: flex-end
-    }
-
-    @media(max-width:768px) {
-        .upload-row {
-            flex-direction: column
-        }
-    }
-
-    .upload-area-small {
-        border: 2px dashed var(--border);
-        border-radius: var(--radius);
-        padding: 1.5rem;
-        text-align: center;
-        cursor: pointer;
-        transition: all .25s;
-        min-height: 120px;
-        display: flex;
-        align-items: center;
-        justify-content: center
-    }
-
-    .upload-area-small:hover {
-        border-color: var(--accent);
-        background: rgba(37, 99, 235, .03)
-    }
-
-    .upload-placeholder {
-        color: var(--text-muted);
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        gap: .5rem
-    }
-
-    .upload-placeholder i {
-        font-size: 1.8rem
-    }
-
-    .upload-placeholder span {
-        font-size: .82rem
-    }
-
-    .upload-preview-small img {
-        max-height: 150px;
-        border-radius: 8px
-    }
-
-    .btn {
-        display: inline-flex;
-        align-items: center;
-        gap: .45rem;
-        padding: .55rem 1.1rem;
-        border-radius: 8px;
-        font-family: var(--font-body);
-        font-size: .83rem;
-        font-weight: 500;
-        cursor: pointer;
-        transition: all .2s;
-        text-decoration: none;
-        border: 1px solid var(--border);
-        white-space: nowrap
-    }
-
-    .btn-primary {
-        background: var(--accent);
-        color: #fff;
-        border-color: var(--accent)
-    }
-
-    .btn-primary:hover {
-        background: #1d4ed8;
-        transform: translateY(-1px);
-        box-shadow: 0 4px 16px var(--accent-glow)
-    }
-
-    .btn-secondary {
-        background: transparent;
-        border: 1px solid var(--border);
-        color: var(--text-dim)
-    }
-
-    .btn-secondary:hover {
-        background: var(--bg-hover);
-        border-color: var(--border-acc);
-        color: var(--text)
-    }
-
-    .media-grid {
-        display: grid;
-        grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
-        gap: 1rem
-    }
-
-    .media-card {
-        background: var(--bg);
-        border: 1px solid var(--border);
-        border-radius: var(--radius);
-        overflow: hidden;
-        transition: all .2s
-    }
-
-    .media-card:hover {
-        border-color: var(--border-acc);
-        transform: translateY(-2px)
-    }
-
-    .media-thumb {
-        position: relative;
-        aspect-ratio: 16/9;
-        overflow: hidden
-    }
-
-    .media-thumb img {
-        width: 100%;
-        height: 100%;
-        object-fit: cover
-    }
-
-    .media-overlay {
-        position: absolute;
-        inset: 0;
-        background: rgba(0, 0, 0, .6);
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        opacity: 0;
-        transition: opacity .2s
-    }
-
-    .media-card:hover .media-overlay {
-        opacity: 1
-    }
-
-    .btn-icon-danger {
-        background: var(--danger);
-        border-color: var(--danger);
-        color: #fff;
-        width: 34px;
-        height: 34px;
-        border-radius: 8px;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        cursor: pointer;
-        transition: all .2s
-    }
-
-    .btn-icon-danger:hover {
-        background: #dc2626;
-        transform: scale(1.1)
-    }
-
-    .media-caption {
-        padding: .5rem .7rem;
-        font-size: .75rem;
-        color: var(--text-dim);
-        text-align: center
-    }
-
-    .empty-state {
-        padding: 3rem 2rem;
-        text-align: center;
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        gap: .5rem
-    }
-
-    .empty-icon {
-        width: 64px;
-        height: 64px;
-        border-radius: 18px;
-        background: var(--bg);
-        border: 1px solid var(--border);
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        font-size: 1.5rem;
-        color: var(--text-muted);
-        margin-bottom: .5rem
-    }
-
-    .empty-state h3 {
-        font-family: var(--font-head);
-        font-size: 1.1rem;
-        font-weight: 700
-    }
-
-    .empty-state p {
-        font-size: .85rem;
-        color: var(--text-muted);
-        max-width: 360px
-    }
-    </style>
-
     <script>
-    const BASE_URL = '<?= BASE_URL ?>';
-    const CSRF = '<?= $_SESSION['admin_csrf_token'] ?>';
+    const BASE_URL = <?= json_encode(BASE_URL, JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP) ?>;
+    const CSRF = document.getElementById('csrf_token')?.value || '';
 
-    // ── Toast helper ─────────────────────────────────────────────
     function showToast(message, type = 'success') {
         const container = document.getElementById('toast-container') || createToastContainer();
         const toast = document.createElement('div');
-        toast.className = `toast toast-${type}`;
-        toast.innerHTML =
-            `<i class="fas fa-${type === 'success' ? 'check-circle' : 'error' ? 'times-circle' : 'info-circle'}"></i> ${message}`;
+        toast.className = `toast ${type}`;
+        const icon = document.createElement('i');
+        icon.className =
+            `fas ${type === 'success' ? 'fa-check-circle' : type === 'error' ? 'fa-times-circle' : 'fa-info-circle'}`;
+        icon.setAttribute('aria-hidden', 'true');
+        const text = document.createElement('span');
+        text.textContent = String(message ?? 'Ocorreu um erro.');
+        toast.append(icon, text);
         container.appendChild(toast);
-        setTimeout(() => {
+        window.setTimeout(() => {
             toast.style.opacity = '0';
-            toast.style.transform = 'translateX(20px)';
-            setTimeout(() => toast.remove(), 300);
+            toast.style.transform = 'translateY(8px)';
+            window.setTimeout(() => toast.remove(), 300);
         }, 4000);
     }
 
     function createToastContainer() {
         const container = document.createElement('div');
         container.id = 'toast-container';
+        container.setAttribute('aria-live', 'polite');
         container.style.cssText =
             'position:fixed;top:1rem;right:1rem;z-index:9999;display:flex;flex-direction:column;gap:.5rem';
         document.body.appendChild(container);
         return container;
     }
 
-    // ── Preview de upload ────────────────────────────────────────
+    async function readJsonResponse(response) {
+        const raw = await response.text();
+        try {
+            return JSON.parse(raw);
+        } catch (error) {
+            console.error('Resposta inesperada do servidor:', response.status, raw.slice(0, 500));
+            if (response.redirected || /<!doctype html|<html/i.test(raw)) {
+                throw new Error(
+                    'A sessão pode ter expirado. Actualiza a página, inicia sessão novamente e tenta outra vez.'
+                    );
+            }
+            throw new Error('O servidor devolveu uma resposta inválida. Consulta a consola do navegador.');
+        }
+    }
+
     const uploadAreaSmall = document.getElementById('uploadAreaSmall');
     const mediaFile = document.getElementById('mediaFile');
     const uploadPlaceholder = document.getElementById('uploadPlaceholder');
     const uploadPreviewSmall = document.getElementById('uploadPreviewSmall');
     const previewImg = document.getElementById('previewImg');
+    const uploadForm = document.getElementById('uploadForm');
+    const uploadBtn = document.getElementById('uploadBtn');
+    const maxUploadBytes = Number(uploadForm?.dataset.maxBytes || 0);
 
     uploadAreaSmall.addEventListener('click', () => mediaFile.click());
+    uploadAreaSmall.addEventListener('keydown', event => {
+        if (event.key === 'Enter' || event.key === ' ') {
+            event.preventDefault();
+            mediaFile.click();
+        }
+    });
 
     mediaFile.addEventListener('change', function() {
-        const file = this.files[0];
+        const file = this.files?. [0];
         if (!file) return;
+        if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type)) {
+            this.value = '';
+            showToast('Formato não permitido. Escolhe JPEG, PNG ou WebP.', 'error');
+            return;
+        }
+        if (maxUploadBytes > 0 && file.size > maxUploadBytes) {
+            this.value = '';
+            showToast(`A imagem excede o limite de ${(maxUploadBytes / 1024 / 1024).toFixed(1)} MB.`, 'error');
+            return;
+        }
         const reader = new FileReader();
-        reader.onload = function(e) {
-            previewImg.src = e.target.result;
+        reader.onload = event => {
+            previewImg.src = event.target.result;
             uploadPlaceholder.style.display = 'none';
             uploadPreviewSmall.style.display = 'block';
         };
+        reader.onerror = () => showToast('Não foi possível pré-visualizar esta imagem.', 'error');
         reader.readAsDataURL(file);
     });
 
-    // ── Upload AJAX ──────────────────────────────────────────────
-    const uploadForm = document.getElementById('uploadForm');
-    const uploadBtn = document.getElementById('uploadBtn');
-
-    uploadForm.addEventListener('submit', async function(e) {
-        e.preventDefault();
-
-        if (!mediaFile.files[0]) {
-            showToast('Seleciona uma imagem.', 'error');
+    uploadForm.addEventListener('submit', async function(event) {
+        event.preventDefault();
+        if (!mediaFile.files?. [0]) {
+            showToast('Selecciona uma imagem.', 'error');
             return;
         }
-
         uploadBtn.disabled = true;
-        uploadBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> A enviar…';
-
-        const formData = new FormData(uploadForm);
+        uploadBtn.innerHTML = '<i class="fas fa-spinner fa-spin" aria-hidden="true"></i> A enviar…';
         try {
-            const res = await fetch(BASE_URL + '/jm-panel/projects/media-process', {
+            const response = await fetch(BASE_URL + '/jm-panel/projects/media-process', {
                 method: 'POST',
-                body: formData,
+                body: new FormData(uploadForm),
                 headers: {
                     'X-Requested-With': 'XMLHttpRequest',
                     'X-CSRF-Token': CSRF
-                }
+                },
+                credentials: 'same-origin'
             });
-            const data = await res.json();
-
-            if (data.success) {
-                showToast('Imagem adicionada!', 'success');
-                // Recarregar após 1s para mostrar a nova imagem
-                setTimeout(() => location.reload(), 800);
-            } else {
-                showToast(data.message || 'Erro ao fazer upload.', 'error');
+            const data = await readJsonResponse(response);
+            if (!response.ok || !data.success) {
+                const messages = Array.isArray(data.errors) ? data.errors : [data.message ||
+                    'Erro ao fazer upload.'
+                ];
+                messages.forEach(message => showToast(message, 'error'));
+                return;
             }
-        } catch (err) {
-            showToast('Erro de rede.', 'error');
+            showToast(data.message || 'Imagem adicionada com sucesso.', 'success');
+            window.setTimeout(() => window.location.reload(), 900);
+        } catch (error) {
+            console.error('Falha no upload da imagem:', error);
+            showToast(error.message || 'Não foi possível contactar o servidor.', 'error');
         } finally {
             uploadBtn.disabled = false;
-            uploadBtn.innerHTML = '<i class="fas fa-upload"></i> Fazer Upload';
+            uploadBtn.innerHTML = '<i class="fas fa-upload" aria-hidden="true"></i> Fazer Upload';
         }
     });
 
-    // ── Eliminar media ───────────────────────────────────────────
-    document.querySelectorAll('.delete-media').forEach(btn => {
-        btn.addEventListener('click', async function() {
+    document.querySelectorAll('.delete-media').forEach(button => {
+        button.addEventListener('click', async function() {
             const mediaId = this.dataset.id;
-            if (!confirm('Eliminar esta imagem?')) return;
-
+            if (!mediaId || !window.confirm('Eliminar esta imagem?')) return;
+            this.disabled = true;
             try {
-                const res = await fetch(BASE_URL + '/jm-panel/projects/media-delete?id=' +
-                mediaId, {
-                    method: 'POST',
-                    headers: {
-                        'X-Requested-With': 'XMLHttpRequest',
-                        'X-CSRF-Token': CSRF
-                    }
-                });
-                const data = await res.json();
-                if (data.success) {
-                    const card = document.getElementById('media-' + mediaId);
-                    if (card) {
-                        card.style.transition = 'opacity .3s, transform .3s';
-                        card.style.opacity = '0';
-                        card.style.transform = 'scale(.8)';
-                        setTimeout(() => card.remove(), 300);
-                    }
-                    showToast('Imagem removida.', 'success');
-                } else {
-                    showToast(data.message || 'Erro ao remover.', 'error');
+                const response = await fetch(BASE_URL + '/jm-panel/projects/media-delete?id=' +
+                    encodeURIComponent(mediaId), {
+                        method: 'POST',
+                        headers: {
+                            'X-Requested-With': 'XMLHttpRequest',
+                            'X-CSRF-Token': CSRF
+                        },
+                        credentials: 'same-origin'
+                    });
+                const data = await readJsonResponse(response);
+                if (!response.ok || !data.success) {
+                    const messages = Array.isArray(data.errors) ? data.errors : [data.message ||
+                        'Erro ao remover a imagem.'
+                    ];
+                    messages.forEach(message => showToast(message, 'error'));
+                    return;
                 }
-            } catch (err) {
-                showToast('Erro de rede.', 'error');
+                const card = document.getElementById('media-' + mediaId);
+                if (card) {
+                    card.style.transition = 'opacity .3s, transform .3s';
+                    card.style.opacity = '0';
+                    card.style.transform = 'scale(.96)';
+                    window.setTimeout(() => {
+                        card.remove();
+                        const grid = document.getElementById('mediaGrid');
+                        if (grid && grid.children.length === 0) {
+                            const empty = document.createElement('div');
+                            empty.className = 'empty-state';
+                            empty.innerHTML =
+                                '<div class="empty-icon"><i class="fas fa-image" aria-hidden="true"></i></div><h3>Nenhuma imagem</h3><p>Este projecto já não tem imagens adicionais. Faz upload acima para adicionar novas.</p>';
+                            grid.replaceWith(empty);
+                        }
+                        const mediaCount = document.getElementById('mediaCount');
+                        if (mediaCount) mediaCount.textContent =
+                            `${document.querySelectorAll('.media-card').length} imagem(ns)`;
+                    }, 300);
+                }
+                showToast(data.message || 'Imagem removida.', 'success');
+            } catch (error) {
+                console.error('Falha ao eliminar imagem:', error);
+                showToast(error.message || 'Não foi possível contactar o servidor.', 'error');
+            } finally {
+                this.disabled = false;
             }
         });
     });

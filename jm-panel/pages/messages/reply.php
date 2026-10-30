@@ -29,29 +29,33 @@ if ($msg['status_msg'] === 'new') {
 // Dados do admin
 $adminName    = $_SESSION['admin_full_name'] ?? $_SESSION['admin_name'] ?? 'Admin';
 $adminEmail   = $_SESSION['admin_email'] ?? '';
-$adminInitial = strtoupper(mb_substr($adminName, 0, 1));
+$adminInitial = strtoupper(function_exists('mb_substr') ? mb_substr($adminName, 0, 1, 'UTF-8') : substr($adminName, 0, 1));
 $adminPhoto   = $_SESSION['admin_photo'] ?? null;
 
 // Initials do remetente
-$senderInitials = strtoupper(mb_substr($msg['name_msg'], 0, 1));
-$senderName2    = explode(' ', trim($msg['name_msg']));
-if (count($senderName2) > 1) {
-    $senderInitials .= strtoupper(mb_substr(end($senderName2), 0, 1));
+$senderName = (string) ($msg['name_msg'] ?? 'Remetente');
+$firstInitial = function_exists('mb_substr') ? mb_substr($senderName, 0, 1, 'UTF-8') : substr($senderName, 0, 1);
+$senderInitials = strtoupper($firstInitial);
+$senderNameParts = preg_split('/\s+/u', trim($senderName), -1, PREG_SPLIT_NO_EMPTY) ?: [];
+if (count($senderNameParts) > 1) {
+    $lastPart = (string) end($senderNameParts);
+    $lastInitial = function_exists('mb_substr') ? mb_substr($lastPart, 0, 1, 'UTF-8') : substr($lastPart, 0, 1);
+    $senderInitials .= strtoupper($lastInitial);
 }
 
 // Resposta anterior (se já foi respondida e a coluna existir)
-$previousReply = !empty($msg['reply_body']) ? $msg['reply_body'] : null;
-$previousSubject = !empty($msg['reply_subject']) ? $msg['reply_subject'] : null;
-$repliedAt     = !empty($msg['replied_at']) ? $msg['replied_at'] : null;
+$previousReply = !empty($msg['reply_body']) ? (string) $msg['reply_body'] : null;
+$previousSubject = !empty($msg['reply_subject']) ? (string) $msg['reply_subject'] : null;
+$repliedAt = !empty($msg['replied_at']) ? (string) $msg['replied_at'] : null;
+$replyWasSent = (($msg['status_msg'] ?? '') === 'replied');
+$draftReply = (!$replyWasSent && $previousReply !== null) ? $previousReply : '';
 
-// Sugestão de assunto
-$suggestedSubject = 'Re: ' . $msg['subject_msg'];
+// Reutiliza o último assunto se a resposta ficou guardada sem envio confirmado.
+$suggestedSubject = (!$replyWasSent && $previousSubject) ? $previousSubject : ('Re: ' . (string) $msg['subject_msg']);
 ?>
 <!DOCTYPE html>
 <html lang="pt" data-theme="dark" data-base-url="<?= BASE_URL ?>">
 <?php include __DIR__ . '/../../include/head.php'; ?>
-</head>
-
 <style>
 /* ── Layout ──────────────────────────────────────────────────── */
 .page-top {
@@ -692,6 +696,7 @@ textarea.form-control {
     flex-shrink: 0
 }
 </style>
+</head>
 
 <body>
     <?php include __DIR__ . '/../../include/sidebar.php'; ?>
@@ -792,9 +797,10 @@ textarea.form-control {
                         </div>
 
                         <!-- Corpo da mensagem -->
-                        <div class="msg-text <?= mb_strlen($msg['message_msg']) > 500 ? 'compact' : '' ?>" id="msgBody">
+                        <div class="msg-text <?= (function_exists('mb_strlen') ? mb_strlen((string) $msg['message_msg'], 'UTF-8') : strlen((string) $msg['message_msg'])) > 500 ? 'compact' : '' ?>"
+                            id="msgBody">
                             <?= nl2br(e($msg['message_msg'])) ?></div>
-                        <?php if (mb_strlen($msg['message_msg']) > 500): ?>
+                        <?php if ((function_exists('mb_strlen') ? mb_strlen((string) $msg['message_msg'], 'UTF-8') : strlen((string) $msg['message_msg'])) > 500): ?>
                         <button class="expand-btn" id="expandBtn" onclick="expandMsg()">
                             <i class="fas fa-chevron-down" id="expandIcon"></i> Ver mensagem completa
                         </button>
@@ -807,8 +813,9 @@ textarea.form-control {
                         <div class="rcard-head">
                             <div class="rcard-icon green"><i class="fas fa-reply-all"></i></div>
                             <div>
-                                <h3>Resposta Anterior</h3>
-                                <p>Enviada <?= $repliedAt ? date('d/m/Y H:i', strtotime($repliedAt)) : '' ?></p>
+                                <h3><?= $replyWasSent ? 'Resposta Anterior' : 'Resposta Guardada' ?></h3>
+                                <p><?= $replyWasSent ? ('Enviada ' . ($repliedAt ? date('d/m/Y H:i', strtotime($repliedAt)) : '')) : 'O envio por e-mail não está confirmado; podes rever e tentar novamente.' ?>
+                                </p>
                             </div>
                         </div>
                         <div class="prev-reply">
@@ -836,7 +843,7 @@ textarea.form-control {
 
                             <form id="replyForm" novalidate data-api="<?= BASE_URL ?>/jm-panel/messages/reply-process">
                                 <input type="hidden" name="csrf_token" id="csrf_token"
-                                    value="<?= $_SESSION['admin_csrf_token'] ?>">
+                                    value="<?= e((string) ($_SESSION['admin_csrf_token'] ?? '')) ?>">
                                 <input type="hidden" name="id_message" value="<?= $id ?>">
 
                                 <!-- Para: -->
@@ -891,7 +898,7 @@ textarea.form-control {
                                     <div class="textarea-wrap">
                                         <textarea id="reply_body" name="reply_body" class="form-control" rows="9"
                                             placeholder="Olá <?= e($msg['name_msg']) ?>,&#10;&#10;Obrigado pelo teu contacto.&#10;&#10;"
-                                            required oninput="updateCounter(this)"></textarea>
+                                            required oninput="updateCounter(this)"><?= e($draftReply) ?></textarea>
                                         <div class="preview-box" id="previewBox"></div>
                                     </div>
                                     <div class="char-counter">
@@ -956,10 +963,12 @@ textarea.form-control {
     <?php include __DIR__ . '/../../include/modal_logout.php'; ?>
 
     <script>
-    const BASE_URL = '<?= BASE_URL ?>';
-    const MSG_ID = <?= $id ?>;
-    const SENDER_NAME = '<?= addslashes(e($msg['name_msg'])) ?>';
-    const ADMIN_NAME = '<?= addslashes(e($adminName)) ?>';
+    const BASE_URL = <?= json_encode(BASE_URL, JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP) ?>;
+    const MSG_ID = <?= (int) $id ?>;
+    const SENDER_NAME =
+        <?= json_encode((string) ($msg['name_msg'] ?? ''), JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP | JSON_UNESCAPED_UNICODE) ?>;
+    const ADMIN_NAME =
+        <?= json_encode((string) $adminName, JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP | JSON_UNESCAPED_UNICODE) ?>;
 
     // ── Templates rápidos ────────────────────────────────────────
     const TEMPLATES = {
@@ -1087,7 +1096,11 @@ textarea.form-control {
             info: 'circle-info',
             warning: 'triangle-exclamation'
         };
-        t.innerHTML = `<i class="fas fa-${icons[type] || 'circle-info'}"></i> ${msg}`;
+        const icon = document.createElement('i');
+        icon.className = `fas fa-${icons[type] || 'circle-info'}`;
+        const text = document.createElement('span');
+        text.textContent = String(msg ?? '');
+        t.append(icon, text);
         c.appendChild(t);
         setTimeout(() => {
             t.style.opacity = '0';
@@ -1122,14 +1135,6 @@ textarea.form-control {
             const fd = new FormData(form);
             const apiUrl = form.dataset.api;
 
-            console.log('📤 Enviando para:', apiUrl);
-            console.log('📦 Dados:', {
-                id_message: fd.get('id_message'),
-                reply_subject: fd.get('reply_subject'),
-                reply_body: fd.get('reply_body').substring(0, 50) + '...',
-                csrf_token: fd.get('csrf_token').substring(0, 10) + '...'
-            });
-
             const res = await fetch(apiUrl, {
                 method: 'POST',
                 body: fd,
@@ -1139,35 +1144,38 @@ textarea.form-control {
                 }
             });
 
-            console.log('📥 Response status:', res.status, res.statusText);
-
-            if (!res.ok) {
-                const text = await res.text();
-                console.error('❌ HTTP Error Body:', text);
-                showToast(`Erro HTTP ${res.status}: ${res.statusText}. Verifica a consola.`, 'error');
-                return;
+            let data;
+            const responseType = res.headers.get('content-type') || '';
+            if (responseType.includes('application/json')) {
+                data = await res.json();
+            } else {
+                const responseText = await res.text();
+                data = {
+                    success: false,
+                    message: responseText.slice(0, 300)
+                };
             }
 
-            const data = await res.json();
-            console.log('✅ Response JSON:', data);
-
-            if (data.success) {
+            if (data.success && res.ok) {
                 if (data.sent_via_email) {
-                    showToast('Resposta enviada com sucesso por email!', 'success');
+                    showToast('O envio foi aceite pelo mailer.', 'success');
+                    setTimeout(() => {
+                        window.location.href = BASE_URL + '/jm-panel/messages';
+                    }, 1800);
                 } else {
-                    showToast(
-                        'Resposta guardada, mas o email não foi entregue. Verifica as configurações SMTP.',
+                    const detail = data.mail_error ?
+                        ' Detalhe técnico (apenas desenvolvimento): ' + data.mail_error :
+                        ' Verifica a configuração SMTP quando formos diagnosticar o envio.';
+                    showToast('Resposta guardada no painel, mas o envio por e-mail falhou.' + detail,
                         'warning');
                 }
-                setTimeout(() => {
-                    window.location.href = BASE_URL + '/jm-panel/messages';
-                }, 1800);
             } else {
-                showToast(data.message || 'Erro ao enviar. Tenta novamente.', 'error');
+                const detail = data.debug ? ' Detalhe técnico (desenvolvimento): ' + data.debug : '';
+                showToast((data.message || 'Erro ao enviar. Tenta novamente.') + detail, 'error');
             }
         } catch (err) {
-            console.error('🔴 Exception:', err);
-            showToast('Erro: ' + err.message, 'error');
+            showToast('Não foi possível contactar o processador. Verifica a ligação e tenta novamente.',
+                'error');
         } finally {
             submitBtn.disabled = false;
             submitBtn.innerHTML = '<i class="fas fa-paper-plane"></i> Enviar Resposta';

@@ -14,18 +14,73 @@ $cfg = function (string $key, string $default = ''): string {
     return get_config($pdo, $key, $default);
 };
 
-$accent = $cfg('accent_color', '#2563eb');
+// Validar a cor antes de a utilizar nos estilos desta página.
+$accentCandidate = trim((string) $cfg('accent_color', '#2563eb'));
+$accent = preg_match('/^#[0-9a-fA-F]{6}$/', $accentCandidate)
+    ? $accentCandidate
+    : '#2563eb';
+$accentHex = substr($accent, 1);
+$accentRgb = [
+    hexdec(substr($accentHex, 0, 2)),
+    hexdec(substr($accentHex, 2, 2)),
+    hexdec(substr($accentHex, 4, 2)),
+];
+$accentRgbCss = implode(', ', $accentRgb);
+
+// Validar URLs externas para impedir protocolos inesperados nos links.
+$safeHttpUrl = static function ($value): string {
+    $url = trim((string) ($value ?? ''));
+    if ($url === '' || filter_var($url, FILTER_VALIDATE_URL) === false) {
+        return '';
+    }
+    $scheme = strtolower((string) (parse_url($url, PHP_URL_SCHEME) ?? ''));
+    return in_array($scheme, ['http', 'https'], true) ? $url : '';
+};
+
+$wa = $safeHttpUrl($cfg('whatsapp_url'));
+$waHref = $wa !== ''
+    ? $wa . (str_contains($wa, '?') ? '&' : '?') . 'text=' . rawurlencode('Olá, José! Vim do seu portfólio e gostaria de conversar sobre um projecto.')
+    : '';
+
+// Categorias e contagens reais dos projectos publicados.
+$categoryRows = $pdo->query(
+    "SELECT category_project, COUNT(*) AS total
+     FROM _projects
+     WHERE status_project = 'published'
+     GROUP BY category_project
+     ORDER BY category_project ASC"
+)->fetchAll(PDO::FETCH_ASSOC);
+
+$categoryCounts = [];
+foreach ($categoryRows as $categoryRow) {
+    $categoryName = trim((string) ($categoryRow['category_project'] ?? ''));
+    if ($categoryName !== '') {
+        $categoryCounts[$categoryName] = (int) $categoryRow['total'];
+    }
+}
+$existing_cats = array_keys($categoryCounts);
 
 // ── Filtros e ordenação ──────────────────────────────────────
-$current_cat    = $_GET['cat']   ?? 'all';
-$current_sort   = $_GET['sort']  ?? 'featured';
-$current_search = trim($_GET['search'] ?? '');
+$requestedCat = $_GET['cat'] ?? 'all';
+$current_cat = is_string($requestedCat)
+    && in_array($requestedCat, array_merge(['all'], $existing_cats), true)
+        ? $requestedCat
+        : 'all';
 
-$allowed_cats  = ['all', 'web', 'mobile', 'api', 'design', 'desktop', 'other'];
+$requestedSort = $_GET['sort'] ?? 'featured';
 $allowed_sorts = ['featured', 'newest', 'oldest', 'name'];
+$current_sort = is_string($requestedSort)
+    && in_array($requestedSort, $allowed_sorts, true)
+        ? $requestedSort
+        : 'featured';
 
-if (!in_array($current_cat, $allowed_cats))   $current_cat  = 'all';
-if (!in_array($current_sort, $allowed_sorts)) $current_sort = 'featured';
+$requestedSearch = $_GET['search'] ?? '';
+$current_search = is_string($requestedSearch) ? trim($requestedSearch) : '';
+if (function_exists('mb_substr')) {
+    $current_search = mb_substr($current_search, 0, 100, 'UTF-8');
+} else {
+    $current_search = substr($current_search, 0, 100);
+}
 
 // ── Consulta base ───────────────────────────────────────────
 $sql = "SELECT * FROM _projects WHERE status_project = 'published'";
@@ -35,31 +90,29 @@ if ($current_cat !== 'all') {
     $sql .= " AND category_project = ?";
     $params[] = $current_cat;
 }
-if (!empty($current_search)) {
-    $sql .= " AND (title_project LIKE ? OR summary_project LIKE ? OR slug_project LIKE ?)";
-    $params[] = "%$current_search%";
-    $params[] = "%$current_search%";
-    $params[] = "%$current_search%";
+if ($current_search !== '') {
+    // ESCAPE trata %, _ e ! digitados como caracteres de pesquisa literais.
+    $searchLiteral = str_replace(['!', '%', '_'], ['!!', '!%', '!_'], $current_search);
+    $searchPattern = '%' . $searchLiteral . '%';
+    $sql .= " AND (title_project LIKE ? ESCAPE '!' OR summary_project LIKE ? ESCAPE '!' OR slug_project LIKE ? ESCAPE '!')";
+    $params[] = $searchPattern;
+    $params[] = $searchPattern;
+    $params[] = $searchPattern;
 }
 
-// Ordenação
+// A cláusula vem de uma lista fixa, nunca directamente do pedido.
 $orderClause = match ($current_sort) {
     'newest'  => 'creat_project DESC',
     'oldest'  => 'creat_project ASC',
     'name'    => 'title_project ASC',
-    default   => 'is_featured DESC, display_order ASC',
+    default   => 'is_featured DESC, display_order ASC, creat_project DESC',
 };
 $sql .= " ORDER BY $orderClause";
 
 $stmt = $pdo->prepare($sql);
 $stmt->execute($params);
-$projects = $stmt->fetchAll();
-
+$projects = $stmt->fetchAll(PDO::FETCH_ASSOC);
 $total_projects = count($projects);
-
-// ── Categorias existentes ───────────────────────────────────
-$cat_stmt = $pdo->query("SELECT DISTINCT category_project FROM _projects WHERE status_project = 'published' ORDER BY category_project ASC");
-$existing_cats = $cat_stmt->fetchAll(PDO::FETCH_COLUMN);
 
 // ── Estatísticas globais ────────────────────────────────────
 $totalAllProjects   = (int) $pdo->query("SELECT COUNT(*) FROM _projects WHERE status_project = 'published'")->fetchColumn();
@@ -73,10 +126,10 @@ $page_desc    = 'Explore o portfólio completo de José Mbenga. Web, Mobile, API
 $page_section = 'projects';
 ?>
 <?php
-include 'includes/header.php';
+// Preparar os estilos da página para serem inseridos dentro do <head> global.
+ob_start();
 ?>
-
-<link rel="stylesheet" href="assets/css/projects.css">
+<link rel="stylesheet" href="<?= e(BASE_URL) ?>/assets/css/projects.css">
 
 <style>
 /* ════════════════════════════════════════════════════════════
@@ -85,15 +138,15 @@ include 'includes/header.php';
 :root {
     --accent: <?=e($accent) ?>;
     --accent-dim: #1d4ed8;
-    --accent-glow: <?=e($accent) ?>26;
-    --accent-rgb: 37, 99, 235;
+    --accent-glow: rgba(<?=e($accentRgbCss) ?>, .15);
+    --accent-rgb: <?=e($accentRgbCss) ?>;
 
     --bg: #0a0d14;
     --bg-2: #0f1623;
     --bg-card: #131b2e;
     --bg-glass: rgba(13, 22, 35, .8);
     --border: rgba(255, 255, 255, .06);
-    --border-acc: rgba(37, 99, 235, .35);
+    --border-acc: rgba(<?=e($accentRgbCss) ?>, .35);
     --text: #e8edf5;
     --text-dim: #8899b4;
     --text-muted: #4a5878;
@@ -120,7 +173,7 @@ include 'includes/header.php';
     --bg-card: #ffffff;
     --bg-glass: rgba(255, 255, 255, .85);
     --border: rgba(0, 0, 0, .07);
-    --border-acc: rgba(37, 99, 235, .25);
+    --border-acc: rgba(<?=e($accentRgbCss) ?>, .25);
     --text: #0f172a;
     --text-dim: #475569;
     --text-muted: #94a3b8;
@@ -337,14 +390,17 @@ include 'includes/header.php';
     margin-right: 4px;
 }
 </style>
-</head>
+<?php
+$extra_head = (string) ob_get_clean();
+include __DIR__ . '/includes/header.php';
+?>
 
 <body>
 
     <!-- WhatsApp Float -->
-    <?php if ($wa = $cfg('whatsapp_url')): ?>
+    <?php if ($wa !== ''): ?>
     <div class="whatsapp-float" id="whatsappFloat">
-        <a href="<?= e($wa) ?>?text=Olá%20José,%20vim%20do%20seu%20portfólio" target="_blank" rel="noopener">
+        <a href="<?= e($waHref) ?>" target="_blank" rel="noopener noreferrer">
             <i class="fab fa-whatsapp"></i> <span>Vamos conversar?</span>
         </a>
         <button class="close-whatsapp" onclick="this.parentElement.style.display='none'" aria-label="Fechar">
@@ -374,7 +430,7 @@ include 'includes/header.php';
                 </div>
                 <div class="hero-stat-mini">
                     <div class="num"><?= $totalTechnologies ?></div>
-                    <div class="lbl">Tecnologias</div>
+                    <div class="lbl">Competências</div>
                 </div>
                 <?php if ($recentProjects > 0): ?>
                 <div class="hero-stat-mini" style="border-color: var(--success); border-style: dashed;">
@@ -391,19 +447,15 @@ include 'includes/header.php';
     <!-- Filtros -->
     <div class="container">
         <div class="filters-bar reveal">
-            <a href="?cat=all<?= $current_sort !== 'featured' ? '&sort=' . $current_sort : '' ?><?= !empty($current_search) ? '&search=' . urlencode($current_search) : '' ?>"
+            <a href="?cat=all<?= $current_sort !== 'featured' ? '&amp;sort=' . e(rawurlencode($current_sort)) : '' ?><?= $current_search !== '' ? '&amp;search=' . e(rawurlencode($current_search)) : '' ?>"
                 class="filter-btn <?= $current_cat === 'all' ? 'active' : '' ?>">
                 Todos <span class="filter-count">(<?= $totalAllProjects ?>)</span>
             </a>
             <?php foreach ($existing_cats as $cat): ?>
-            <?php
-                $catCountStmt = $pdo->prepare("SELECT COUNT(*) FROM _projects WHERE status_project='published' AND category_project=?");
-                $catCountStmt->execute([$cat]);
-                $catCount = $catCountStmt->fetchColumn();
-                ?>
-            <a href="?cat=<?= e($cat) ?><?= $current_sort !== 'featured' ? '&sort=' . $current_sort : '' ?><?= !empty($current_search) ? '&search=' . urlencode($current_search) : '' ?>"
-                class="filter-btn <?= $current_cat === $cat ? 'active' : '' ?>">
-                <?= e(ucfirst($cat)) ?> <span class="filter-count">(<?= $catCount ?>)</span>
+            <a href="?cat=<?= e(rawurlencode($cat)) ?><?= $current_sort !== 'featured' ? '&amp;sort=' . e(rawurlencode($current_sort)) : '' ?><?= $current_search !== '' ? '&amp;search=' . e(rawurlencode($current_search)) : '' ?>"
+                class="filter-btn <?= $current_cat === $cat ? 'active' : '' ?>"
+                <?= $current_cat === $cat ? 'aria-current="page"' : '' ?>>
+                <?= e(ucfirst($cat)) ?> <span class="filter-count">(<?= (int) ($categoryCounts[$cat] ?? 0) ?>)</span>
             </a>
             <?php endforeach; ?>
         </div>
@@ -419,9 +471,10 @@ include 'includes/header.php';
             </select>
             <div class="search-wrap">
                 <i class="fas fa-search"></i>
-                <input type="text" name="search" value="<?= e($current_search) ?>" placeholder="Pesquisar projectos...">
+                <input type="text" name="search" value="<?= e($current_search) ?>" maxlength="100"
+                    placeholder="Pesquisar projectos..." aria-label="Pesquisar projectos">
                 <?php if (!empty($current_search)): ?>
-                <a href="?cat=<?= e($current_cat) ?>&sort=<?= e($current_sort) ?>"
+                <a href="?cat=<?= e(rawurlencode($current_cat)) ?>&amp;sort=<?= e(rawurlencode($current_sort)) ?>"
                     style="color:var(--text-muted);text-decoration:none">
                     <i class="fas fa-times"></i>
                 </a>
@@ -451,8 +504,19 @@ include 'includes/header.php';
             <?php foreach ($projects as $i => $p):
                     $tech = [];
                     if (!empty($p['tech_stack'])) {
-                        $decoded = json_decode($p['tech_stack'], true);
-                        $tech = is_array($decoded) ? $decoded : explode(',', $p['tech_stack']);
+                        $decoded = json_decode((string) $p['tech_stack'], true);
+                        $techCandidates = is_array($decoded)
+                            ? $decoded
+                            : explode(',', (string) $p['tech_stack']);
+                        foreach ($techCandidates as $candidate) {
+                            if (!is_scalar($candidate)) {
+                                continue;
+                            }
+                            $candidateText = trim((string) $candidate);
+                            if ($candidateText !== '') {
+                                $tech[] = $candidateText;
+                            }
+                        }
                     }
                     $cat_icon = match ($p['category_project']) {
                         'mobile'  => 'fa-mobile-alt',
@@ -461,13 +525,30 @@ include 'includes/header.php';
                         'desktop' => 'fa-desktop',
                         default   => 'fa-globe'
                     };
-                    $isNew = strtotime($p['creat_project']) > strtotime('-30 days');
+                    $createdAt = strtotime((string) ($p['creat_project'] ?? ''));
+                    $isNew = $createdAt !== false && $createdAt > strtotime('-30 days');
                 ?>
             <article class="project-card reveal" style="transition-delay: <?= min($i * 0.05, 0.5) ?>s">
                 <div class="project-thumb">
-                    <?php if (!empty($p['cover_project']) && file_exists(ROOT_PATH . '/assets/img/projects/' . $p['cover_project'])): ?>
-                    <img src="<?= BASE_URL ?>/assets/img/projects/<?= e($p['cover_project']) ?>"
-                        alt="<?= e($p['title_project']) ?>" loading="lazy">
+                    <?php
+                        $coverCandidate = trim((string) ($p['cover_project'] ?? ''));
+                        $projectsDir = realpath(ROOT_PATH . '/assets/img/projects');
+                        $coverName = basename(str_replace('\\', '/', $coverCandidate));
+                        $coverPath = ($projectsDir && $coverCandidate !== '')
+                            ? realpath($projectsDir . DIRECTORY_SEPARATOR . $coverName)
+                            : false;
+                        $coverDirPrefix = $projectsDir
+                            ? rtrim($projectsDir, DIRECTORY_SEPARATOR) . DIRECTORY_SEPARATOR
+                            : '';
+                        $hasSafeCover = $coverPath !== false
+                            && is_file($coverPath)
+                            && $coverDirPrefix !== ''
+                            && str_starts_with($coverPath, $coverDirPrefix)
+                            && $coverName === $coverCandidate;
+                    ?>
+                    <?php if ($hasSafeCover): ?>
+                    <img src="<?= e(BASE_URL) ?>/assets/img/projects/<?= e(rawurlencode($coverName)) ?>"
+                        alt="<?= e($p['title_project']) ?>" loading="lazy" decoding="async">
                     <?php else: ?>
                     <div class="project-thumb-placeholder">
                         <i class="fas <?= $cat_icon ?>"></i>
@@ -482,20 +563,24 @@ include 'includes/header.php';
                     <?php endif; ?>
 
                     <div class="project-overlay">
-                        <?php if (!empty($p['url_demo'])): ?>
-                        <a href="<?= e($p['url_demo']) ?>" target="_blank" rel="noopener" class="project-overlay-btn"
-                            title="Demonstração"><i class="fas fa-external-link-alt"></i></a>
+                        <?php $demoUrl = $safeHttpUrl($p['url_demo'] ?? ''); ?>
+                        <?php if ($demoUrl !== ''): ?>
+                        <a href="<?= e($demoUrl) ?>" target="_blank" rel="noopener noreferrer"
+                            class="project-overlay-btn" title="Demonstração"><i
+                                class="fas fa-external-link-alt"></i></a>
                         <?php endif; ?>
-                        <?php if (!empty($p['url_github'])): ?>
-                        <a href="<?= e($p['url_github']) ?>" target="_blank" rel="noopener" class="project-overlay-btn"
-                            title="Repositório"><i class="fab fa-github"></i></a>
+                        <?php $githubUrl = $safeHttpUrl($p['url_github'] ?? ''); ?>
+                        <?php if ($githubUrl !== ''): ?>
+                        <a href="<?= e($githubUrl) ?>" target="_blank" rel="noopener noreferrer"
+                            class="project-overlay-btn" title="Repositório"><i class="fab fa-github"></i></a>
                         <?php endif; ?>
-                        <?php if (!empty($p['url_live'])): ?>
-                        <a href="<?= e($p['url_live']) ?>" target="_blank" rel="noopener" class="project-overlay-btn"
-                            title="Site ao vivo"><i class="fas fa-globe"></i></a>
+                        <?php $liveUrl = $safeHttpUrl($p['url_live'] ?? ''); ?>
+                        <?php if ($liveUrl !== ''): ?>
+                        <a href="<?= e($liveUrl) ?>" target="_blank" rel="noopener noreferrer"
+                            class="project-overlay-btn" title="Site ao vivo"><i class="fas fa-globe"></i></a>
                         <?php endif; ?>
-                        <a href="<?= BASE_URL ?>/project/<?= e($p['slug_project']) ?>" class="project-overlay-btn"
-                            title="Ver detalhes"><i class="fas fa-info"></i></a>
+                        <a href="<?= e(BASE_URL) ?>/project/<?= e(rawurlencode((string) $p['slug_project'])) ?>"
+                            class="project-overlay-btn" title="Ver detalhes"><i class="fas fa-info"></i></a>
                     </div>
                 </div>
 
@@ -505,7 +590,8 @@ include 'includes/header.php';
                         <?= e(ucfirst($p['category_project'])) ?>
                     </span>
                     <h3 class="project-title">
-                        <a href="<?= BASE_URL ?>/project/<?= e($p['slug_project']) ?>"><?= e($p['title_project']) ?></a>
+                        <a
+                            href="<?= e(BASE_URL) ?>/project/<?= e(rawurlencode((string) $p['slug_project'])) ?>"><?= e($p['title_project']) ?></a>
                     </h3>
                     <?php if (!empty($p['summary_project'])): ?>
                     <p class="project-summary"><?= e($p['summary_project']) ?></p>
@@ -523,11 +609,11 @@ include 'includes/header.php';
                     <!-- Meta informações (NOVO) -->
                     <div class="project-meta">
                         <span><i class="far fa-calendar-alt"></i>
-                            <?= date('d/m/Y', strtotime($p['creat_project'])) ?></span>
-                        <?php if (!empty($p['url_github'])): ?>
+                            <?= $createdAt !== false ? e(date('d/m/Y', $createdAt)) : '—' ?></span>
+                        <?php if (($githubUrl ?? '') !== ''): ?>
                         <span><i class="fab fa-github"></i> Open source</span>
                         <?php endif; ?>
-                        <?php if (!empty($p['url_live'])): ?>
+                        <?php if (($liveUrl ?? '') !== ''): ?>
                         <span><i class="fas fa-globe"></i> No ar</span>
                         <?php endif; ?>
                     </div>
@@ -551,14 +637,17 @@ include 'includes/header.php';
         <div class="cta-inner reveal">
             <span class="tag">Vamos Trabalhar Juntos?</span>
             <h2 class="cta-title">Gostou do que viu?<br><span class="text-gradient">Vamos conversar!</span></h2>
-            <p class="cta-sub">Tem um projecto em mente? Estou disponível para discutir ideias, orçamentos e prazos.
-                Resposta em até 24 horas.</p>
+            <p class="cta-sub">Tem um projecto em mente? Podemos conversar sobre as necessidades, o âmbito do trabalho e
+                os próximos passos.</p>
             <div style="display:flex;gap:14px;justify-content:center;flex-wrap:wrap">
-                <a href="<?= BASE_URL ?>/contact?subject=Orçamento de Projecto" class="btn btn-primary">
+                <a href="<?= e(BASE_URL) ?>/contact" class="btn btn-primary">
                     <i class="fas fa-paper-plane"></i> Solicitar Orçamento
                 </a>
-                <?php if ($wa): ?>
-                <a href="<?= e($wa) ?>" target="_blank" class="btn btn-secondary">
+                <a href="<?= e(BASE_URL) ?>/servicos" class="btn btn-outline">
+                    <i class="fas fa-layer-group"></i> Conhecer serviços
+                </a>
+                <?php if ($waHref !== ''): ?>
+                <a href="<?= e($waHref) ?>" target="_blank" rel="noopener noreferrer" class="btn btn-secondary">
                     <i class="fab fa-whatsapp"></i> Conversar no WhatsApp
                 </a>
                 <?php endif; ?>
@@ -567,19 +656,8 @@ include 'includes/header.php';
     </div>
 
     <?php
-    $inline_js = <<<JS
-// Animação suave nos botões de filtro
-document.querySelectorAll('.filter-btn').forEach(btn => {
-  btn.addEventListener('click', function(e) {
-    this.style.transform = 'scale(0.93)';
-    setTimeout(() => { this.style.transform = ''; }, 150);
-  });
-});
-JS;
-
-    $page_scripts = [];
-    include 'includes/footer.php';
-    include 'includes/bottom-nav.php';
+    include __DIR__ . '/includes/footer.php';
+    include __DIR__ . '/includes/bottom-nav.php';
     ?>
 </body>
 

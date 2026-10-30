@@ -4,6 +4,33 @@
 // ══════════════════════════════════════════════════════════════
 require_once __DIR__ . '/../../include/functions_admin.php';
 
+// Usa MAX_UPLOAD_SIZE quando configurado; caso contrário, respeita os limites PHP.
+if (!defined('MAX_UPLOAD_SIZE')) {
+    $jmbengaIniSizeToBytes = static function (string $value): int {
+        $value = trim($value);
+        if ($value === '' || !preg_match('/^([0-9]+(?:\.[0-9]+)?)\s*([KMG]?)B?$/i', $value, $matches)) {
+            return 0;
+        }
+        $number = (float) $matches[1];
+        $unit = strtoupper($matches[2] ?? '');
+        $factor = match ($unit) {
+            'G' => 1024 ** 3,
+            'M' => 1024 ** 2,
+            'K' => 1024,
+            default => 1,
+        };
+        return (int) min(PHP_INT_MAX, round($number * $factor));
+    };
+    $uploadLimit = $jmbengaIniSizeToBytes((string) ini_get('upload_max_filesize'));
+    $postLimit = $jmbengaIniSizeToBytes((string) ini_get('post_max_size'));
+    // Reserva margem para os campos multipart do formulário.
+    if ($postLimit > 262144) {
+        $postLimit -= 262144;
+    }
+    $limits = array_values(array_filter([$uploadLimit, $postLimit], static fn (int $size): bool => $size > 0));
+    define('MAX_UPLOAD_SIZE', $limits ? min($limits) : 5 * 1024 * 1024);
+}
+
 startAdminSession();
 checkAdminRememberMe();
 requireAdminLogin();
@@ -57,7 +84,7 @@ unset($_SESSION['form_data'], $_SESSION['form_errors']);
     <div class="main">
         <?php include __DIR__ . '/../../include/header.php'; ?>
 
-        <div class="content">
+        <div class="content project-form-page">
             <!-- O restante do formulário mantém‑se exatamente como já está -->
 
             <!-- ═══ CABEÇALHO + BREADCRUMB ════════════════════════════════ -->
@@ -100,7 +127,7 @@ unset($_SESSION['form_data'], $_SESSION['form_errors']);
             <?php endif; ?>
 
             <!-- ═══ FORMULÁRIO ════════════════════════════════════════════ -->
-            <form id="projectForm" novalidate data-api="<?= BASE_URL ?>/jm-panel/projects/add-process">
+            <form id="projectForm" novalidate data-api="<?= e(BASE_URL) ?>/jm-panel/pages/projects/add-process.php">
 
                 <!-- CSRF token escondido – o JS vai usá‑lo -->
                 <input type="hidden" name="csrf_token" id="csrf_token" value="<?= $_SESSION['admin_csrf_token'] ?>">
@@ -110,8 +137,8 @@ unset($_SESSION['form_data'], $_SESSION['form_errors']);
                     <div class="section-header">
                         <span class="section-icon"><i class="fas fa-info-circle"></i></span>
                         <div>
-                            <h3>Informações Básicas</h3>
-                            <p>Título, slug, categoria e estado do projecto.</p>
+                            <h3>Informação principal e publicação</h3>
+                            <p>Título, slug, categoria e estado público do projecto.</p>
                         </div>
                     </div>
                     <div class="form-grid">
@@ -235,8 +262,9 @@ unset($_SESSION['form_data'], $_SESSION['form_errors']);
                     <div class="section-header">
                         <span class="section-icon"><i class="fas fa-align-left"></i></span>
                         <div>
-                            <h3>Conteúdo</h3>
-                            <p>Resumo curto e descrição completa do projecto.</p>
+                            <h3>Estudo de caso</h3>
+                            <p>Resumo, objectivos, funcionalidades, descrição e contributo técnico. Use texto simples.
+                            </p>
                         </div>
                     </div>
                     <div class="form-grid">
@@ -253,7 +281,24 @@ unset($_SESSION['form_data'], $_SESSION['form_errors']);
                         <div class="form-group full-width">
                             <label class="form-label" for="body_project">Descrição Completa</label>
                             <textarea id="body_project" name="body_project" class="form-control textarea-lg" rows="8"
+                                maxlength="20000"
                                 placeholder="Descrição detalhada do projecto, funcionalidades, tecnologias utilizadas..."><?= e($formData['body_project'] ?? '') ?></textarea>
+                            <span class="form-hint">Texto simples, sem HTML. As quebras de linha são preservadas.</span>
+                        </div>
+                        <div class="form-group full-width"><label class="form-label"
+                                for="objectives_project">Objectivos</label><textarea id="objectives_project"
+                                name="objectives_project" class="form-control" rows="4" maxlength="10000"
+                                placeholder="Que necessidade ou objectivo este projecto aborda?"><?= e($formData['objectives_project'] ?? '') ?></textarea>
+                        </div>
+                        <div class="form-group full-width"><label class="form-label"
+                                for="features_project">Funcionalidades</label><textarea id="features_project"
+                                name="features_project" class="form-control" rows="4" maxlength="10000"
+                                placeholder="Descreve as funcionalidades implementadas, uma por linha se preferires."><?= e($formData['features_project'] ?? '') ?></textarea>
+                        </div>
+                        <div class="form-group full-width"><label class="form-label"
+                                for="contribution_project">Contributo técnico</label><textarea id="contribution_project"
+                                name="contribution_project" class="form-control" rows="4" maxlength="10000"
+                                placeholder="Descreve o teu contributo técnico neste projecto."><?= e($formData['contribution_project'] ?? '') ?></textarea>
                         </div>
                     </div>
                 </div>
@@ -263,7 +308,7 @@ unset($_SESSION['form_data'], $_SESSION['form_errors']);
                     <div class="section-header">
                         <span class="section-icon"><i class="fas fa-code"></i></span>
                         <div>
-                            <h3>Tech Stack</h3>
+                            <h3>Tecnologias</h3>
                             <p>Adiciona as tecnologias utilizadas no projecto.</p>
                         </div>
                     </div>
@@ -308,8 +353,8 @@ unset($_SESSION['form_data'], $_SESSION['form_errors']);
                     <div class="section-header">
                         <span class="section-icon"><i class="fas fa-link"></i></span>
                         <div>
-                            <h3>Links do Projecto</h3>
-                            <p>URLs para demonstração, repositório e site ao vivo.</p>
+                            <h3>Links independentes</h3>
+                            <p>URLs externos da demonstração, do repositório e do site ao vivo.</p>
                         </div>
                     </div>
                     <div class="form-grid-3">
@@ -340,6 +385,41 @@ unset($_SESSION['form_data'], $_SESSION['form_errors']);
 
                 <!-- ═══ SECÇÃO 6 — IMAGEM DE CAPA ═════════════════════════ -->
                 <div class="form-section">
+                    <div class="section-header"><span class="section-icon"><i class="fas fa-desktop"></i></span>
+                        <div>
+                            <h3>Demonstração configurada</h3>
+                            <p>Define o modo, a disponibilidade e o destino da demonstração gerida pelo preview.</p>
+                        </div>
+                    </div>
+                    <div class="form-grid-3">
+                        <div class="form-group"><label class="form-label" for="preview_mode">Modo</label><select
+                                id="preview_mode" name="preview_mode" class="form-control">
+                                <option value="disabled"
+                                    <?= ($formData['preview_mode'] ?? 'disabled') === 'disabled' ? 'selected' : '' ?>>
+                                    Desactivado</option>
+                                <option value="external_embed"
+                                    <?= ($formData['preview_mode'] ?? '') === 'external_embed' ? 'selected' : '' ?>>URL
+                                    externa incorporada</option>
+                                <option value="external_link"
+                                    <?= ($formData['preview_mode'] ?? '') === 'external_link' ? 'selected' : '' ?>>URL
+                                    externa, abrir separadamente</option>
+                                <option value="internal"
+                                    <?= ($formData['preview_mode'] ?? '') === 'internal' ? 'selected' : '' ?>>
+                                    Demonstração estática interna</option>
+                                <option value="gallery"
+                                    <?= ($formData['preview_mode'] ?? '') === 'gallery' ? 'selected' : '' ?>>Galeria
+                                    visual</option>
+                            </select></div>
+                        <div class="form-group"><label class="form-label" for="preview_url">URL / caminho</label><input
+                                type="text" id="preview_url" name="preview_url" class="form-control"
+                                value="<?= e($formData['preview_url'] ?? '') ?>"
+                                placeholder="https://demo.example.com ou /demos/project/index.html"></div>
+                        <div class="form-group"><label class="form-label"><input type="checkbox" name="preview_enabled"
+                                    value="1" <?= !empty($formData['preview_enabled']) ? 'checked' : '' ?>>
+                                Disponibilizar preview ao público</label></div>
+                    </div>
+                </div>
+                <div class="form-section">
                     <div class="section-header">
                         <span class="section-icon"><i class="fas fa-image"></i></span>
                         <div>
@@ -369,6 +449,14 @@ unset($_SESSION['form_data'], $_SESSION['form_errors']);
                 </div>
 
                 <!-- ═══ BOTÕES DE ACÇÃO ═══════════════════════════════════ -->
+                <div class="form-section">
+                    <div class="section-header"><span class="section-icon"><i class="fas fa-images"></i></span>
+                        <div>
+                            <h3>Media</h3>
+                            <p>Depois de criar o projecto, pode gerir a galeria e as legendas no módulo de media.</p>
+                        </div>
+                    </div>
+                </div>
                 <div class="form-actions">
                     <a href="<?= BASE_URL ?>/jm-panel/projects" class="btn btn-secondary">
                         <i class="fas fa-times"></i> Cancelar
@@ -384,598 +472,9 @@ unset($_SESSION['form_data'], $_SESSION['form_errors']);
 
     <?php include __DIR__ . '/../../include/modal_logout.php'; ?>
 
-    <!-- ═══ ESTILOS ESPECÍFICOS DESTA PÁGINA ══════════════════════ -->
-    <style>
-    /* ── Breadcrumb ─────────────────────────────────────────────── */
-    .breadcrumb {
-        display: flex;
-        align-items: center;
-        gap: .5rem;
-        font-size: .78rem;
-        color: var(--text-muted);
-        margin-bottom: .5rem;
-    }
-
-    .breadcrumb a {
-        color: var(--text-dim);
-        text-decoration: none;
-        transition: color .2s
-    }
-
-    .breadcrumb a:hover {
-        color: var(--accent)
-    }
-
-    .breadcrumb i {
-        font-size: .6rem
-    }
-
-    /* ── Cabeçalho ──────────────────────────────────────────────── */
-    .page-top {
-        display: flex;
-        justify-content: space-between;
-        align-items: flex-start;
-        flex-wrap: wrap;
-        gap: 1rem;
-        margin-bottom: 1.5rem;
-    }
-
-    .page-title {
-        font-family: var(--font-head);
-        font-size: 1.5rem;
-        font-weight: 800;
-        letter-spacing: -.02em;
-        margin-bottom: .2rem;
-    }
-
-    .page-sub {
-        font-size: .8rem;
-        color: var(--text-muted)
-    }
-
-    /* ── Alertas ────────────────────────────────────────────────── */
-    .alert {
-        padding: 1rem 1.2rem;
-        border-radius: var(--radius);
-        margin-bottom: 1.5rem;
-        display: flex;
-        align-items: flex-start;
-        gap: .75rem;
-        font-size: .85rem;
-    }
-
-    .alert-danger {
-        background: rgba(239, 68, 68, .1);
-        border: 1px solid rgba(239, 68, 68, .3);
-        color: #f87171;
-    }
-
-    .alert-close {
-        margin-left: auto;
-        background: none;
-        border: none;
-        color: inherit;
-        cursor: pointer;
-        opacity: .6;
-        font-size: .9rem;
-    }
-
-    .alert-close:hover {
-        opacity: 1
-    }
-
-    /* ── Secções do formulário ──────────────────────────────────── */
-    .form-section {
-        background: var(--bg-card);
-        border: 1px solid var(--border);
-        border-radius: var(--radius-lg);
-        padding: 1.8rem;
-        margin-bottom: 1.2rem;
-        transition: border-color .25s;
-    }
-
-    .form-section:focus-within {
-        border-color: var(--border-acc)
-    }
-
-    .section-header {
-        display: flex;
-        align-items: flex-start;
-        gap: 1rem;
-        margin-bottom: 1.5rem;
-        padding-bottom: 1.2rem;
-        border-bottom: 1px solid var(--border);
-    }
-
-    .section-icon {
-        width: 40px;
-        height: 40px;
-        border-radius: 10px;
-        background: var(--accent-glow);
-        border: 1px solid var(--border-acc);
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        color: var(--accent);
-        font-size: .95rem;
-        flex-shrink: 0;
-    }
-
-    .section-header h3 {
-        font-family: var(--font-head);
-        font-size: 1rem;
-        font-weight: 700;
-        margin-bottom: .15rem;
-    }
-
-    .section-header p {
-        font-size: .78rem;
-        color: var(--text-muted)
-    }
-
-    /* ── Grid do formulário ─────────────────────────────────────── */
-    .form-grid {
-        display: grid;
-        grid-template-columns: 1fr 1fr;
-        gap: 1.2rem;
-    }
-
-    .form-grid-3 {
-        display: grid;
-        grid-template-columns: 1fr 1fr;
-        gap: 1.2rem;
-    }
-
-    @media (max-width: 768px) {
-
-        .form-grid,
-        .form-grid-3 {
-            grid-template-columns: 1fr
-        }
-
-        .category-select-grid {
-            grid-template-columns: repeat(3, 1fr)
-        }
-    }
-
-    @media (max-width: 480px) {
-        .category-select-grid {
-            grid-template-columns: repeat(2, 1fr)
-        }
-    }
-
-    /* ── Grupos de campo ────────────────────────────────────────── */
-    .form-group {
-        display: flex;
-        flex-direction: column;
-        gap: .35rem
-    }
-
-    .form-group.full-width {
-        grid-column: 1 / -1
-    }
-
-    .form-label {
-        font-size: .75rem;
-        font-weight: 600;
-        text-transform: uppercase;
-        letter-spacing: .04em;
-        color: var(--text-dim);
-    }
-
-    .required {
-        color: var(--danger)
-    }
-
-    /* ── Campos de formulário ───────────────────────────────────── */
-    .form-control {
-        padding: .65rem .85rem;
-        background: var(--bg);
-        border: 1px solid var(--border);
-        border-radius: 8px;
-        color: var(--text);
-        font-family: var(--font-body);
-        font-size: .88rem;
-        outline: none;
-        transition: border-color .2s, box-shadow .2s;
-    }
-
-    .form-control:focus {
-        border-color: var(--accent);
-        box-shadow: 0 0 0 3px var(--accent-glow)
-    }
-
-    .form-control::placeholder {
-        color: var(--text-muted)
-    }
-
-    .form-hint {
-        font-size: .7rem;
-        color: var(--text-muted);
-        margin-top: .15rem
-    }
-
-    .textarea-lg {
-        resize: vertical;
-        min-height: 160px;
-        line-height: 1.7
-    }
-
-    /* Input com ícone */
-    .input-with-icon {
-        position: relative;
-        display: flex;
-        align-items: center
-    }
-
-    .input-with-icon .form-control {
-        flex: 1
-    }
-
-    .input-icon-btn {
-        position: absolute;
-        right: .5rem;
-        background: none;
-        border: none;
-        color: var(--text-muted);
-        cursor: pointer;
-        font-size: .85rem;
-        padding: .3rem;
-        transition: color .2s;
-    }
-
-    .input-icon-btn:hover {
-        color: var(--accent)
-    }
-
-    .input-icon-left {
-        position: absolute;
-        left: .7rem;
-        color: var(--text-muted);
-        font-size: .8rem;
-        pointer-events: none;
-        z-index: 1;
-    }
-
-    /* ── Categoria select grid ──────────────────────────────────── */
-    .category-select-grid {
-        display: grid;
-        grid-template-columns: repeat(3, 1fr);
-        gap: .5rem;
-    }
-
-    .category-option {
-        display: flex;
-        align-items: center;
-        gap: .5rem;
-        padding: .6rem .8rem;
-        border-radius: 8px;
-        border: 1px solid var(--border);
-        cursor: pointer;
-        transition: all .2s;
-        position: relative;
-    }
-
-    .category-option:hover {
-        border-color: var(--border-acc)
-    }
-
-    .category-option.selected {
-        border-color: var(--cat-color);
-        background: color-mix(in srgb, var(--cat-color) 10%, transparent);
-    }
-
-    .category-option input {
-        display: none
-    }
-
-    .category-option i {
-        color: var(--cat-color);
-        font-size: .85rem;
-        width: 16px;
-        text-align: center
-    }
-
-    .category-option span {
-        font-size: .82rem;
-        font-weight: 500
-    }
-
-    /* ── Radio badges (estado) ──────────────────────────────────── */
-    .radio-group {
-        display: flex;
-        gap: .5rem;
-        flex-wrap: wrap
-    }
-
-    .radio-item input {
-        display: none
-    }
-
-    .radio-badge {
-        display: inline-flex;
-        align-items: center;
-        gap: .35rem;
-        padding: .5rem .85rem;
-        border-radius: 8px;
-        border: 1px solid var(--border);
-        font-size: .8rem;
-        font-weight: 500;
-        cursor: pointer;
-        transition: all .2s;
-    }
-
-    .radio-item input:checked+.radio-badge {
-        border-color: var(--accent);
-        background: var(--accent-glow);
-    }
-
-    .radio-badge:hover {
-        border-color: var(--border-acc)
-    }
-
-    /* ── Switch toggle ──────────────────────────────────────────── */
-    .switch {
-        display: flex;
-        align-items: center;
-        gap: .75rem;
-        cursor: pointer;
-    }
-
-    .switch input {
-        display: none
-    }
-
-    .switch-slider {
-        width: 42px;
-        height: 24px;
-        border-radius: 12px;
-        background: var(--border);
-        transition: background .25s;
-        position: relative;
-        flex-shrink: 0;
-    }
-
-    .switch-slider::after {
-        content: '';
-        position: absolute;
-        top: 3px;
-        left: 3px;
-        width: 18px;
-        height: 18px;
-        border-radius: 50%;
-        background: #fff;
-        transition: transform .25s;
-    }
-
-    .switch input:checked+.switch-slider {
-        background: var(--accent);
-    }
-
-    .switch input:checked+.switch-slider::after {
-        transform: translateX(18px);
-    }
-
-    .switch-label {
-        font-size: .82rem;
-        font-weight: 500
-    }
-
-    /* ── Number input ───────────────────────────────────────────── */
-    .number-input {
-        display: flex;
-        align-items: center;
-        gap: .3rem
-    }
-
-    .num-btn {
-        width: 32px;
-        height: 32px;
-        border-radius: 6px;
-        background: var(--bg);
-        border: 1px solid var(--border);
-        color: var(--text-dim);
-        cursor: pointer;
-        font-size: .9rem;
-        transition: all .15s;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-    }
-
-    .num-btn:hover {
-        border-color: var(--accent);
-        color: var(--accent)
-    }
-
-    .num-field {
-        width: 70px;
-        text-align: center;
-        appearance: textfield;
-    }
-
-    .num-field::-webkit-outer-spin-button,
-    .num-field::-webkit-inner-spin-button {
-        -webkit-appearance: none;
-        margin: 0
-    }
-
-    /* ── Tags (tech stack) ──────────────────────────────────────── */
-    .tags-wrap {
-        display: flex;
-        flex-wrap: wrap;
-        gap: .5rem;
-        margin-bottom: .75rem
-    }
-
-    .tag-item {
-        display: inline-flex;
-        align-items: center;
-        gap: .4rem;
-        padding: .35rem .7rem;
-        background: rgba(37, 99, 235, .1);
-        border: 1px solid rgba(37, 99, 235, .2);
-        border-radius: 99px;
-        font-size: .78rem;
-        color: var(--accent);
-        font-family: var(--font-mono);
-    }
-
-    .tag-item i {
-        font-size: .65rem;
-        opacity: .6
-    }
-
-    .tag-remove {
-        background: none;
-        border: none;
-        color: var(--accent);
-        cursor: pointer;
-        font-size: .65rem;
-        padding: 0 0 0 .2rem;
-        opacity: .5;
-    }
-
-    .tag-remove:hover {
-        opacity: 1
-    }
-
-    .tag-input-row {
-        display: flex;
-        gap: .5rem
-    }
-
-    /* ── Upload de imagem ───────────────────────────────────────── */
-    .upload-area {
-        border: 2px dashed var(--border);
-        border-radius: var(--radius-lg);
-        padding: 2rem;
-        text-align: center;
-        cursor: pointer;
-        transition: all .25s;
-    }
-
-    .upload-area:hover {
-        border-color: var(--accent);
-        background: rgba(37, 99, 235, .03)
-    }
-
-    .upload-area.has-image {
-        border-style: solid;
-        padding: 0;
-        border-radius: var(--radius-lg);
-        overflow: hidden
-    }
-
-    .upload-preview {
-        pointer-events: none
-    }
-
-    .upload-preview img {
-        width: 100%;
-        max-height: 300px;
-        object-fit: cover;
-        border-radius: var(--radius-lg);
-        display: block;
-    }
-
-    .upload-icon {
-        font-size: 2.5rem;
-        color: var(--text-muted);
-        margin-bottom: .8rem
-    }
-
-    .upload-preview h4 {
-        font-family: var(--font-head);
-        font-size: 1rem;
-        margin-bottom: .2rem
-    }
-
-    .upload-preview p {
-        font-size: .8rem;
-        color: var(--text-muted)
-    }
-
-    .upload-actions {
-        display: flex;
-        gap: .5rem;
-        margin-top: 1rem;
-        justify-content: center
-    }
-
-    /* ── Botões ─────────────────────────────────────────────────── */
-    .btn {
-        display: inline-flex;
-        align-items: center;
-        gap: .45rem;
-        padding: .55rem 1.1rem;
-        border-radius: 8px;
-        font-family: var(--font-body);
-        font-size: .83rem;
-        font-weight: 500;
-        cursor: pointer;
-        transition: all .2s;
-        text-decoration: none;
-        border: 1px solid var(--border);
-        white-space: nowrap;
-    }
-
-    .btn-primary {
-        background: var(--accent);
-        color: #fff;
-        border-color: var(--accent)
-    }
-
-    .btn-primary:hover {
-        background: #1d4ed8;
-        transform: translateY(-1px);
-        box-shadow: 0 4px 16px var(--accent-glow)
-    }
-
-    .btn-secondary {
-        background: transparent;
-        border: 1px solid var(--border);
-        color: var(--text-dim)
-    }
-
-    .btn-secondary:hover {
-        background: var(--bg-hover);
-        border-color: var(--border-acc);
-        color: var(--text)
-    }
-
-    .btn-lg {
-        padding: .7rem 1.5rem;
-        font-size: .9rem
-    }
-
-    .form-actions {
-        display: flex;
-        gap: .75rem;
-        justify-content: flex-end;
-        margin-top: 1.5rem;
-        padding-top: 1.5rem;
-        border-top: 1px solid var(--border);
-    }
-
-    /* ── Responsividade extra ───────────────────────────────────── */
-    @media (max-width: 600px) {
-        .page-top {
-            flex-direction: column
-        }
-
-        .form-section {
-            padding: 1.2rem
-        }
-
-        .radio-group {
-            flex-direction: column
-        }
-    }
-    </style>
 
     <script>
-    const BASE = '<?= BASE_URL ?>'; // já existia
+    const BASE = <?= json_encode(BASE_URL, JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_AMP | JSON_HEX_QUOT) ?>;
     const form = document.getElementById('projectForm');
     const submitBtns = document.querySelectorAll('#submitBtn, #submitBtn2');
 
@@ -983,9 +482,15 @@ unset($_SESSION['form_data'], $_SESSION['form_errors']);
     function showToast(message, type = 'success') {
         const container = document.getElementById('toast-container') || createToastContainer();
         const toast = document.createElement('div');
-        toast.className = `toast toast-${type}`;
-        toast.innerHTML =
-            `<i class="fas fa-${type === 'success' ? 'check-circle' : type === 'error' ? 'times-circle' : 'info-circle'}"></i> ${message}`;
+        const safeType = ['success', 'error'].includes(type) ? type : 'info';
+        toast.className = `toast ${safeType}`;
+        const icon = document.createElement('i');
+        icon.className =
+            `fas fa-${safeType === 'success' ? 'check-circle' : safeType === 'error' ? 'times-circle' : 'info-circle'}`;
+        icon.setAttribute('aria-hidden', 'true');
+        const text = document.createElement('span');
+        text.textContent = String(message ?? '');
+        toast.append(icon, text);
         container.appendChild(toast);
         setTimeout(() => {
             toast.style.opacity = '0';
@@ -1047,20 +552,63 @@ unset($_SESSION['form_data'], $_SESSION['form_errors']);
     const uploadActions = document.getElementById('uploadActions');
 
     uploadArea.addEventListener('click', function(e) {
-        if (e.target === coverInput) return;
+        if (e.target === coverInput || (e.target.closest && e.target.closest('button'))) return;
         coverInput.click();
     });
 
-    coverInput.addEventListener('change', function() {
-        const file = this.files[0];
+    function previewCoverFile(file) {
         if (!file) return;
+        const allowed = ['image/jpeg', 'image/png', 'image/webp'];
+        if (!allowed.includes(file.type)) {
+            showToast('Formato inválido. Usa JPEG, PNG ou WebP.', 'error');
+            removeCover();
+            return;
+        }
+        const maxBytes = <?= (int) MAX_UPLOAD_SIZE ?>;
+        if (file.size > maxBytes) {
+            showToast('A imagem excede o limite de ' + (maxBytes / 1024 / 1024).toLocaleString('pt-PT', {
+                maximumFractionDigits: 2
+            }) + ' MB.', 'error');
+            removeCover();
+            return;
+        }
         const reader = new FileReader();
         reader.onload = function(e) {
-            coverPreview.innerHTML = '<img src="' + e.target.result + '" alt="Preview">';
+            const image = document.createElement('img');
+            image.src = String(e.target.result || '');
+            image.alt = 'Pré-visualização da imagem de capa';
+            coverPreview.replaceChildren(image);
             uploadArea.classList.add('has-image');
             uploadActions.style.display = 'flex';
         };
         reader.readAsDataURL(file);
+    }
+
+    coverInput.addEventListener('change', function() {
+        previewCoverFile(this.files && this.files[0]);
+    });
+
+    ['dragenter', 'dragover'].forEach(eventName => {
+        uploadArea.addEventListener(eventName, event => {
+            event.preventDefault();
+            event.stopPropagation();
+            uploadArea.classList.add('drag-over');
+        });
+    });
+    ['dragleave', 'drop'].forEach(eventName => {
+        uploadArea.addEventListener(eventName, event => {
+            event.preventDefault();
+            event.stopPropagation();
+            uploadArea.classList.remove('drag-over');
+        });
+    });
+    uploadArea.addEventListener('drop', event => {
+        const file = event.dataTransfer && event.dataTransfer.files && event.dataTransfer.files[0];
+        if (!file) return;
+        const transfer = new DataTransfer();
+        transfer.items.add(file);
+        coverInput.files = transfer.files;
+        previewCoverFile(file);
     });
 
     function removeCover() {
@@ -1080,8 +628,24 @@ unset($_SESSION['form_data'], $_SESSION['form_errors']);
         const wrap = document.getElementById('tagsWrap');
         const span = document.createElement('span');
         span.className = 'tag-item';
-        span.innerHTML = '<i class="fas fa-code"></i><span>' + val + '</span>' +
-            '<button type="button" class="tag-remove" onclick="this.parentElement.remove();updateHiddenTech()"><i class="fas fa-times"></i></button>';
+        const codeIcon = document.createElement('i');
+        codeIcon.className = 'fas fa-code';
+        codeIcon.setAttribute('aria-hidden', 'true');
+        const tagText = document.createElement('span');
+        tagText.textContent = val;
+        const removeButton = document.createElement('button');
+        removeButton.type = 'button';
+        removeButton.className = 'tag-remove';
+        removeButton.setAttribute('aria-label', 'Remover tecnologia ' + val);
+        const removeIcon = document.createElement('i');
+        removeIcon.className = 'fas fa-times';
+        removeIcon.setAttribute('aria-hidden', 'true');
+        removeButton.appendChild(removeIcon);
+        removeButton.addEventListener('click', () => {
+            span.remove();
+            updateHiddenTech();
+        });
+        span.append(codeIcon, tagText, removeButton);
         wrap.appendChild(span);
         tagInput.value = '';
         updateHiddenTech();
@@ -1122,71 +686,105 @@ unset($_SESSION['form_data'], $_SESSION['form_errors']);
         summaryInput.dispatchEvent(new Event('input'));
     }
 
-    // ── Submissão AJAX (NOVO, substitui o evento submit antigo) ──
+    // ── Submissão AJAX ─────────────────────────────────────────────
     form.addEventListener('submit', async function(e) {
         e.preventDefault();
 
-        // Validação rápida no cliente
         let clientValid = true;
         form.querySelectorAll('[required]').forEach(field => {
-            if (!field.value.trim()) {
+            const invalidFile = field.type === 'file' && (!field.files || field.files.length === 0);
+            const emptyValue = field.type !== 'file' && !String(field.value || '').trim();
+            if (invalidFile || emptyValue) {
                 field.classList.add('error');
                 clientValid = false;
             } else {
                 field.classList.remove('error');
             }
         });
+
         if (!clientValid) {
             showToast('Preenche todos os campos obrigatórios.', 'error');
             return;
         }
 
-        // Desactivar botões
-        submitBtns.forEach(btn => {
-            btn.disabled = true;
-            btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> A guardar…';
-        });
+        const setBusy = (busy) => {
+            submitBtns.forEach(btn => {
+                btn.disabled = busy;
+                btn.innerHTML = busy ?
+                    '<i class="fas fa-spinner fa-spin"></i> A guardar…' :
+                    '<i class="fas fa-save"></i> Guardar Projecto';
+            });
+        };
+        setBusy(true);
 
+        const endpoint = form.dataset.api;
         try {
             const formData = new FormData(form);
-            const res = await fetch(form.dataset.api, {
+            const res = await fetch(endpoint, {
                 method: 'POST',
+                credentials: 'same-origin',
+                cache: 'no-store',
                 body: formData,
                 headers: {
                     'X-Requested-With': 'XMLHttpRequest',
-                    'X-CSRF-Token': document.getElementById('csrf_token').value
+                    'X-CSRF-Token': document.getElementById('csrf_token').value,
+                    'Accept': 'application/json'
                 }
             });
 
-            const data = await res.json();
-
-            if (!res.ok || !data.success) {
-                // Exibir erros
-                if (data.errors) {
-                    data.errors.forEach(err => showToast(err, 'error'));
-                } else {
-                    showToast(data.message || 'Erro ao criar projecto.', 'error');
-                }
-                // Reactivar botões
-                submitBtns.forEach(btn => {
-                    btn.disabled = false;
-                    btn.innerHTML = '<i class="fas fa-save"></i> Guardar Projecto';
+            const responseText = await res.text();
+            let data;
+            try {
+                data = JSON.parse(responseText);
+            } catch (parseError) {
+                console.error('[JMbenga add project] O endpoint não devolveu JSON.', {
+                    status: res.status,
+                    redirected: res.redirected,
+                    responseUrl: res.url,
+                    endpoint,
+                    responsePreview: responseText.slice(0, 1200)
                 });
+
+                const finalUrl = String(res.url || '').toLowerCase();
+                if (res.redirected && /(entrar|login)/.test(finalUrl)) {
+                    showToast(
+                        'A sessão administrativa expirou. Actualiza a página, inicia sessão novamente e tenta guardar.',
+                        'error');
+                } else if (res.redirected && /lockscreen/.test(finalUrl)) {
+                    showToast('O painel está bloqueado. Desbloqueia a sessão e tenta novamente.', 'error');
+                } else {
+                    showToast(
+                        `O servidor devolveu uma resposta inesperada (HTTP ${res.status}). Abre a consola do navegador (F12) para ver os detalhes.`,
+                        'error');
+                }
+                setBusy(false);
                 return;
             }
 
-            // Sucesso
-            showToast('Projecto criado com sucesso!', 'success');
+            if (!res.ok || !data.success) {
+                if (Array.isArray(data.errors) && data.errors.length) {
+                    data.errors.forEach(err => showToast(String(err), 'error'));
+                } else {
+                    showToast(String(data.message ||
+                        `Não foi possível guardar o projecto (HTTP ${res.status}).`), 'error');
+                }
+                setBusy(false);
+                return;
+            }
+
+            showToast(data.message || 'Projecto criado com sucesso!', 'success');
             setTimeout(() => {
                 window.location.href = BASE + '/jm-panel/projects?msg=created';
             }, 800);
-
         } catch (err) {
-            showToast('Erro de rede. Tenta novamente.', 'error');
-            submitBtns.forEach(btn => {
-                btn.disabled = false;
-                btn.innerHTML = '<i class="fas fa-save"></i> Guardar Projecto';
+            console.error('[JMbenga add project] Falha ao contactar o endpoint:', {
+                endpoint,
+                error: err
             });
+            showToast(
+                'Não foi possível contactar o processador do projecto. Confirma o servidor e a rota; consulta a consola (F12) para detalhes.',
+                'error');
+            setBusy(false);
         }
     });
     </script>

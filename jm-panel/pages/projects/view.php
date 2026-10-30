@@ -114,7 +114,7 @@ $auditLogs = $auditStmt->fetchAll();
 
 // ── Testemunhos / Depoimentos (se existir tabela) ────────────
 $testimonials = [];
-if ($db->query("SHOW TABLES LIKE '_testimonials'")->rowCount() > 0) {
+if ((int) $db->query("SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = DATABASE() AND table_name = '_testimonials'")->fetchColumn() > 0) {
     $testStmt = $db->prepare("
         SELECT * FROM _testimonials
         WHERE body_testimonial LIKE ? OR company_testimonial LIKE ?
@@ -138,9 +138,10 @@ $relatedMessages = $relatedMessages->fetchAll();
 // ── Cores por categoria ──────────────────────────────────────
 function categoryColor(string $cat): string {
     $map = [
-        'web'       => '#2563eb', 'mobile' => '#10b981', 'design' => '#8b5cf6',
-        'backend'   => '#f59e0b', 'frontend' => '#14b8a6', 'fullstack' => '#ec4899',
-        'devops'    => '#f97316', 'other' => '#64748b',
+        'web' => '#2563eb', 'mobile' => '#10b981', 'api' => '#f59e0b',
+        'desktop' => '#8b5cf6', 'design' => '#ec4899', 'other' => '#64748b',
+        'backend' => '#f59e0b', 'frontend' => '#14b8a6', 'fullstack' => '#ec4899',
+        'devops' => '#f97316',
     ];
     return $map[strtolower($cat)] ?? '#64748b';
 }
@@ -168,8 +169,6 @@ foreach ($dailyVisits as $day) {
 <!DOCTYPE html>
 <html lang="pt" data-theme="dark" data-base-url="<?= BASE_URL ?>">
 <?php include __DIR__ . '/../../include/head.php'; ?>
-<!-- Chart.js para o gráfico -->
-<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
 
 <body>
@@ -179,7 +178,7 @@ foreach ($dailyVisits as $day) {
     <div class="main">
         <?php include __DIR__ . '/../../include/header.php'; ?>
 
-        <div class="content">
+        <div class="content project-view-page">
 
             <!-- ═══ CABEÇALHO ════════════════════════════════════════════ -->
             <div class="page-top">
@@ -206,7 +205,7 @@ foreach ($dailyVisits as $day) {
                 <div style="display:flex;gap:.6rem;align-items:center">
                     <?php if ($project['status_project'] === 'published'): ?>
                     <a href="<?= BASE_URL ?>/project/<?= e($project['slug_project']) ?>" target="_blank"
-                        class="btn btn-secondary">
+                        rel="noopener noreferrer" class="btn btn-secondary">
                         <i class="fas fa-external-link-alt"></i> Ver no site
                     </a>
                     <?php endif; ?>
@@ -284,9 +283,16 @@ foreach ($dailyVisits as $day) {
                                 <h3>Visitas nos Últimos 30 Dias</h3>
                             </div>
                         </div>
-                        <div style="height:260px">
-                            <canvas id="visitsChart"></canvas>
+                        <?php if (!empty($chartLabels)): ?>
+                        <div class="view-chart-wrap">
+                            <canvas id="visitsChart" aria-label="Gráfico de visitas nos últimos 30 dias"
+                                role="img"></canvas>
                         </div>
+                        <?php else: ?>
+                        <div class="view-empty-data"><i class="fas fa-chart-line"></i>
+                            <p>Ainda não há visitas registadas nos últimos 30 dias.</p>
+                        </div>
+                        <?php endif; ?>
                     </div>
 
                     <!-- Dispositivos -->
@@ -509,16 +515,16 @@ foreach ($dailyVisits as $day) {
                         </div>
                         <div class="link-list">
                             <?php if (!empty($project['url_demo'])): ?>
-                            <a href="<?= e($project['url_demo']) ?>" target="_blank" class="link-item"><i
-                                    class="fas fa-external-link-alt"></i> Demo</a>
+                            <a href="<?= e($project['url_demo']) ?>" target="_blank" rel="noopener noreferrer"
+                                class="link-item"><i class="fas fa-external-link-alt"></i> Demo</a>
                             <?php endif; ?>
                             <?php if (!empty($project['url_github'])): ?>
-                            <a href="<?= e($project['url_github']) ?>" target="_blank" class="link-item"><i
-                                    class="fab fa-github"></i> GitHub</a>
+                            <a href="<?= e($project['url_github']) ?>" target="_blank" rel="noopener noreferrer"
+                                class="link-item"><i class="fab fa-github"></i> GitHub</a>
                             <?php endif; ?>
                             <?php if (!empty($project['url_live'])): ?>
-                            <a href="<?= e($project['url_live']) ?>" target="_blank" class="link-item"><i
-                                    class="fas fa-globe"></i> Site ao vivo</a>
+                            <a href="<?= e($project['url_live']) ?>" target="_blank" rel="noopener noreferrer"
+                                class="link-item"><i class="fas fa-globe"></i> Site ao vivo</a>
                             <?php endif; ?>
                         </div>
                     </div>
@@ -532,469 +538,10 @@ foreach ($dailyVisits as $day) {
 
     <?php include __DIR__ . '/../../include/modal_logout.php'; ?>
 
-    <style>
-    .breadcrumb {
-        display: flex;
-        align-items: center;
-        gap: .5rem;
-        font-size: .78rem;
-        color: var(--text-muted);
-        margin-bottom: .5rem
-    }
-
-    .breadcrumb a {
-        color: var(--text-dim);
-        text-decoration: none;
-        transition: color .2s
-    }
-
-    .breadcrumb a:hover {
-        color: var(--accent)
-    }
-
-    .breadcrumb i {
-        font-size: .6rem
-    }
-
-    .page-top {
-        display: flex;
-        justify-content: space-between;
-        align-items: flex-start;
-        flex-wrap: wrap;
-        gap: 1rem;
-        margin-bottom: 1.5rem
-    }
-
-    .page-title {
-        font-family: var(--font-head);
-        font-size: 1.5rem;
-        font-weight: 800;
-        letter-spacing: -.02em;
-        margin-bottom: .2rem
-    }
-
-    .page-sub {
-        font-size: .8rem;
-        color: var(--text-muted);
-        display: flex;
-        align-items: center;
-        gap: .5rem;
-        flex-wrap: wrap
-    }
-
-    .kpi-row {
-        display: flex;
-        gap: .75rem;
-        flex-wrap: wrap;
-        margin-bottom: 1.5rem
-    }
-
-    .kpi-card {
-        flex: 1;
-        min-width: 120px;
-        background: var(--bg-card);
-        border: 1px solid var(--border);
-        border-radius: var(--radius);
-        padding: .75rem 1rem;
-        display: flex;
-        align-items: center;
-        gap: .65rem;
-        transition: all .22s
-    }
-
-    .kpi-card:hover {
-        transform: translateY(-2px);
-        border-color: var(--border-acc);
-        box-shadow: 0 6px 24px rgba(0, 0, 0, .25)
-    }
-
-    .kpi-icon {
-        width: 36px;
-        height: 36px;
-        border-radius: 9px;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        font-size: .85rem;
-        flex-shrink: 0
-    }
-
-    .kpi-val {
-        font-family: var(--font-head);
-        font-size: 1.3rem;
-        font-weight: 800;
-        letter-spacing: -.02em;
-        line-height: 1
-    }
-
-    .kpi-lbl {
-        font-size: .65rem;
-        color: var(--text-muted);
-        margin-top: 1px;
-        white-space: nowrap
-    }
-
-    .view-grid {
-        display: grid;
-        grid-template-columns: 1fr 360px;
-        gap: 1.2rem;
-        align-items: start
-    }
-
-    @media(max-width:1024px) {
-        .view-grid {
-            grid-template-columns: 1fr
-        }
-    }
-
-    .view-cover {
-        border-radius: var(--radius-lg);
-        overflow: hidden;
-        border: 1px solid var(--border);
-        margin-bottom: 1.2rem
-    }
-
-    .view-cover img {
-        width: 100%;
-        display: block
-    }
-
-    .form-section {
-        background: var(--bg-card);
-        border: 1px solid var(--border);
-        border-radius: var(--radius-lg);
-        padding: 1.5rem;
-        margin-bottom: 1.2rem
-    }
-
-    .section-header {
-        display: flex;
-        align-items: center;
-        gap: .75rem;
-        margin-bottom: 1rem
-    }
-
-    .section-icon {
-        width: 34px;
-        height: 34px;
-        border-radius: 8px;
-        background: var(--accent-glow);
-        border: 1px solid var(--border-acc);
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        color: var(--accent);
-        font-size: .85rem;
-        flex-shrink: 0
-    }
-
-    .section-header h3 {
-        font-family: var(--font-head);
-        font-size: .95rem;
-        font-weight: 700
-    }
-
-    .view-body {
-        color: var(--text-dim);
-        font-size: .9rem;
-        line-height: 1.8;
-        white-space: pre-wrap
-    }
-
-    .view-gallery {
-        display: grid;
-        grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
-        gap: .75rem
-    }
-
-    .gallery-item {
-        border-radius: var(--radius);
-        overflow: hidden;
-        border: 1px solid var(--border);
-        background: var(--bg)
-    }
-
-    .gallery-item img {
-        width: 100%;
-        display: block;
-        aspect-ratio: 16/9;
-        object-fit: cover
-    }
-
-    .gallery-caption {
-        padding: .4rem .6rem;
-        font-size: .72rem;
-        color: var(--text-muted);
-        text-align: center
-    }
-
-    .info-list {
-        display: flex;
-        flex-direction: column;
-        gap: 0
-    }
-
-    .info-row {
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        padding: .55rem 0;
-        border-bottom: 1px solid var(--border);
-        font-size: .82rem
-    }
-
-    .info-row:last-child {
-        border-bottom: none
-    }
-
-    .info-row span:first-child {
-        color: var(--text-muted);
-        font-size: .75rem
-    }
-
-    .info-row code {
-        font-family: var(--font-mono);
-        font-size: .75rem;
-        background: var(--bg);
-        padding: 2px 6px;
-        border-radius: 4px;
-        color: var(--accent)
-    }
-
-    .cat-tag {
-        display: inline-flex;
-        align-items: center;
-        gap: 4px;
-        padding: 2px 8px;
-        border-radius: 99px;
-        font-size: .7rem;
-        font-weight: 700;
-        background: color-mix(in srgb, var(--cat-color) 12%, transparent);
-        color: var(--cat-color);
-        border: 1px solid color-mix(in srgb, var(--cat-color) 25%, transparent)
-    }
-
-    .tags-wrap {
-        display: flex;
-        flex-wrap: wrap;
-        gap: .4rem
-    }
-
-    .tag-item {
-        display: inline-flex;
-        align-items: center;
-        gap: .35rem;
-        padding: .3rem .65rem;
-        background: rgba(37, 99, 235, .1);
-        border: 1px solid rgba(37, 99, 235, .2);
-        border-radius: 99px;
-        font-size: .76rem;
-        color: var(--accent);
-        font-family: var(--font-mono)
-    }
-
-    .tag-item i {
-        font-size: .6rem;
-        opacity: .6
-    }
-
-    .link-list {
-        display: flex;
-        flex-direction: column;
-        gap: .5rem
-    }
-
-    .link-item {
-        display: flex;
-        align-items: center;
-        gap: .6rem;
-        padding: .55rem .8rem;
-        background: var(--bg);
-        border: 1px solid var(--border);
-        border-radius: 8px;
-        color: var(--accent);
-        text-decoration: none;
-        font-size: .82rem;
-        transition: all .2s
-    }
-
-    .link-item:hover {
-        background: var(--accent-glow);
-        border-color: var(--accent)
-    }
-
-    .audit-list {
-        display: flex;
-        flex-direction: column;
-        gap: 0
-    }
-
-    .audit-item {
-        display: flex;
-        gap: .75rem;
-        padding: .6rem 0;
-        border-bottom: 1px solid var(--border)
-    }
-
-    .audit-item:last-child {
-        border-bottom: none
-    }
-
-    .audit-dot {
-        width: 8px;
-        height: 8px;
-        border-radius: 50%;
-        flex-shrink: 0;
-        margin-top: 5px
-    }
-
-    .audit-content {
-        flex: 1
-    }
-
-    .audit-action {
-        font-size: .82rem;
-        font-weight: 600
-    }
-
-    .audit-meta {
-        font-size: .7rem;
-        color: var(--text-muted);
-        margin-top: 2px
-    }
-
-    .testi-list {
-        display: flex;
-        flex-direction: column;
-        gap: 1rem
-    }
-
-    .testi-item {
-        padding: .8rem;
-        background: var(--bg);
-        border: 1px solid var(--border);
-        border-radius: var(--radius)
-    }
-
-    .testi-stars {
-        margin-bottom: .4rem
-    }
-
-    .testi-body {
-        font-size: .85rem;
-        color: var(--text-dim);
-        font-style: italic;
-        line-height: 1.6
-    }
-
-    .testi-author {
-        font-size: .75rem;
-        color: var(--text-muted);
-        margin-top: .4rem
-    }
-
-    .msg-list {
-        display: flex;
-        flex-direction: column;
-        gap: .75rem
-    }
-
-    .msg-item {
-        padding: .8rem;
-        background: var(--bg);
-        border: 1px solid var(--border);
-        border-radius: var(--radius)
-    }
-
-    .msg-header {
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        margin-bottom: .3rem
-    }
-
-    .msg-subject {
-        font-size: .82rem;
-        color: var(--accent)
-    }
-
-    .msg-date {
-        font-size: .7rem;
-        color: var(--text-muted);
-        margin-top: .3rem
-    }
-
-    .device-grid {
-        display: flex;
-        flex-direction: column;
-        gap: .6rem
-    }
-
-    .device-bar-bg {
-        height: 6px;
-        background: var(--border);
-        border-radius: 3px;
-        overflow: hidden;
-        margin-bottom: .15rem
-    }
-
-    .device-bar-fill {
-        height: 100%;
-        border-radius: 3px
-    }
-
-    .device-info {
-        display: flex;
-        justify-content: space-between;
-        font-size: .75rem;
-        color: var(--text-dim)
-    }
-
-    .btn {
-        display: inline-flex;
-        align-items: center;
-        gap: .45rem;
-        padding: .55rem 1.1rem;
-        border-radius: 8px;
-        font-family: var(--font-body);
-        font-size: .83rem;
-        font-weight: 500;
-        cursor: pointer;
-        transition: all .2s;
-        text-decoration: none;
-        border: 1px solid var(--border);
-        white-space: nowrap
-    }
-
-    .btn-primary {
-        background: var(--accent);
-        color: #fff;
-        border-color: var(--accent)
-    }
-
-    .btn-primary:hover {
-        background: #1d4ed8;
-        transform: translateY(-1px);
-        box-shadow: 0 4px 16px var(--accent-glow)
-    }
-
-    .btn-secondary {
-        background: transparent;
-        border: 1px solid var(--border);
-        color: var(--text-dim)
-    }
-
-    .btn-secondary:hover {
-        background: var(--bg-hover);
-        border-color: var(--border-acc);
-        color: var(--text)
-    }
-    </style>
-
     <script>
     // ── Gráfico de visitas ──────────────────────────────────────
-    const chartLabels = <?= json_encode($chartLabels) ?>;
-    const chartData = <?= json_encode($chartData) ?>;
+    const chartLabels = <?= json_encode($chartLabels, JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP) ?>;
+    const chartData = <?= json_encode($chartData, JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP) ?>;
     if (chartLabels.length > 0) {
         const ctx = document.getElementById('visitsChart').getContext('2d');
         new Chart(ctx, {

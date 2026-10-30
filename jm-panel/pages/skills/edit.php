@@ -12,7 +12,8 @@ requireNoLockscreen();
 $db = $GLOBALS['pdo'];
 
 // ── Verificar se o ID foi passado e a skill existe ──────────
-$editId = (int)($_GET['id'] ?? 0);
+$rawEditId = $_GET['id'] ?? null;
+$editId = is_string($rawEditId) && ctype_digit($rawEditId) ? (int) $rawEditId : 0;
 if ($editId <= 0) {
     redirect('/jm-panel/skills');
 }
@@ -58,17 +59,34 @@ $formData   = $_SESSION['form_data']   ?? [];
 $formErrors = $_SESSION['form_errors'] ?? [];
 unset($_SESSION['form_data'], $_SESSION['form_errors']);
 
-// Se não houve erro, usar dados da skill
-if (empty($formData)) {
+// Se não houve dados de recuperação, usar os dados actuais da skill.
+if (!is_array($formData) || empty($formData)) {
     $formData = $skill;
 }
+
+// Normalizar valores antes de os inserir no HTML.
+$nameValue = isset($formData['name_skill']) && is_string($formData['name_skill'])
+    ? $formData['name_skill'] : '';
+$percentageValue = filter_var($formData['percentage_skill'] ?? 80, FILTER_VALIDATE_INT);
+$percentageValue = ($percentageValue === false) ? 80 : max(0, min(100, $percentageValue));
+$categoryValue = $formData['category_skill'] ?? 'frontend';
+if (!is_string($categoryValue) || !array_key_exists($categoryValue, $categories)) {
+    $categoryValue = 'frontend';
+}
+$iconValue = isset($formData['icon_skill']) && is_string($formData['icon_skill'])
+    ? $formData['icon_skill'] : 'fas fa-code';
+$displayOrderValue = filter_var($formData['display_order'] ?? 0, FILTER_VALIDATE_INT);
+$displayOrderValue = ($displayOrderValue === false) ? 0 : max(0, $displayOrderValue);
+$isVisibleValue = (int) ($formData['is_visible'] ?? 1) === 1;
 ?>
 <!DOCTYPE html>
 <html lang="pt" data-theme="dark" data-base-url="<?= BASE_URL ?>">
 <?php include __DIR__ . '/../../include/head.php'; ?>
+<link rel="stylesheet"
+    href="<?= e(BASE_URL) ?>/assets/css/jmbenga-skills.css?v=<?= file_exists(ROOT_PATH . '/assets/css/jmbenga-skills.css') ? (int) filemtime(ROOT_PATH . '/assets/css/jmbenga-skills.css') : 1 ?>">
 </head>
 
-<body>
+<body class="skill-form-page">
 
     <?php include __DIR__ . '/../../include/sidebar.php'; ?>
 
@@ -121,7 +139,8 @@ if (empty($formData)) {
             <!-- ═══ FORMULÁRIO ════════════════════════════════════════════ -->
             <form id="skillForm" novalidate data-api="<?= BASE_URL ?>/jm-panel/skills/edit-process">
 
-                <input type="hidden" name="csrf_token" id="csrf_token" value="<?= $_SESSION['admin_csrf_token'] ?>">
+                <input type="hidden" name="csrf_token" id="csrf_token"
+                    value="<?= e($_SESSION['admin_csrf_token'] ?? '') ?>">
                 <input type="hidden" name="id_skill" value="<?= $editId ?>">
 
                 <!-- ═══ SECÇÃO 1 — INFORMAÇÕES BÁSICAS ════════════════════ -->
@@ -140,8 +159,8 @@ if (empty($formData)) {
                                 Nome <span class="required">*</span>
                             </label>
                             <input type="text" id="name_skill" name="name_skill" class="form-control"
-                                value="<?= e($formData['name_skill'] ?? '') ?>" placeholder="Ex: PHP, React, MySQL"
-                                maxlength="100" required autofocus>
+                                value="<?= e($nameValue) ?>" placeholder="Ex: PHP, React, MySQL" maxlength="100"
+                                required autofocus>
                         </div>
 
                         <!-- Percentagem -->
@@ -151,10 +170,9 @@ if (empty($formData)) {
                             </label>
                             <div class="percentage-input">
                                 <input type="range" id="percentage_skill" name="percentage_skill" min="0" max="100"
-                                    value="<?= $formData['percentage_skill'] ?? 80 ?>" class="range-slider"
-                                    oninput="document.getElementById('pctValue').textContent=this.value+'%'">
+                                    value="<?= $percentageValue ?>" required class="range-slider">
                                 <div class="percentage-display">
-                                    <span id="pctValue"><?= $formData['percentage_skill'] ?? 80 ?>%</span>
+                                    <span id="pctValue"><?= $percentageValue ?>%</span>
                                 </div>
                             </div>
                         </div>
@@ -166,11 +184,11 @@ if (empty($formData)) {
                             </label>
                             <div class="category-select-grid">
                                 <?php foreach ($categories as $key => $cat): ?>
-                                <label
-                                    class="category-option <?= ($formData['category_skill'] ?? 'frontend') === $key ? 'selected' : '' ?>"
+                                <label class="category-option <?= $categoryValue === $key ? 'selected' : '' ?>"
                                     style="--cat-color:<?= $cat['color'] ?>">
                                     <input type="radio" name="category_skill" value="<?= $key ?>"
-                                        <?= ($formData['category_skill'] ?? 'frontend') === $key ? 'checked' : '' ?>>
+                                        <?= $key === 'frontend' ? 'required' : '' ?>
+                                        <?= $categoryValue === $key ? 'checked' : '' ?>>
                                     <i class="fas <?= $cat['icon'] ?>"></i>
                                     <span><?= $cat['label'] ?></span>
                                 </label>
@@ -183,10 +201,10 @@ if (empty($formData)) {
                             <label class="form-label">Estado</label>
                             <label class="switch">
                                 <input type="checkbox" name="is_visible" value="1"
-                                    <?= ($formData['is_visible'] ?? 1) ? 'checked' : '' ?>>
+                                    <?= $isVisibleValue ? 'checked' : '' ?>>
                                 <span class="switch-slider"></span>
                                 <span class="switch-label">
-                                    <?= ($formData['is_visible'] ?? 1) ? 'Visível' : 'Oculta' ?>
+                                    <?= $isVisibleValue ? 'Visível' : 'Oculta' ?>
                                 </span>
                             </label>
                         </div>
@@ -210,10 +228,10 @@ if (empty($formData)) {
                             </label>
                             <div class="input-with-icon">
                                 <input type="text" id="icon_skill" name="icon_skill" class="form-control"
-                                    value="<?= e($formData['icon_skill'] ?? 'fas fa-code') ?>"
-                                    placeholder="Ex: fab fa-php, fas fa-database" maxlength="100">
+                                    value="<?= e($iconValue) ?>" required placeholder="Ex: fab fa-php, fas fa-database"
+                                    maxlength="100">
                                 <span class="icon-preview" id="iconPreview">
-                                    <i class="<?= e($formData['icon_skill'] ?? 'fas fa-code') ?>"></i>
+                                    <i class="<?= e($iconValue) ?>"></i>
                                 </span>
                             </div>
                         </div>
@@ -224,8 +242,7 @@ if (empty($formData)) {
                             <div class="number-input">
                                 <button type="button" class="num-btn" onclick="changeOrder(-1)">−</button>
                                 <input type="number" id="display_order" name="display_order"
-                                    class="form-control num-field" value="<?= $formData['display_order'] ?? 0 ?>"
-                                    min="0">
+                                    class="form-control num-field" value="<?= $displayOrderValue ?>" min="0">
                                 <button type="button" class="num-btn" onclick="changeOrder(1)">+</button>
                             </div>
                         </div>
@@ -247,555 +264,146 @@ if (empty($formData)) {
     </div><!-- /.main -->
 
     <?php include __DIR__ . '/../../include/modal_logout.php'; ?>
-
-    <!-- ═══ ESTILOS (idênticos ao add.php) ══════════════════════ -->
-    <style>
-    .breadcrumb {
-        display: flex;
-        align-items: center;
-        gap: .5rem;
-        font-size: .78rem;
-        color: var(--text-muted);
-        margin-bottom: .5rem
-    }
-
-    .breadcrumb a {
-        color: var(--text-dim);
-        text-decoration: none;
-        transition: color .2s
-    }
-
-    .breadcrumb a:hover {
-        color: var(--accent)
-    }
-
-    .breadcrumb i {
-        font-size: .6rem
-    }
-
-    .page-top {
-        display: flex;
-        justify-content: space-between;
-        align-items: flex-start;
-        flex-wrap: wrap;
-        gap: 1rem;
-        margin-bottom: 1.5rem
-    }
-
-    .page-title {
-        font-family: var(--font-head);
-        font-size: 1.5rem;
-        font-weight: 800;
-        letter-spacing: -.02em;
-        margin-bottom: .2rem
-    }
-
-    .page-sub {
-        font-size: .8rem;
-        color: var(--text-muted)
-    }
-
-    .alert {
-        padding: 1rem 1.2rem;
-        border-radius: var(--radius);
-        margin-bottom: 1.5rem;
-        display: flex;
-        align-items: flex-start;
-        gap: .75rem;
-        font-size: .85rem
-    }
-
-    .alert-danger {
-        background: rgba(239, 68, 68, .1);
-        border: 1px solid rgba(239, 68, 68, .3);
-        color: #f87171
-    }
-
-    .alert-close {
-        margin-left: auto;
-        background: none;
-        border: none;
-        color: inherit;
-        cursor: pointer;
-        opacity: .6;
-        font-size: .9rem
-    }
-
-    .alert-close:hover {
-        opacity: 1
-    }
-
-    .form-section {
-        background: var(--bg-card);
-        border: 1px solid var(--border);
-        border-radius: var(--radius-lg);
-        padding: 1.8rem;
-        margin-bottom: 1.2rem;
-        transition: border-color .25s
-    }
-
-    .form-section:focus-within {
-        border-color: var(--border-acc)
-    }
-
-    .section-header {
-        display: flex;
-        align-items: flex-start;
-        gap: 1rem;
-        margin-bottom: 1.5rem;
-        padding-bottom: 1.2rem;
-        border-bottom: 1px solid var(--border)
-    }
-
-    .section-icon {
-        width: 40px;
-        height: 40px;
-        border-radius: 10px;
-        background: var(--accent-glow);
-        border: 1px solid var(--border-acc);
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        color: var(--accent);
-        font-size: .95rem;
-        flex-shrink: 0
-    }
-
-    .section-header h3 {
-        font-family: var(--font-head);
-        font-size: 1rem;
-        font-weight: 700;
-        margin-bottom: .15rem
-    }
-
-    .section-header p {
-        font-size: .78rem;
-        color: var(--text-muted)
-    }
-
-    .form-grid {
-        display: grid;
-        grid-template-columns: 1fr 1fr;
-        gap: 1.2rem
-    }
-
-    @media(max-width:768px) {
-        .form-grid {
-            grid-template-columns: 1fr
-        }
-
-        .category-select-grid {
-            grid-template-columns: repeat(3, 1fr)
-        }
-    }
-
-    @media(max-width:480px) {
-        .category-select-grid {
-            grid-template-columns: repeat(2, 1fr)
-        }
-    }
-
-    .form-group {
-        display: flex;
-        flex-direction: column;
-        gap: .35rem
-    }
-
-    .form-label {
-        font-size: .75rem;
-        font-weight: 600;
-        text-transform: uppercase;
-        letter-spacing: .04em;
-        color: var(--text-dim)
-    }
-
-    .required {
-        color: var(--danger)
-    }
-
-    .form-control {
-        padding: .65rem .85rem;
-        background: var(--bg);
-        border: 1px solid var(--border);
-        border-radius: 8px;
-        color: var(--text);
-        font-family: var(--font-body);
-        font-size: .88rem;
-        outline: none;
-        transition: border-color .2s, box-shadow .2s
-    }
-
-    .form-control:focus {
-        border-color: var(--accent);
-        box-shadow: 0 0 0 3px var(--accent-glow)
-    }
-
-    .form-control::placeholder {
-        color: var(--text-muted)
-    }
-
-    .input-with-icon {
-        position: relative;
-        display: flex;
-        align-items: center
-    }
-
-    .input-with-icon .form-control {
-        padding-right: 2.5rem
-    }
-
-    .icon-preview {
-        position: absolute;
-        right: .7rem;
-        color: var(--accent);
-        font-size: 1rem;
-        pointer-events: none
-    }
-
-    .percentage-input {
-        display: flex;
-        align-items: center;
-        gap: 1rem
-    }
-
-    .range-slider {
-        flex: 1;
-        -webkit-appearance: none;
-        appearance: none;
-        height: 6px;
-        background: var(--border);
-        border-radius: 3px;
-        outline: none
-    }
-
-    .range-slider::-webkit-slider-thumb {
-        -webkit-appearance: none;
-        width: 18px;
-        height: 18px;
-        border-radius: 50%;
-        background: var(--accent);
-        cursor: pointer
-    }
-
-    .percentage-display {
-        min-width: 45px;
-        text-align: right;
-        font-family: var(--font-mono);
-        font-size: .9rem;
-        color: var(--accent);
-        font-weight: 600
-    }
-
-    .category-select-grid {
-        display: grid;
-        grid-template-columns: repeat(3, 1fr);
-        gap: .5rem
-    }
-
-    .category-option {
-        display: flex;
-        align-items: center;
-        gap: .5rem;
-        padding: .6rem .8rem;
-        border-radius: 8px;
-        border: 1px solid var(--border);
-        cursor: pointer;
-        transition: all .2s;
-        position: relative
-    }
-
-    .category-option:hover {
-        border-color: var(--border-acc)
-    }
-
-    .category-option.selected {
-        border-color: var(--cat-color);
-        background: color-mix(in srgb, var(--cat-color) 10%, transparent)
-    }
-
-    .category-option input {
-        display: none
-    }
-
-    .category-option i {
-        color: var(--cat-color);
-        font-size: .85rem;
-        width: 16px;
-        text-align: center
-    }
-
-    .category-option span {
-        font-size: .82rem;
-        font-weight: 500
-    }
-
-    .switch {
-        display: flex;
-        align-items: center;
-        gap: .75rem;
-        cursor: pointer
-    }
-
-    .switch input {
-        display: none
-    }
-
-    .switch-slider {
-        width: 42px;
-        height: 24px;
-        border-radius: 12px;
-        background: var(--border);
-        transition: background .25s;
-        position: relative;
-        flex-shrink: 0
-    }
-
-    .switch-slider::after {
-        content: '';
-        position: absolute;
-        top: 3px;
-        left: 3px;
-        width: 18px;
-        height: 18px;
-        border-radius: 50%;
-        background: #fff;
-        transition: transform .25s
-    }
-
-    .switch input:checked+.switch-slider {
-        background: var(--accent)
-    }
-
-    .switch input:checked+.switch-slider::after {
-        transform: translateX(18px)
-    }
-
-    .switch-label {
-        font-size: .82rem;
-        font-weight: 500
-    }
-
-    .number-input {
-        display: flex;
-        align-items: center;
-        gap: .3rem
-    }
-
-    .num-btn {
-        width: 32px;
-        height: 32px;
-        border-radius: 6px;
-        background: var(--bg);
-        border: 1px solid var(--border);
-        color: var(--text-dim);
-        cursor: pointer;
-        font-size: .9rem;
-        transition: all .15s;
-        display: flex;
-        align-items: center;
-        justify-content: center
-    }
-
-    .num-btn:hover {
-        border-color: var(--accent);
-        color: var(--accent)
-    }
-
-    .num-field {
-        width: 70px;
-        text-align: center;
-        -moz-appearance: textfield
-    }
-
-    .num-field::-webkit-outer-spin-button,
-    .num-field::-webkit-inner-spin-button {
-        -webkit-appearance: none;
-        margin: 0
-    }
-
-    .btn {
-        display: inline-flex;
-        align-items: center;
-        gap: .45rem;
-        padding: .55rem 1.1rem;
-        border-radius: 8px;
-        font-family: var(--font-body);
-        font-size: .83rem;
-        font-weight: 500;
-        cursor: pointer;
-        transition: all .2s;
-        text-decoration: none;
-        border: 1px solid var(--border);
-        white-space: nowrap
-    }
-
-    .btn-primary {
-        background: var(--accent);
-        color: #fff;
-        border-color: var(--accent)
-    }
-
-    .btn-primary:hover {
-        background: #1d4ed8;
-        transform: translateY(-1px);
-        box-shadow: 0 4px 16px var(--accent-glow)
-    }
-
-    .btn-secondary {
-        background: transparent;
-        border: 1px solid var(--border);
-        color: var(--text-dim)
-    }
-
-    .btn-secondary:hover {
-        background: var(--bg-hover);
-        border-color: var(--border-acc);
-        color: var(--text)
-    }
-
-    .btn-lg {
-        padding: .7rem 1.5rem;
-        font-size: .9rem
-    }
-
-    .form-actions {
-        display: flex;
-        gap: .75rem;
-        justify-content: flex-end;
-        margin-top: 1.5rem;
-        padding-top: 1.5rem;
-        border-top: 1px solid var(--border)
-    }
-    </style>
+    <!-- Os estilos do formulário são carregados pelo módulo CSS partilhado. -->
 
     <script>
-    const BASE_URL = '<?= BASE_URL ?>';
+    const BASE_URL = <?= json_encode(BASE_URL, JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_AMP | JSON_HEX_QUOT) ?>;
     const form = document.getElementById('skillForm');
     const submitBtns = document.querySelectorAll('#submitBtn, #submitBtn2');
+    const defaultButtonMarkup = '<i class="fas fa-save"></i> Actualizar Skill';
 
     function showToast(message, type = 'success') {
         const container = document.getElementById('toast-container') || createToastContainer();
         const toast = document.createElement('div');
+        const icon = document.createElement('i');
+        const text = document.createElement('span');
+        const iconName = type === 'success' ? 'check-circle' : type === 'error' ? 'times-circle' : 'info-circle';
         toast.className = `toast toast-${type}`;
-        toast.innerHTML =
-            `<i class="fas fa-${type === 'success' ? 'check-circle' : type === 'error' ? 'times-circle' : 'info-circle'}"></i> ${message}`;
+        icon.className = `fas fa-${iconName}`;
+        text.textContent = String(message ?? '');
+        toast.append(icon, text);
         container.appendChild(toast);
-        setTimeout(() => {
+        window.setTimeout(() => {
             toast.style.opacity = '0';
             toast.style.transform = 'translateX(20px)';
-            setTimeout(() => toast.remove(), 300);
+            window.setTimeout(() => toast.remove(), 300);
         }, 4000);
     }
 
     function createToastContainer() {
         const container = document.createElement('div');
         container.id = 'toast-container';
-        container.style.cssText =
-            'position:fixed;top:1rem;right:1rem;z-index:9999;display:flex;flex-direction:column;gap:.5rem';
         document.body.appendChild(container);
         return container;
     }
 
-    // ── Categoria select visual ──────────────────────────────────
-    document.querySelectorAll('.category-option').forEach(opt => {
-        opt.addEventListener('click', function() {
-            const radio = this.querySelector('input');
-            radio.checked = true;
-            document.querySelectorAll('.category-option').forEach(o => o.classList.remove('selected'));
-            this.classList.add('selected');
-        });
-    });
-
-    // ── Preview do ícone ────────────────────────────────────────
-    const iconInput = document.getElementById('icon_skill');
-    const iconPreview = document.getElementById('iconPreview');
-    iconInput.addEventListener('input', function() {
-        const icon = iconPreview.querySelector('i');
-        icon.className = this.value || 'fas fa-code';
-    });
-
-    // ── Range slider ─────────────────────────────────────────────
-    const rangeSlider = document.getElementById('percentage_skill');
-    const pctValue = document.getElementById('pctValue');
-    rangeSlider.addEventListener('input', function() {
-        pctValue.textContent = this.value + '%';
-    });
-
-    // ── Ordem +/− ──────────────────────────────────────────────
-    function changeOrder(delta) {
-        const field = document.getElementById('display_order');
-        let val = parseInt(field.value) || 0;
-        val = Math.max(0, val + delta);
-        field.value = val;
+    async function readJsonResponse(response) {
+        const raw = await response.text();
+        try {
+            return JSON.parse(raw);
+        } catch (_) {
+            throw new Error(
+                `O servidor devolveu uma resposta inválida (HTTP ${response.status}). Actualiza a página e tenta novamente.`
+            );
+        }
     }
 
-    // ── Switch label ─────────────────────────────────────────────
-    const visibilityCheckbox = document.querySelector('input[name="is_visible"]');
-    const switchLabel = document.querySelector('.switch-label');
-    visibilityCheckbox.addEventListener('change', function() {
-        switchLabel.textContent = this.checked ? 'Visível' : 'Oculta';
+    function setSaving(isSaving) {
+        submitBtns.forEach(btn => {
+            btn.disabled = isSaving;
+            btn.innerHTML = isSaving ?
+                '<i class="fas fa-spinner fa-spin"></i> A actualizar…' :
+                defaultButtonMarkup;
+        });
+    }
+
+    // Selecção acessível da categoria.
+    document.querySelectorAll('.category-option').forEach(option => {
+        option.addEventListener('click', function() {
+            const radio = this.querySelector('input[type="radio"]');
+            if (!radio) return;
+            radio.checked = true;
+            document.querySelectorAll('.category-option').forEach(item => item.classList.remove(
+                'selected'));
+            this.classList.add('selected');
+        });
+        const radio = option.querySelector('input[type="radio"]');
+        if (radio) {
+            radio.addEventListener('change', () => {
+                document.querySelectorAll('.category-option').forEach(item => item.classList.remove(
+                    'selected'));
+                option.classList.add('selected');
+            });
+        }
     });
 
-    // ── Submissão AJAX ───────────────────────────────────────────
-    form.addEventListener('submit', async function(e) {
-        e.preventDefault();
+    // Preview do ícone Font Awesome.
+    const iconInput = document.getElementById('icon_skill');
+    const iconPreview = document.getElementById('iconPreview');
+    iconInput?.addEventListener('input', function() {
+        const icon = iconPreview?.querySelector('i');
+        if (icon) icon.className = this.value.trim() || 'fas fa-code';
+    });
 
-        let clientValid = true;
-        form.querySelectorAll('[required]').forEach(field => {
-            if (!field.value.trim()) {
-                field.classList.add('error');
-                clientValid = false;
-            } else {
-                field.classList.remove('error');
-            }
-        });
-        if (!clientValid) {
-            showToast('Preenche todos os campos obrigatórios.', 'error');
+    // Percentagem.
+    const rangeSlider = document.getElementById('percentage_skill');
+    const pctValue = document.getElementById('pctValue');
+    rangeSlider?.addEventListener('input', function() {
+        if (pctValue) pctValue.textContent = `${this.value}%`;
+    });
+
+    // Ordem de apresentação.
+    function changeOrder(delta) {
+        const field = document.getElementById('display_order');
+        if (!field) return;
+        const current = Number.parseInt(field.value, 10);
+        field.value = String(Math.max(0, (Number.isFinite(current) ? current : 0) + delta));
+    }
+
+    // Estado visível/oculto.
+    const visibilityCheckbox = document.querySelector('input[name="is_visible"]');
+    const switchLabel = document.querySelector('.switch-label');
+    visibilityCheckbox?.addEventListener('change', function() {
+        if (switchLabel) switchLabel.textContent = this.checked ? 'Visível' : 'Oculta';
+    });
+
+    form?.addEventListener('submit', async function(event) {
+        event.preventDefault();
+        if (!form.checkValidity()) {
+            form.reportValidity();
+            showToast('Verifica os campos obrigatórios e os valores indicados.', 'error');
             return;
         }
 
-        submitBtns.forEach(btn => {
-            btn.disabled = true;
-            btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> A actualizar…';
-        });
-
+        setSaving(true);
         try {
             const formData = new FormData(form);
-            const res = await fetch(form.dataset.api, {
+            const response = await fetch(form.dataset.api, {
                 method: 'POST',
                 body: formData,
                 headers: {
                     'X-Requested-With': 'XMLHttpRequest',
-                    'X-CSRF-Token': document.getElementById('csrf_token').value
+                    'X-CSRF-Token': document.getElementById('csrf_token')?.value ?? ''
                 }
             });
+            const data = await readJsonResponse(response);
 
-            const data = await res.json();
-
-            if (!res.ok || !data.success) {
-                if (data.errors) {
-                    data.errors.forEach(err => showToast(err, 'error'));
-                } else {
-                    showToast(data.message || 'Erro ao actualizar skill.', 'error');
-                }
-                submitBtns.forEach(btn => {
-                    btn.disabled = false;
-                    btn.innerHTML = '<i class="fas fa-save"></i> Actualizar Skill';
-                });
+            if (!response.ok || !data.success) {
+                const errors = Array.isArray(data.errors) ? data.errors : [];
+                if (errors.length) errors.forEach(error => showToast(error, 'error'));
+                else showToast(data.message || 'Erro ao actualizar a skill.', 'error');
+                setSaving(false);
                 return;
             }
 
-            showToast('Skill actualizada com sucesso!', 'success');
-            setTimeout(() => {
-                window.location.href = BASE_URL + '/jm-panel/skills?msg=updated';
+            showToast(data.message || 'Skill actualizada com sucesso!', 'success');
+            window.setTimeout(() => {
+                window.location.href = `${BASE_URL}/jm-panel/skills?msg=updated`;
             }, 800);
-
-        } catch (err) {
-            showToast('Erro de rede. Tenta novamente.', 'error');
-            submitBtns.forEach(btn => {
-                btn.disabled = false;
-                btn.innerHTML = '<i class="fas fa-save"></i> Actualizar Skill';
-            });
+        } catch (error) {
+            showToast(error instanceof Error ? error.message : 'Falha de comunicação com o servidor.',
+                'error');
+            setSaving(false);
         }
     });
     </script>

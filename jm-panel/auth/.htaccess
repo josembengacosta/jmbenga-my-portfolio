@@ -6,15 +6,19 @@
 Options -Indexes
 RewriteEngine On
 
-# ── Bloquear acesso directo à pasta include ───
-RewriteRule ^include/ - [F,L]
+# Esta pasta não deve expor listagens de ficheiros.
+# A pasta /jm-panel/include/ é bloqueada pelo .htaccess do painel raiz.
 
-# ── Bloquear _process.php via GET ─────────────
-# _process só aceita POST — GET redireciona para login
+# ── Bloquear acesso GET/HEAD a processadores ────────────────
+# Os processadores devem aceitar apenas POST e validar também
+# CSRF dentro do próprio PHP. O teste HTTP aqui é uma defesa adicional.
+RewriteCond %{THE_REQUEST} \s/+[^\s?]*/auth/[^?\s]+-process\.php(?:\?[^\s]*)?\s [NC]
 RewriteCond %{REQUEST_METHOD} !POST
-RewriteRule _process\.php$ ../entrar [R=302,L]
+RewriteRule ^[^/]+-process\.php$ ../entrar [R=303,L,NC]
 
-# ── Bloquear acesso directo a ficheiros PHP internos ──
-# (que não são páginas de entrada directa)
-RewriteCond %{THE_REQUEST} \s/(?:.*?/)?(lockscreen|invite-accept)\.php [NC]
-RewriteRule ^(lockscreen|invite-accept)\.php$ - [F,L]
+# ── Bloquear acesso HTTP directo a páginas internas ─────────
+# As rotas públicas do painel (/lockscreen e /invite/accept)
+# continuam a funcionar através das regras de reescrita do painel.
+# Só são bloqueados pedidos cujo URL original termina em .php.
+RewriteCond %{THE_REQUEST} \s/+[^\s?]*/(?:lockscreen|invite-accept)\.php(?:\?[^\s]*)?\s [NC]
+RewriteRule ^(?:lockscreen|invite-accept)\.php$ - [F,L,NC]

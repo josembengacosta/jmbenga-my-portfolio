@@ -1,118 +1,118 @@
 <?php
-// ══════════════════════════════════════════════════════════════
-// JMbenga Portfolio — Processador Editar Skill (AJAX)
-// ══════════════════════════════════════════════════════════════
+declare(strict_types=1);
+// JMbenga Portfolio — Processador de edição de Skill (AJAX).
 require_once __DIR__ . '/../../include/functions_admin.php';
 
 startAdminSession();
+checkAdminRememberMe();
 requireAdminLogin();
 requireNoLockscreen();
-
 header('Content-Type: application/json; charset=utf-8');
 
-$db = $GLOBALS['pdo'];
-
-// ── Apenas POST ───────────────────────────────────────────────
-if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
-    http_response_code(405);
-    echo json_encode(['success' => false, 'message' => 'Método não permitido.']);
-    exit;
-}
-
-// ── CSRF ──────────────────────────────────────────────────────
-$token = $_POST['csrf_token'] ?? $_SERVER['HTTP_X_CSRF_TOKEN'] ?? '';
-if (!validateAdminCsrf($token)) {
-    http_response_code(403);
-    echo json_encode(['success' => false, 'message' => 'Token de segurança inválido.']);
-    exit;
-}
-
-// ── Função auxiliar para retornar erros ───────────────────────
-$jsonError = function (array $errors, int $status = 422) {
+function skillEditJsonResponse(array $payload, int $status = 200): never
+{
     http_response_code($status);
-    echo json_encode(['success' => false, 'errors' => $errors]);
+    echo json_encode($payload, JSON_UNESCAPED_UNICODE | JSON_INVALID_UTF8_SUBSTITUTE);
     exit;
-};
-
-// ── ID da skill ───────────────────────────────────────────────
-$id = (int)($_POST['id_skill'] ?? 0);
-if ($id <= 0) {
-    $jsonError(['ID de skill inválido.'], 400);
 }
 
-// Verificar se a skill existe
-$stmt = $db->prepare("SELECT * FROM _skills WHERE id_skill = ?");
-$stmt->execute([$id]);
-$old = $stmt->fetch();
-if (!$old) {
-    $jsonError(['Skill não encontrada.'], 404);
+function skillEditPostString(string $key, string $default = ''): string
+{
+    $value = $_POST[$key] ?? $default;
+    return is_string($value) ? trim($value) : $default;
 }
 
-// ── Capturar e sanitizar campos ───────────────────────────────
-$name          = trim($_POST['name_skill']       ?? '');
-$percentage    = (int)($_POST['percentage_skill'] ?? 80);
-$category      = $_POST['category_skill']        ?? 'frontend';
-$icon          = trim($_POST['icon_skill']        ?? 'fas fa-code');
-$displayOrder  = (int)($_POST['display_order']    ?? 0);
-$isVisible     = isset($_POST['is_visible']) ? 1 : 0;
+if (($_SERVER['REQUEST_METHOD'] ?? '') !== 'POST') {
+    header('Allow: POST');
+    skillEditJsonResponse(['success' => false, 'message' => 'Método não permitido.'], 405);
+}
 
-// ── Validações ─────────────────────────────────────────────────
+$token = skillEditPostString('csrf_token');
+if ($token === '' && is_string($_SERVER['HTTP_X_CSRF_TOKEN'] ?? null)) {
+    $token = $_SERVER['HTTP_X_CSRF_TOKEN'];
+}
+if (!validateAdminCsrf($token)) {
+    skillEditJsonResponse(['success' => false, 'message' => 'Token de segurança inválido. Actualiza a página e tenta novamente.'], 403);
+}
+
+$rawId = skillEditPostString('id_skill');
+if (!preg_match('/\A[1-9]\d{0,9}\z/', $rawId)) {
+    skillEditJsonResponse(['success' => false, 'errors' => ['ID de skill inválido.']], 400);
+}
+$id = (int) $rawId;
+$name = skillEditPostString('name_skill');
+$rawPercentage = skillEditPostString('percentage_skill');
+$category = skillEditPostString('category_skill');
+$icon = skillEditPostString('icon_skill');
+$rawOrder = skillEditPostString('display_order', '0');
+$isVisible = (($_POST['is_visible'] ?? null) === '1') ? 1 : 0;
+
 $errors = [];
-
-if (mb_strlen($name) < 2) {
-    $errors[] = 'O nome da skill deve ter pelo menos 2 caracteres.';
+if (mb_strlen($name) < 2 || mb_strlen($name) > 100) {
+    $errors[] = 'O nome da skill deve ter entre 2 e 100 caracteres.';
 }
-if ($percentage < 0 || $percentage > 100) {
-    $errors[] = 'A percentagem deve estar entre 0 e 100.';
+if (!preg_match('/\A\d{1,3}\z/', $rawPercentage)) {
+    $errors[] = 'A percentagem deve ser um número inteiro entre 0 e 100.';
+    $percentage = -1;
+} else {
+    $percentage = (int) $rawPercentage;
+    if ($percentage > 100) $errors[] = 'A percentagem deve estar entre 0 e 100.';
 }
 $allowedCategories = ['frontend', 'backend', 'devops', 'design', 'other'];
-if (!in_array($category, $allowedCategories)) {
+if (!in_array($category, $allowedCategories, true)) {
     $errors[] = 'Categoria inválida.';
 }
-if (mb_strlen($icon) < 3) {
-    $errors[] = 'O ícone deve ter pelo menos 3 caracteres.';
+$iconPattern = '/\A(?:fas|far|fab|fa-solid|fa-regular|fa-brands)\s+fa-[a-z0-9-]+(?:\s+fa-[a-z0-9-]+)*\z/i';
+if ($icon === '' || mb_strlen($icon) > 100 || !preg_match($iconPattern, $icon)) {
+    $errors[] = 'Indica classes Font Awesome válidas, por exemplo: fas fa-code ou fab fa-php.';
+}
+if (!preg_match('/\A\d{1,9}\z/', $rawOrder)) {
+    $errors[] = 'A ordem de exibição deve ser um número inteiro igual ou superior a zero.';
+    $displayOrder = -1;
+} else {
+    $displayOrder = (int) $rawOrder;
+}
+if ($errors) skillEditJsonResponse(['success' => false, 'errors' => $errors], 422);
+
+$db = $GLOBALS['pdo'] ?? null;
+if (!$db instanceof PDO) {
+    error_log('[EDIT SKILL] PDO connection is unavailable.');
+    skillEditJsonResponse(['success' => false, 'message' => 'Serviço de dados indisponível. Tenta novamente.'], 500);
 }
 
-// ── Verificar duplicados (mesmo nome, excluindo o próprio) ────
-$stmt = $db->prepare("SELECT COUNT(*) FROM _skills WHERE name_skill = ? AND id_skill != ?");
-$stmt->execute([$name, $id]);
-if ((int)$stmt->fetchColumn() > 0) {
-    $errors[] = 'Já existe uma skill com este nome. Escolhe um nome diferente.';
-}
-
-if (!empty($errors)) {
-    $jsonError($errors);
-}
-
-// ── Actualizar na base de dados ───────────────────────────────
 try {
-    $stmt = $db->prepare("
-        UPDATE _skills SET
-            name_skill       = ?,
-            percentage_skill = ?,
-            category_skill   = ?,
-            icon_skill       = ?,
-            display_order    = ?,
-            is_visible       = ?
-        WHERE id_skill       = ?
-    ");
-    $stmt->execute([$name, $percentage, $category, $icon, $displayOrder, $isVisible, $id]);
+    $stmt = $db->prepare('SELECT id_skill, name_skill, percentage_skill, category_skill, icon_skill, display_order, is_visible FROM _skills WHERE id_skill = ? LIMIT 1');
+    $stmt->execute([$id]);
+    $old = $stmt->fetch(PDO::FETCH_ASSOC);
+    if (!$old) skillEditJsonResponse(['success' => false, 'message' => 'Skill não encontrada.'], 404);
 
-    // Auditoria
+    $duplicate = $db->prepare('SELECT COUNT(*) FROM _skills WHERE name_skill = ? AND id_skill <> ?');
+    $duplicate->execute([$name, $id]);
+    if ((int) $duplicate->fetchColumn() > 0) {
+        skillEditJsonResponse(['success' => false, 'errors' => ['Já existe uma skill com este nome. Escolhe um nome diferente.']], 409);
+    }
+
+    $stmt = $db->prepare('UPDATE _skills SET name_skill = ?, percentage_skill = ?, category_skill = ?, icon_skill = ?, display_order = ?, is_visible = ? WHERE id_skill = ?');
+    $stmt->execute([$name, $percentage, $category, $icon, $displayOrder, $isVisible, $id]);
+} catch (PDOException $exception) {
+    error_log('[EDIT SKILL DB] ' . $exception->getMessage());
+    skillEditJsonResponse(['success' => false, 'message' => 'Erro interno ao actualizar a skill. Tenta novamente.'], 500);
+}
+
+// Auditoria não altera o resultado de uma actualização que já foi concluída.
+try {
     logAudit(
-        (int)$_SESSION['admin_id'],
+        (int) ($_SESSION['admin_id'] ?? 0),
         null,
         'skill.update',
         '_skills',
         $id,
         $old,
-        ['name' => $name, 'percentage' => $percentage, 'category' => $category, 'is_visible' => $isVisible]
+        ['name_skill' => $name, 'percentage_skill' => $percentage, 'category_skill' => $category,
+         'icon_skill' => $icon, 'display_order' => $displayOrder, 'is_visible' => $isVisible]
     );
-
-    echo json_encode(['success' => true, 'message' => 'Skill actualizada com sucesso.']);
-    exit;
-
-} catch (PDOException $e) {
-    error_log('[EDIT SKILL] ' . $e->getMessage());
-    $jsonError(['Erro interno ao actualizar a skill. Tenta novamente.'], 500);
+} catch (Throwable $exception) {
+    error_log('[EDIT SKILL AUDIT] ' . $exception->getMessage());
 }
+
+skillEditJsonResponse(['success' => true, 'message' => 'Skill actualizada com sucesso.', 'id' => $id]);

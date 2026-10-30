@@ -1,24 +1,30 @@
--- Active: 1771850637954@@127.0.0.1@3306@portfolio_db
 # Sistema
 .DS_Store
 Thumbs.db
 *.log
 
-# Ambiente & credenciais (NUNCA subir ao git)
-# config base
-/includes/config.php
-includes/config.*.php
+# Ambiente e credenciais privadas
+# O ficheiro includes/config.php contém código de configuração e deve ser versionável.
+# Segredos reais ficam no .env, que não deve ser enviado para o Git.
 .env
+.env.*
+!.env.example
+!.env.production.example
 *.env
 
-# Qualquer outro ficheiro dentro de includes/api com segredos
-/includes/*config*.php
-/api/*config*.php
-/api/*secret*.php
+
+# Ficheiros locais privados opcionais (se forem usados)
+/includes/config.local.php
+/includes/config.private.php
+
+# Ficheiros de configuração/segredos locais de API
+/api/*config*.local.php
+/api/*secret*.local.php
 
 # Uploads e ficheiros gerados
 assets/img/profile/*
 assets/img/projects/*
+assets/downloads/*.pdf
 assets/img/testimonials/*
 !assets/img/profile/.gitkeep
 !assets/img/projects/.gitkeep

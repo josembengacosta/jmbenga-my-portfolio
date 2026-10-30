@@ -14,19 +14,73 @@ $cfg = function (string $key, string $default = ''): string {
     return get_config($pdo, $key, $default);
 };
 
-$email      = $cfg('email_contact');
-$phone      = $cfg('phone_contact');
-$whatsapp   = $cfg('whatsapp_url');
-$location   = $cfg('location', 'Luanda, Angola');
-$accent     = $cfg('accent_color', '#2563eb');
-// ── Capturar parâmetros de URL ──────────────────────────────
-$subject_from_url = '';
-if (!empty($_GET['subject']))           $subject_from_url = trim($_GET['subject']);
-elseif (!empty($_GET['service']))       $subject_from_url = 'Serviço: ' . trim($_GET['service']);
-elseif (!empty($_GET['type']))          $subject_from_url = 'Pedido de ' . trim($_GET['type']);
-elseif (!empty($_GET['from']))          $subject_from_url = 'Vim da página ' . trim($_GET['from']);
+$email    = $cfg('email_contact');
+$phone    = $cfg('phone_contact');
+$location = $cfg('location', 'Luanda, Angola');
 
-// Lista de assuntos
+// Validar valores usados directamente em CSS ou como destinos de links.
+$accent = $cfg('accent_color', '#2563eb');
+if (!preg_match('/^#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/', $accent)) {
+    $accent = '#2563eb';
+}
+
+$safe_http_url = static function (?string $url): string {
+    $url = trim((string)$url);
+    if ($url === '' || filter_var($url, FILTER_VALIDATE_URL) === false) {
+        return '';
+    }
+    $scheme = strtolower((string)parse_url($url, PHP_URL_SCHEME));
+    return in_array($scheme, ['http', 'https'], true) ? $url : '';
+};
+$whatsapp = $safe_http_url($cfg('whatsapp_url'));
+$whatsapp_message_url = $whatsapp !== ''
+    ? $whatsapp . (str_contains($whatsapp, '?') ? '&' : '?') . 'text=' . rawurlencode('Olá José, vim do seu portfólio')
+    : '';
+$github_url = $safe_http_url($cfg('github_url'));
+$linkedin_url = $safe_http_url($cfg('linkedin_url'));
+
+// Ler apenas parâmetros escalares e limitar o tamanho para evitar avisos e entradas excessivas.
+$query_value = static function (string $key): string {
+    $value = $_GET[$key] ?? '';
+    if (!is_string($value)) {
+        return '';
+    }
+    $value = trim(preg_replace('/[\x00-\x1F\x7F]/u', '', $value) ?? '');
+    if (function_exists('mb_substr')) {
+        return mb_substr($value, 0, 120, 'UTF-8');
+    }
+    return substr($value, 0, 120);
+};
+
+// Valores comerciais permitidos. O pacote só se aplica a Desenvolvimento Web.
+$package_options = [
+    'JMbenga Start'    => 'JMbenga Start',
+    'JMbenga Business' => 'JMbenga Business',
+    'JMbenga Custom'   => 'JMbenga Custom',
+];
+
+// Normalizar acentos, barras, &, hífenes e prefixos antigos antes de comparar.
+$normalize_subject = static function (string $value): string {
+    $value = trim($value);
+    if (function_exists('iconv')) {
+        $ascii = @iconv('UTF-8', 'ASCII//TRANSLIT//IGNORE', $value);
+        if ($ascii !== false) {
+            $value = $ascii;
+        }
+    }
+    $value = strtolower($value);
+    $value = preg_replace('/[^a-z0-9]+/', ' ', $value) ?? '';
+    $value = trim(preg_replace('/\s+/', ' ', $value) ?? '');
+    $value = preg_replace('/^(?:servico(?: de)?|pedido de|contacto via pagina|vim da pagina)\s+/', '', $value) ?? $value;
+    return trim($value);
+};
+
+$raw_subject  = $query_value('subject');
+$raw_service  = $query_value('service');
+$raw_type     = $query_value('type');
+$raw_from     = $query_value('from');
+$raw_package  = $query_value('package');
+
 $subject_options = [
     'Desenvolvimento Web'        => 'Desenvolvimento Web',
     'Aplicativo Mobile'          => 'Aplicativo Mobile',
@@ -39,35 +93,83 @@ $subject_options = [
     'Outro (especificar abaixo)' => '__other__',
 ];
 
-// Determinar seleção baseada na URL
+$subject_aliases = [
+    'Desenvolvimento Web' => ['desenvolvimento web', 'web development', 'website', 'web site'],
+    'Aplicativo Mobile' => ['aplicativo mobile', 'aplicativos mobile', 'app mobile', 'apps mobile', 'aplicacao mobile', 'aplicacoes moveis'],
+    'UI/UX Design' => ['ui ux design', 'ui ux', 'design ui ux', 'design de interface'],
+    'APIs & Backend' => ['apis backend', 'api backend', 'apis e backend', 'api e backend', 'api backend development'],
+    'Manutenção de Site / App' => ['manutencao de site app', 'manutencao de sites e apps', 'manutencao de site', 'manutencao de sites', 'manutencao de app', 'manutencao'],
+    'Consultoria Técnica' => ['consultoria tecnica', 'consultoria'],
+    'Orçamento de Projecto' => ['orcamento', 'orcamento de projecto', 'orcamento de projeto', 'pedido de orcamento'],
+    'Parceria / Colaboração' => ['parceria', 'colaboracao', 'parceria colaboracao'],
+];
+
+// Reconhecer o pacote apenas por uma correspondência exacta com a lista aprovada.
+$matched_package = '';
+$package_candidate = $raw_package;
+$legacy_package_in_service = false;
+if ($package_candidate === '' && $raw_service !== '') {
+    $package_candidate = $raw_service; // Compatibilidade com links antigos ?service=JMbenga+Business
+    $legacy_package_in_service = true;
+}
+foreach ($package_options as $package_value) {
+    if ($package_candidate !== '' && $normalize_subject($package_candidate) === $normalize_subject($package_value)) {
+        $matched_package = $package_value;
+        break;
+    }
+}
+
+// Determinar o serviço. Os links antigos que passavam o pacote como serviço
+// são convertidos para Desenvolvimento Web + pacote, em vez de caírem em "Outro".
+if ($raw_subject !== '') {
+    $subject_from_url = $raw_subject;
+} elseif ($legacy_package_in_service && $matched_package !== '') {
+    $subject_from_url = 'Desenvolvimento Web';
+} elseif ($raw_service !== '') {
+    $subject_from_url = $raw_service;
+} elseif ($raw_type !== '') {
+    $subject_from_url = 'Pedido de ' . $raw_type;
+} elseif ($raw_from !== '') {
+    $subject_from_url = 'Contacto via página: ' . $raw_from;
+} elseif ($raw_package !== '' && $matched_package !== '') {
+    // Se só vier o pacote, inferir a categoria à qual pertence.
+    $subject_from_url = 'Desenvolvimento Web';
+} else {
+    $subject_from_url = '';
+}
+
 $selected_subject = '';
 $free_text_subject = '';
-if (!empty($subject_from_url)) {
-    foreach ($subject_options as $label => $value) {
-        if ($value === '__other__') continue;
-        if (stripos($subject_from_url, $value) !== false) {
-            $selected_subject = $value;
-            break;
+if ($subject_from_url !== '') {
+    $normalized_request = $normalize_subject($subject_from_url);
+    foreach ($subject_aliases as $canonical => $aliases) {
+        foreach ($aliases as $alias) {
+            $normalized_alias = $normalize_subject($alias);
+            if ($normalized_request === $normalized_alias) {
+                $selected_subject = $canonical;
+                break 2;
+            }
         }
     }
+
+    // Se não houver correspondência conhecida, preservar o pedido em "Outro".
     if ($selected_subject === '') {
         $selected_subject = '__other__';
         $free_text_subject = $subject_from_url;
     }
 }
 
-// Fallback: se nada foi definido, usar o primeiro item da lista (não "Outro")
-if ($selected_subject === '' && $free_text_subject === '') {
-    foreach ($subject_options as $val) {
-        if ($val !== '__other__') {
-            $selected_subject = $val;
-            break;
-        }
-    }
+// Não associar um pacote Web a outro serviço. O pacote só é retido se a
+// categoria seleccionada for Desenvolvimento Web e o valor constar da lista aprovada.
+$selected_package = ($selected_subject === 'Desenvolvimento Web') ? $matched_package : '';
+$message_prefill = '';
+if ($selected_package !== '') {
+    $message_prefill = 'Olá, tenho interesse no pacote ' . $selected_package
+        . ' de Desenvolvimento Web. Gostaria de solicitar um orçamento.';
 }
 
 $page_title = 'Contacto — José Mbenga | Full Stack Developer';
-$page_desc  = 'Entre em contacto com José Mbenga para discutir o seu próximo projecto. Resposta em até 24 horas.';
+$page_desc  = 'Entre em contacto com José Mbenga para discutir o seu próximo projecto, solicitar um orçamento ou esclarecer dúvidas sobre os serviços.';
 $page_section = 'contact';
 
 ?>
@@ -77,7 +179,7 @@ $page_section = 'contact';
 include 'includes/header.php';
 ?>
 
-<link rel="stylesheet" href="assets/css/contact.css">
+<link rel="stylesheet" href="<?= BASE_URL ?>/assets/css/contact.css">
 
 <style>
 /* ════════════════════════════════════════════════════════════
@@ -145,9 +247,9 @@ include 'includes/header.php';
 <body>
 
     <!-- WhatsApp Float -->
-    <?php if ($wa = $cfg('whatsapp_url')): ?>
+    <?php if ($whatsapp !== ''): ?>
     <div class=" whatsapp-float" id="whatsappFloat">
-        <a href="<?= e($wa) ?>?text=Olá%20José,%20vim%20do%20seu%20portfólio" target="_blank" rel="noopener">
+        <a href="<?= e($whatsapp_message_url) ?>" target="_blank" rel="noopener">
             <i class="fab fa-whatsapp"></i> <span>Vamos conversar?</span>
         </a>
         <button class="close-whatsapp" onclick="this.parentElement.style.display='none'" aria-label="Fechar">
@@ -163,7 +265,7 @@ include 'includes/header.php';
             <span class="tag">Contacto</span>
             <h1>Vamos <span>Conversar</span></h1>
             <p>Tem um projecto em mente? Gostaria de trocar ideias ou simplesmente dizer olá? Preencha o formulário ou
-                utilize um dos canais abaixo. Responderei em até <strong style="color:var(--accent)">24 horas</strong>.
+                utilize um dos canais abaixo. Entrarei em contacto assim que possível.
             </p>
         </div>
     </section>
@@ -208,17 +310,17 @@ include 'includes/header.php';
 
                         <!-- Redes sociais -->
                         <div class="social-links">
-                            <?php if ($cfg('github_url')): ?>
-                            <a href="<?= e($cfg('github_url')) ?>" target="_blank" class="social-link-item"
-                                aria-label="GitHub"><i class="fab fa-github"></i></a>
+                            <?php if ($github_url !== ''): ?>
+                            <a href="<?= e($github_url) ?>" target="_blank" rel="noopener noreferrer"
+                                class="social-link-item" aria-label="GitHub"><i class="fab fa-github"></i></a>
                             <?php endif; ?>
-                            <?php if ($cfg('linkedin_url')): ?>
-                            <a href="<?= e($cfg('linkedin_url')) ?>" target="_blank" class="social-link-item"
-                                aria-label="LinkedIn"><i class="fab fa-linkedin-in"></i></a>
+                            <?php if ($linkedin_url !== ''): ?>
+                            <a href="<?= e($linkedin_url) ?>" target="_blank" rel="noopener noreferrer"
+                                class="social-link-item" aria-label="LinkedIn"><i class="fab fa-linkedin-in"></i></a>
                             <?php endif; ?>
                             <?php if ($whatsapp): ?>
-                            <a href="<?= e($whatsapp) ?>" target="_blank" class="social-link-item"
-                                aria-label="WhatsApp"><i class="fab fa-whatsapp"></i></a>
+                            <a href="<?= e($whatsapp) ?>" target="_blank" rel="noopener noreferrer"
+                                class="social-link-item" aria-label="WhatsApp"><i class="fab fa-whatsapp"></i></a>
                             <?php endif; ?>
                         </div>
                     </div>
@@ -230,29 +332,33 @@ include 'includes/header.php';
                             class="text-gradient">Mensagem</span></h2>
                     <form id="contact-form" class="contact-form" novalidate>
 
-                        <input type="hidden" name="_hp" style="display:none" tabindex="-1" autocomplete="off">
-                        <input type="hidden" name="csrf_token" value="<?= csrf_token() ?>">
-                        <input type="hidden" name="_hp" style="display:none" tabindex="-1" autocomplete="off">
+                        <input type="hidden" name="csrf_token" value="<?= e(csrf_token()) ?>">
+                        <input type="text" name="_hp" value="" tabindex="-1" autocomplete="off" aria-hidden="true"
+                            style="position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0">
                         <div class="form-row">
                             <div class="form-group">
-                                <label class="form-label">Nome *</label>
-                                <input type="text" name="name" class="form-control" placeholder="José Silva" required>
+                                <label class="form-label" for="contact-name">Nome *</label>
+                                <input id="contact-name" type="text" name="name" class="form-control"
+                                    placeholder="José Silva" autocomplete="name" required>
                             </div>
                             <div class="form-group">
-                                <label class="form-label">Email *</label>
-                                <input type="email" name="email" class="form-control" placeholder="jose@exemplo.com"
-                                    required>
+                                <label class="form-label" for="contact-email">Email *</label>
+                                <input id="contact-email" type="email" name="email" class="form-control"
+                                    placeholder="jose@exemplo.com" autocomplete="email" required>
                             </div>
                         </div>
                         <div class="form-group">
-                            <label class="form-label">Telefone</label>
-                            <input type="tel" name="phone" class="form-control" placeholder="+244 9xx xxx xxx">
+                            <label class="form-label" for="contact-phone">Telefone</label>
+                            <input id="contact-phone" type="tel" name="phone" class="form-control"
+                                placeholder="+244 9xx xxx xxx" autocomplete="tel">
                         </div>
 
                         <!-- Assunto (select + campo livre para "Outro") -->
                         <div class="form-group">
-                            <label class="form-label">Assunto *</label>
-                            <select id="subject-select" class="form-select">
+                            <label class="form-label" for="subject-select">Assunto *</label>
+                            <select id="subject-select" class="form-select" required>
+                                <option value="" <?= $selected_subject === '' ? 'selected' : '' ?> disabled>Seleccione
+                                    um assunto</option>
                                 <?php foreach ($subject_options as $label => $value): ?>
                                 <option value="<?= e($value) ?>" <?= $selected_subject === $value ? 'selected' : '' ?>>
                                     <?= e($label) ?></option>
@@ -260,20 +366,38 @@ include 'includes/header.php';
                             </select>
                         </div>
                         <div class="form-group" id="custom-subject-wrap"
-                            <?= $selected_subject === '__other__' ? 'style="display:block"' : '' ?>>
-                            <label class="form-label">Especifique o assunto</label>
+                            style="display:<?= $selected_subject === '__other__' ? 'block' : 'none' ?>">
+                            <label class="form-label" for="custom-subject">Especifique o assunto</label>
                             <input type="text" id="custom-subject" class="form-control"
                                 placeholder="Descreva o assunto em poucas palavras..."
-                                value="<?= e($free_text_subject) ?>">
+                                value="<?= e($free_text_subject) ?>" maxlength="120">
                         </div>
                         <!-- Campo hidden que será enviado com o assunto final -->
                         <input type="hidden" name="subject" id="subject-hidden"
                             value="<?= e($selected_subject === '__other__' ? $free_text_subject : $selected_subject) ?>">
 
+                        <div class="form-group" id="package-wrap"
+                            style="display:<?= $selected_subject === 'Desenvolvimento Web' ? 'block' : 'none' ?>">
+                            <label class="form-label" for="package-select">Pacote pretendido (opcional)</label>
+                            <select id="package-select" name="package" class="form-select">
+                                <option value="" <?= $selected_package === '' ? 'selected' : '' ?>>Ainda não escolhi um
+                                    pacote</option>
+                                <?php foreach ($package_options as $package_label => $package_value): ?>
+                                <option value="<?= e($package_value) ?>"
+                                    <?= $selected_package === $package_value ? 'selected' : '' ?>>
+                                    <?= e($package_label) ?></option>
+                                <?php endforeach; ?>
+                            </select>
+                            <small class="form-help">Pode escolher um pacote ou pedir uma proposta
+                                personalizada.</small>
+                        </div>
+
                         <div class="form-group">
-                            <label class="form-label">Mensagem *</label>
-                            <textarea name="message" class="form-control" rows="5"
-                                placeholder="Descreva o seu projecto ou ideia..." required></textarea>
+                            <label class="form-label" for="contact-message">Mensagem *</label>
+                            <textarea id="contact-message" name="message" class="form-control" rows="5"
+                                data-package-autofilled="<?= $message_prefill !== '' ? 'true' : 'false' ?>"
+                                placeholder="Descreva o seu projecto ou ideia..."
+                                required><?= e($message_prefill) ?></textarea>
                         </div>
 
                         <div id="form-status" class="form-status"></div>
@@ -300,7 +424,7 @@ include 'includes/header.php';
                 Estou disponível no WhatsApp para uma conversa rápida e sem compromisso.
             </p>
             <?php if ($whatsapp): ?>
-            <a href="<?= e($whatsapp) ?>" target="_blank" class="btn btn-primary"
+            <a href="<?= e($whatsapp) ?>" target="_blank" rel="noopener noreferrer" class="btn btn-primary"
                 style="font-size:1.1rem;padding:16px 36px">
                 <i class="fab fa-whatsapp"></i> Iniciar Conversa no WhatsApp
             </a>
@@ -310,38 +434,7 @@ include 'includes/header.php';
 
     <?php
 $page_scripts = ['assets/js/contact-form.js'];
-$inline_js = <<<JS
-// ── Lógica do select de assunto ────────────────────────────
-(function() {
-  const select = document.getElementById('subject-select');
-  const customWrap = document.getElementById('custom-subject-wrap');
-  const customInput = document.getElementById('custom-subject');
-  const hiddenSubject = document.getElementById('subject-hidden');
-
-  function updateSubject() {
-    const val = select.value;
-    if (val === '__other__') {
-      customWrap.classList.add('show');
-      customInput.setAttribute('required', 'required');
-      hiddenSubject.value = customInput.value;
-    } else {
-      customWrap.classList.remove('show');
-      customInput.removeAttribute('required');
-      hiddenSubject.value = val;
-    }
-  }
-
-  select.addEventListener('change', updateSubject);
-  customInput.addEventListener('input', function() {
-    if (select.value === '__other__') {
-      hiddenSubject.value = this.value;
-    }
-  });
-
-  // Inicializar (caso já venha pré‑selecionado "Outro")
-  updateSubject();
-})();
-JS;
+$inline_js = ''; // A sincronização do formulário é gerida por assets/js/contact-form.js.
 
     include 'includes/footer.php';
     include 'includes/bottom-nav.php';

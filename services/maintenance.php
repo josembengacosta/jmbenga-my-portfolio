@@ -14,12 +14,25 @@ $cfg = function (string $key, string $default = ''): string {
     return get_config($pdo, $key, $default);
 };
 
-$accent   = $cfg('accent_color', '#2563eb');
-$whatsapp = $cfg('whatsapp_url');
-$email    = $cfg('email_contact');
+$accent   = trim($cfg('accent_color', '#2563eb'));
+if (!preg_match('/^#[0-9a-fA-F]{6}$/', $accent)) {
+    $accent = '#2563eb';
+}
 
-$page_title   = 'Manutenção de Sites e Apps — José Mbenga | Full Stack Developer';
-$page_desc    = 'Manutenção preventiva e corretiva para sites e aplicativos. Suporte técnico, atualizações, segurança e backup. Especialista em Manutenção Angola.';
+$whatsapp = trim($cfg('whatsapp_url'));
+$whatsappUrl = '';
+if ($whatsapp !== '' && filter_var($whatsapp, FILTER_VALIDATE_URL)) {
+    $parts = parse_url($whatsapp);
+    if (is_array($parts) && in_array(strtolower($parts['scheme'] ?? ''), ['https', 'http'], true)) {
+        $whatsappUrl = $whatsapp;
+    }
+}
+$whatsappContactUrl = $whatsappUrl !== ''
+    ? $whatsappUrl . (str_contains($whatsappUrl, '?') ? '&' : '?') . 'text=' . rawurlencode('Olá José, preciso de informações sobre manutenção do meu site ou aplicação.')
+    : '';
+
+$page_title   = 'Manutenção de Sites e Aplicações — JMbenga | Angola';
+$page_desc    = 'Planos de manutenção de sites e aplicações em Angola: verificações, suporte técnico, actualizações e backups conforme o âmbito contratado.';
 $page_section = 'services';
 ?>
 <?php
@@ -31,65 +44,65 @@ include '../includes/header.php';
 <link rel="stylesheet" href="<?= BASE_URL ?>/assets/css/services/maintenance.css">
 
 <style>
-    /* ════════════════════════════════════════════════════════════
+/* ════════════════════════════════════════════════════════════
    TOKENS — Dark (padrão) e Light 
 ════════════════════════════════════════════════════════════ */
-    :root {
-        --accent: <?= e($accent) ?>;
-        --accent-dim: #1d4ed8;
-        --accent-glow: <?= e($accent) ?>26;
-        --accent-rgb: 37, 99, 235;
+:root {
+    --accent: <?=e($accent) ?>;
+    --accent-dim: #1d4ed8;
+    --accent-glow: <?=e($accent) ?>26;
+    --accent-rgb: 37, 99, 235;
 
-        --bg: #0a0d14;
-        --bg-2: #0f1623;
-        --bg-card: #131b2e;
-        --bg-glass: rgba(13, 22, 35, .8);
-        --border: rgba(255, 255, 255, .06);
-        --border-acc: rgba(37, 99, 235, .35);
-        --text: #e8edf5;
-        --text-dim: #8899b4;
-        --text-muted: #4a5878;
-        --shadow: 0 8px 40px rgba(0, 0, 0, .5);
-        --shadow-acc: 0 0 40px var(--accent-glow);
+    --bg: #0a0d14;
+    --bg-2: #0f1623;
+    --bg-card: #131b2e;
+    --bg-glass: rgba(13, 22, 35, .8);
+    --border: rgba(255, 255, 255, .06);
+    --border-acc: rgba(37, 99, 235, .35);
+    --text: #e8edf5;
+    --text-dim: #8899b4;
+    --text-muted: #4a5878;
+    --shadow: 0 8px 40px rgba(0, 0, 0, .5);
+    --shadow-acc: 0 0 40px var(--accent-glow);
 
-        --font-head: 'Syne', 'Inter', sans-serif;
-        --font-body: 'DM Sans', 'Inter', sans-serif;
-        --font-mono: 'DM Mono', 'Fira Code', monospace;
-        --radius: 12px;
-        --radius-lg: 20px;
-        --ease: cubic-bezier(.16, 1, .3, 1);
-        --nav-h: 70px;
+    --font-head: 'Syne', 'Inter', sans-serif;
+    --font-body: 'DM Sans', 'Inter', sans-serif;
+    --font-mono: 'DM Mono', 'Fira Code', monospace;
+    --radius: 12px;
+    --radius-lg: 20px;
+    --ease: cubic-bezier(.16, 1, .3, 1);
+    --nav-h: 70px;
 
-        --grad: linear-gradient(135deg, var(--accent) 0%, #7c3aed 100%);
-        --grad-text: linear-gradient(135deg, var(--accent), #a78bfa);
-    }
+    --grad: linear-gradient(135deg, var(--accent) 0%, #7c3aed 100%);
+    --grad-text: linear-gradient(135deg, var(--accent), #a78bfa);
+}
 
-    [data-theme="light"] {
-        --bg: #f0f4fb;
-        --bg-2: #e4eaf6;
-        --bg-card: #ffffff;
-        --bg-glass: rgba(255, 255, 255, .85);
-        --border: rgba(0, 0, 0, .07);
-        --border-acc: rgba(37, 99, 235, .25);
-        --text: #0f172a;
-        --text-dim: #475569;
-        --text-muted: #94a3b8;
-        --shadow: 0 8px 40px rgba(0, 0, 0, .12);
-    }
+[data-theme="light"] {
+    --bg: #f0f4fb;
+    --bg-2: #e4eaf6;
+    --bg-card: #ffffff;
+    --bg-glass: rgba(255, 255, 255, .85);
+    --border: rgba(0, 0, 0, .07);
+    --border-acc: rgba(37, 99, 235, .25);
+    --text: #0f172a;
+    --text-dim: #475569;
+    --text-muted: #94a3b8;
+    --shadow: 0 8px 40px rgba(0, 0, 0, .12);
+}
 
-    /* Blur de luz */
-    .hero-blob {
-        position: absolute;
-        top: -200px;
-        right: -100px;
-        z-index: 0;
-        width: 700px;
-        height: 700px;
-        border-radius: 50%;
-        background: radial-gradient(circle, <?= e($accent) ?>22 0%, transparent 65%);
-        animation: blob 14s ease-in-out infinite alternate;
-        pointer-events: none;
-    }
+/* Blur de luz */
+.hero-blob {
+    position: absolute;
+    top: -200px;
+    right: -100px;
+    z-index: 0;
+    width: 700px;
+    height: 700px;
+    border-radius: 50%;
+    background: radial-gradient(circle, <?=e($accent) ?>22 0%, transparent 65%);
+    animation: blob 14s ease-in-out infinite alternate;
+    pointer-events: none;
+}
 </style>
 
 </head>
@@ -97,15 +110,15 @@ include '../includes/header.php';
 <body>
 
     <!-- WhatsApp Float -->
-    <?php if ($wa = $cfg('whatsapp_url')): ?>
-        <div class=" whatsapp-float" id="whatsappFloat">
-            <a href="<?= e($wa) ?>?text=Olá%20José,%20vim%20do%20seu%20portfólio" target="_blank" rel="noopener">
-                <i class="fab fa-whatsapp"></i> <span>Vamos conversar?</span>
-            </a>
-            <button class="close-whatsapp" onclick="this.parentElement.style.display='none'" aria-label="Fechar">
-                <i class="fas fa-times"></i>
-            </button>
-        </div>
+    <?php if ($whatsappContactUrl !== ''): ?>
+    <div class="whatsapp-float" id="whatsappFloat">
+        <a href="<?= e($whatsappContactUrl) ?>" target="_blank" rel="noopener noreferrer">
+            <i class="fab fa-whatsapp"></i> <span>Vamos conversar?</span>
+        </a>
+        <button class="close-whatsapp" onclick="this.parentElement.style.display='none'" aria-label="Fechar">
+            <i class="fas fa-times"></i>
+        </button>
+    </div>
     <?php endif; ?>
     <?php include '../includes/navbar.php'; ?>
 
@@ -117,36 +130,35 @@ include '../includes/header.php';
                 <div class="service-hero-text reveal">
                     <span class="tag">Serviço Contínuo</span>
                     <h1>Manutenção de Sites & Apps <span>Preventiva</span></h1>
-                    <p class="lead">Mantenha seu site ou aplicativo sempre seguro, rápido e atualizado. Evite problemas
-                        e
-                        foque no que realmente importa: o seu negócio.</p>
+                    <p class="lead">Com um plano de manutenção adequado, o seu site ou aplicação recebe verificações e
+                        melhorias planeadas. Reduza riscos técnicos e concentre-se no que importa: o seu negócio.</p>
                     <div style="display:flex;gap:14px;flex-wrap:wrap">
                         <a href="<?= BASE_URL ?>/contact?service=Manutenção+de+Site+App" class="btn btn-primary"><i
                                 class="fas fa-headset"></i>Solicitar
                             Manutenção</a>
-                        <?php if ($whatsapp): ?>
-                            <a href="<?= e($whatsapp) ?>" target="_blank" class="btn btn-outline"><i
-                                    class="fab fa-whatsapp"></i>Suporte Emergencial</a>
+                        <?php if ($whatsappContactUrl !== ''): ?>
+                        <a href="<?= e($whatsappContactUrl) ?>" target="_blank" rel="noopener noreferrer"
+                            class="btn btn-outline"><i class="fab fa-whatsapp"></i>Contactar por WhatsApp</a>
                         <?php endif; ?>
                     </div>
-                    <!-- Painel de Monitoramento Mock -->
+                    <!-- O âmbito da manutenção é definido por projecto e plano. -->
                     <div class="monitor-panel reveal">
                         <div class="monitor-grid">
                             <div class="monitor-item">
-                                <div class="val" style="color:#10b981"><span class="status-dot"></span>99.9%</div>
-                                <div class="lbl">Uptime</div>
+                                <div class="val"><i class="fas fa-search"></i></div>
+                                <div class="lbl">Verificações acordadas</div>
                             </div>
                             <div class="monitor-item">
-                                <div class="val">0.8s</div>
-                                <div class="lbl">Tempo de Carregamento</div>
+                                <div class="val"><i class="fas fa-tools"></i></div>
+                                <div class="lbl">Suporte com limite definido</div>
                             </div>
                             <div class="monitor-item">
-                                <div class="val">0</div>
-                                <div class="lbl">Vulnerabilidades</div>
+                                <div class="val"><i class="fas fa-database"></i></div>
+                                <div class="lbl">Backups conforme infraestrutura</div>
                             </div>
                             <div class="monitor-item">
-                                <div class="val"><i class="fas fa-check-circle" style="color:#10b981"></i></div>
-                                <div class="lbl">Backup Diário OK</div>
+                                <div class="val"><i class="fas fa-file-alt"></i></div>
+                                <div class="lbl">Registo do trabalho realizado</div>
                             </div>
                         </div>
                     </div>
@@ -186,11 +198,13 @@ include '../includes/header.php';
                 <div class="risk-box success">
                     <h3><i class="fas fa-check-circle"></i> Benefícios Com Manutenção</h3>
                     <ul>
-                        <li><i class="fas fa-shield-alt"></i> Site sempre seguro contra ataques</li>
-                        <li><i class="fas fa-rocket"></i> Performance otimizada continuamente</li>
-                        <li><i class="fas fa-sync-alt"></i> Funcionalidades sempre atualizadas</li>
-                        <li><i class="fas fa-save"></i> Backups regulares garantem seus dados</li>
-                        <li><i class="fas fa-headset"></i> Suporte técnico rápido quando precisar</li>
+                        <li><i class="fas fa-shield-alt"></i> Redução de riscos através de verificações e actualizações
+                            acordadas</li>
+                        <li><i class="fas fa-rocket"></i> Oportunidades de melhoria de desempenho</li>
+                        <li><i class="fas fa-sync-alt"></i> Actualizações planeadas conforme compatibilidade e âmbito
+                        </li>
+                        <li><i class="fas fa-save"></i> Verificação de backups quando suportados e contratados</li>
+                        <li><i class="fas fa-headset"></i> Apoio técnico dentro dos limites do plano</li>
                         <li><i class="fas fa-chart-line"></i> Foco no seu negócio, não em problemas técnicos</li>
                     </ul>
                 </div>
@@ -210,21 +224,21 @@ include '../includes/header.php';
             <div class="services-grid reveal">
                 <?php
                 $services = [
-                    ['icon' => 'fa-shield-alt', 'title' => 'Segurança', 'desc' => 'Firewall, SSL, proteção contra hackers, scans de vulnerabilidade e atualizações de segurança.'],
-                    ['icon' => 'fa-tachometer-alt', 'title' => 'Performance', 'desc' => 'Otimização de velocidade, cache, compressão de imagens e monitoramento de performance.'],
-                    ['icon' => 'fa-sync-alt', 'title' => 'Atualizações', 'desc' => 'WordPress, plugins, frameworks, bibliotecas e dependências sempre atualizadas.'],
-                    ['icon' => 'fa-save', 'title' => 'Backup', 'desc' => 'Backups diários automáticos, armazenamento seguro e plano de recuperação de desastres.'],
-                    ['icon' => 'fa-eye', 'title' => 'Monitoramento', 'desc' => 'Uptime 24/7, alertas de downtime, métricas de performance e relatórios mensais.'],
+                    ['icon' => 'fa-shield-alt', 'title' => 'Segurança', 'desc' => 'Revisão de configurações de segurança, certificados SSL quando aplicável e actualizações de segurança incluídas no âmbito acordado.'],
+                    ['icon' => 'fa-tachometer-alt', 'title' => 'Performance', 'desc' => 'Análise de desempenho e aplicação de melhorias de velocidade adequadas à tecnologia e ao plano contratado.'],
+                    ['icon' => 'fa-sync-alt', 'title' => 'Atualizações', 'desc' => 'Actualizações de CMS, plugins, frameworks, bibliotecas e dependências, após avaliação de compatibilidade e dentro do âmbito acordado.'],
+                    ['icon' => 'fa-save', 'title' => 'Backups', 'desc' => 'Verificação e planeamento de cópias de segurança, quando a infraestrutura e o acesso técnico o permitem.'],
+                    ['icon' => 'fa-eye', 'title' => 'Verificações', 'desc' => 'Verificações de disponibilidade e desempenho de acordo com o plano contratado e as ferramentas disponíveis.'],
                     ['icon' => 'fa-bug', 'title' => 'Correção de Bugs', 'desc' => 'Identificação e correção de erros, problemas de compatibilidade e funcionalidades quebradas.'],
-                    ['icon' => 'fa-headset', 'title' => 'Suporte', 'desc' => 'Suporte técnico via email, WhatsApp, pequenas alterações e consultoria.'],
+                    ['icon' => 'fa-headset', 'title' => 'Suporte', 'desc' => 'Suporte técnico pelos canais acordados e pequenas alterações dentro das horas incluídas no plano.'],
                     ['icon' => 'fa-search', 'title' => 'SEO Técnico', 'desc' => 'Otimização para motores de busca, sitemaps, robots.txt e performance mobile.'],
                 ];
                 foreach ($services as $svc): ?>
-                    <div class="service-card reveal">
-                        <i class="fas <?= $svc['icon'] ?>"></i>
-                        <h4><?= $svc['title'] ?></h4>
-                        <p><?= $svc['desc'] ?></p>
-                    </div>
+                <div class="service-card reveal">
+                    <i class="fas <?= e($svc['icon']) ?>"></i>
+                    <h4><?= e($svc['title']) ?></h4>
+                    <p><?= e($svc['desc']) ?></p>
+                </div>
                 <?php endforeach; ?>
             </div>
         </div>
@@ -244,16 +258,16 @@ include '../includes/header.php';
                     ['num' => 1, 'title' => 'Análise Inicial', 'desc' => 'Avaliação completa do seu site/app: segurança, performance, backups e estado geral. Relatório detalhado.'],
                     ['num' => 2, 'title' => 'Plano de Ação', 'desc' => 'Definição de prioridades, correções críticas, otimizações e cronograma de manutenção.'],
                     ['num' => 3, 'title' => 'Implementação', 'desc' => 'Execução das melhorias, atualizações e configuração dos sistemas de monitoramento.'],
-                    ['num' => 4, 'title' => 'Monitoramento 24/7', 'desc' => 'Sistema de alertas ativo, backups automáticos e verificações regulares de saúde do sistema.'],
-                    ['num' => 5, 'title' => 'Relatórios Mensais', 'desc' => 'Relatórios detalhados com métricas, ações realizadas e recomendações. Transparência total.'],
-                    ['num' => 6, 'title' => 'Suporte Contínuo', 'desc' => 'Atendimento rápido para dúvidas, pequenas alterações e emergências. Canal direto de comunicação.'],
+                    ['num' => 4, 'title' => 'Verificações periódicas', 'desc' => 'A frequência das verificações e eventuais alertas depende do plano, das ferramentas e da infraestrutura do cliente.'],
+                    ['num' => 5, 'title' => 'Registo e recomendações', 'desc' => 'Resumo do trabalho realizado e recomendações, com a periodicidade definida no plano.'],
+                    ['num' => 6, 'title' => 'Suporte definido', 'desc' => 'Atendimento dentro das horas incluídas, do horário combinado e das condições indicadas na proposta.'],
                 ];
                 foreach ($steps as $step): ?>
-                    <div class="process-step">
-                        <div class="step-number"><?= $step['num'] ?></div>
-                        <h4><?= $step['title'] ?></h4>
-                        <p><?= $step['desc'] ?></p>
-                    </div>
+                <div class="process-step">
+                    <div class="step-number"><?= (int)$step['num'] ?></div>
+                    <h4><?= e($step['title']) ?></h4>
+                    <p><?= e($step['desc']) ?></p>
+                </div>
                 <?php endforeach; ?>
             </div>
         </div>
@@ -272,29 +286,31 @@ include '../includes/header.php';
                     <div class="emergency-features">
                         <div class="emergency-feat">
                             <i class="fas fa-clock"></i>
-                            <h5>Resposta em até 2h</h5>
-                            <p style="font-size:.72rem;color:var(--text-muted)">Horário comercial</p>
+                            <h5>Avaliação prioritária</h5>
+                            <p style="font-size:.72rem;color:var(--text-muted)">Sujeita à disponibilidade</p>
                         </div>
                         <div class="emergency-feat">
                             <i class="fas fa-undo"></i>
-                            <h5>Restauração de Backup</h5>
-                            <p style="font-size:.72rem;color:var(--text-muted)">Recuperação rápida</p>
+                            <h5>Revisão de recuperação</h5>
+                            <p style="font-size:.72rem;color:var(--text-muted)">Se houver backup acessível</p>
                         </div>
                         <div class="emergency-feat">
                             <i class="fas fa-biohazard"></i>
-                            <h5>Limpeza de Malware</h5>
-                            <p style="font-size:.72rem;color:var(--text-muted)">Remoção completa</p>
+                            <h5>Análise de segurança</h5>
+                            <p style="font-size:.72rem;color:var(--text-muted)">Âmbito após diagnóstico</p>
                         </div>
                         <div class="emergency-feat">
                             <i class="fas fa-shield-virus"></i>
-                            <h5>Proteção Futura</h5>
-                            <p style="font-size:.72rem;color:var(--text-muted)">Prevenção de ataques</p>
+                            <h5>Plano de prevenção</h5>
+                            <p style="font-size:.72rem;color:var(--text-muted)">Medidas recomendadas</p>
                         </div>
                     </div>
                 </div>
                 <div style="text-align:center">
                     <h3 style="font-family:var(--font-head);margin-bottom:16px">Atendimento Prioritário</h3>
-                    <p style="margin-bottom:20px">Preencha o formulário para atendimento de emergência prioritário.</p>
+                    <p style="margin-bottom:20px">Descreva o problema para avaliarmos a urgência, a viabilidade da
+                        recuperação e o orçamento aplicável. O atendimento depende da disponibilidade e das condições
+                        acordadas.</p>
                     <a href="<?= BASE_URL ?>/contact?service=Manutenção+de+Site+App" class="btn btn-primary"><i
                             class="fas fa-exclamation-triangle"></i>Solicitar Suporte de Emergência</a>
                 </div>
@@ -308,66 +324,59 @@ include '../includes/header.php';
             <div class="section-head reveal">
                 <span class="tag">Investimento</span>
                 <h2 class="section-title">Planos de <span class="text-gradient">Manutenção</span></h2>
-                <p class="section-sub">Escolha o plano ideal para as necessidades do seu projecto. Todos incluem
-                    correção de
-                    bugs críticos.</p>
+                <p class="section-sub">Planos mensais de referência com limites de trabalho definidos. O âmbito final
+                    depende da tecnologia, dos acessos e da infraestrutura do projecto.</p>
             </div>
             <div class="pricing-grid reveal">
-                <!-- Básico -->
+                <!-- JMbenga Care Basic -->
                 <div class="pricing-card">
-                    <h3 style="font-family:var(--font-head)">Básico</h3>
-                    <div class="price">$99<span>/mês</span></div>
+                    <h3 style="font-family:var(--font-head)">JMbenga Care Basic</h3>
+                    <div class="price">15.000 Kz<span>/mês</span></div>
                     <ul>
-                        <li><i class="fas fa-check"></i>Monitoramento de uptime</li>
-                        <li><i class="fas fa-check"></i>Backup semanal</li>
-                        <li><i class="fas fa-check"></i>Atualizações de segurança</li>
-                        <li><i class="fas fa-check"></i>Suporte por email</li>
-                        <li><i class="fas fa-check"></i>Relatório mensal</li>
-                        <li><i class="fas fa-check"></i>Otimização de performance</li>
-                        <li><i class="fas fa-check"></i>Suporte WhatsApp</li>
+                        <li><i class="fas fa-check"></i>Verificação mensal de funcionamento</li>
+                        <li><i class="fas fa-check"></i>Até 1 hora de suporte ou pequenas alterações</li>
+                        <li><i class="fas fa-check"></i>Verificação de links e formulários</li>
+                        <li><i class="fas fa-check"></i>Relatório mensal breve</li>
                     </ul>
-                    <a href="<?= BASE_URL ?>/contact" class="btn btn-outline" style="width:100%">Começar</a>
+                    <a href="<?= BASE_URL ?>/contact?service=Manutenção+de+Site+App&amp;plan=Care+Basic"
+                        class="btn btn-outline" style="width:100%">Pedir este plano</a>
                 </div>
-                <!-- Profissional -->
+                <!-- JMbenga Care Business -->
                 <div class="pricing-card featured">
-                    <div class="plan-badge">MAIS POPULAR</div>
-                    <h3 style="font-family:var(--font-head)">Profissional</h3>
-                    <div class="price">$199<span>/mês</span></div>
+                    <div class="plan-badge">RECOMENDADO</div>
+                    <h3 style="font-family:var(--font-head)">JMbenga Care Business</h3>
+                    <div class="price">35.000 Kz<span>/mês</span></div>
                     <ul>
-                        <li><i class="fas fa-check"></i>Monitoramento 24/7</li>
-                        <li><i class="fas fa-check"></i>Backup diário</li>
-                        <li><i class="fas fa-check"></i>Atualizações automáticas</li>
-                        <li><i class="fas fa-check"></i>Suporte WhatsApp</li>
-                        <li><i class="fas fa-check"></i>Otimização de performance</li>
-                        <li><i class="fas fa-check"></i>Scan de segurança semanal</li>
-                        <li><i class="fas fa-check"></i>SEO técnico</li>
-                        <li><i class="fas fa-check"></i>Suporte emergencial</li>
+                        <li><i class="fas fa-check"></i>Verificações periódicas</li>
+                        <li><i class="fas fa-check"></i>Até 3 horas de trabalho mensal</li>
+                        <li><i class="fas fa-check"></i>Actualizações simples de conteúdo</li>
+                        <li><i class="fas fa-check"></i>Verificação de backups, quando suportados</li>
+                        <li><i class="fas fa-check"></i>Prioridade normal no atendimento</li>
                     </ul>
-                    <a href="<?= BASE_URL ?>/contact" class="btn btn-primary" style="width:100%">Começar</a>
+                    <a href="<?= BASE_URL ?>/contact?service=Manutenção+de+Site+App&amp;plan=Care+Business"
+                        class="btn btn-primary" style="width:100%">Pedir este plano</a>
                 </div>
-                <!-- Enterprise -->
+                <!-- JMbenga Care Pro -->
                 <div class="pricing-card">
-                    <h3 style="font-family:var(--font-head)">Enterprise</h3>
-                    <div class="price">$399<span>/mês</span></div>
+                    <h3 style="font-family:var(--font-head)">JMbenga Care Pro</h3>
+                    <div class="price">70.000 Kz<span>/mês</span></div>
                     <ul>
-                        <li><i class="fas fa-check"></i>Tudo do Profissional</li>
-                        <li><i class="fas fa-check"></i>Backup em tempo real</li>
-                        <li><i class="fas fa-check"></i>SEO técnico mensal</li>
-                        <li><i class="fas fa-check"></i>Suporte emergencial 24/7</li>
-                        <li><i class="fas fa-check"></i>Firewall avançado</li>
-                        <li><i class="fas fa-check"></i>Relatórios detalhados</li>
-                        <li><i class="fas fa-check"></i>Consultoria mensal</li>
-                        <li><i class="fas fa-check"></i>SLA 2 horas resposta</li>
+                        <li><i class="fas fa-check"></i>Até 6 horas de trabalho mensal</li>
+                        <li><i class="fas fa-check"></i>Monitorização conforme a infraestrutura</li>
+                        <li><i class="fas fa-check"></i>Actualizações e testes controlados</li>
+                        <li><i class="fas fa-check"></i>Apoio prioritário</li>
+                        <li><i class="fas fa-check"></i>Relatório técnico mensal</li>
                     </ul>
-                    <a href="<?= BASE_URL ?>/contact" class="btn btn-outline" style="width:100%">Começar</a>
+                    <a href="<?= BASE_URL ?>/contact?service=Manutenção+de+Site+App&amp;plan=Care+Pro"
+                        class="btn btn-outline" style="width:100%">Pedir este plano</a>
                 </div>
             </div>
             <p style="text-align:center;margin-top:24px;color:var(--text-muted);font-size:.85rem">
-                * Primeiro mês com <strong style="color:var(--accent)">30% de desconto</strong> para novos clientes.
-                Horas
-                extras a $40/h para demandas não incluídas. <a
-                    href="<?= BASE_URL ?>/contact?service=Manutenção+de+Site+App" style="color:var(--accent)">Sem
-                    fidelidade, cancele a qualquer momento.</a>
+                Os preços são referências iniciais. As horas incluídas não transitam automaticamente para o mês
+                seguinte.
+                Funcionalidades novas, horas adicionais, domínio, alojamento, licenças e serviços de terceiros são
+                orçamentados à parte, salvo indicação escrita em contrário.
+                O horário, o tempo de resposta, a duração e as condições de cancelamento serão definidos na proposta.
             </p>
         </div>
     </section>
@@ -382,51 +391,25 @@ include '../includes/header.php';
             <div class="faq-list reveal">
                 <?php
                 $faqs = [
-                    ['q' => 'Posso cancelar a qualquer momento?', 'a' => 'Sim, todos os planos são mensais sem fidelidade. Basta avisar com 7 dias de antecedência. O acesso aos backups realizados durante o período contratado é mantido por 30 dias após o cancelamento.'],
-                    ['q' => 'E se eu precisar de algo fora do plano?', 'a' => 'Trabalho com horas extras a $40/hora para demandas não incluídas no plano. Sempre consulto antes de realizar qualquer trabalho extra e forneço orçamento prévio.'],
-                    ['q' => 'Como são feitos os backups?', 'a' => 'Os backups incluem banco de dados, arquivos, emails e configurações. São armazenados em servidores seguros com criptografia. Mantemos versões dos últimos 30 dias no plano Profissional e 90 dias no Enterprise.'],
-                    ['q' => 'Você trabalha com qual tipo de site?', 'a' => 'Trabalho com WordPress, HTML/CSS/JS estático, React, Vue, Node.js, Laravel, e-commerce (Magento, WooCommerce), e aplicativos mobile. Se o seu site usa uma tecnologia diferente, entre em contacto para avaliar.'],
-                    ['q' => 'E se meu site for hackeado?', 'a' => 'No plano Profissional e Enterprise, a limpeza de malware está incluída. Restauramos a versão limpa do backup mais recente, removemos todo código malicioso e fortalecemos a segurança para prevenir futuros ataques.'],
+                    ['q' => 'Como funciona a duração e o cancelamento?', 'a' => 'A periodicidade de cobrança, o aviso prévio e as condições de cancelamento ficam definidos na proposta ou acordo antes do início do serviço.'],
+                    ['q' => 'E se eu precisar de algo fora do plano?', 'a' => 'Funcionalidades novas e trabalho que exceda as horas incluídas são avaliados e orçamentados separadamente. Nenhum extra deve avançar sem aprovação prévia do cliente.'],
+                    ['q' => 'Como são feitos os backups?', 'a' => 'A possibilidade, frequência, retenção e local de armazenamento dependem da infraestrutura e dos acessos disponíveis. O serviço exacto de backup será descrito na proposta; não se presume backup automático quando este não existe.'],
+                    ['q' => 'Que tecnologias consegue manter?', 'a' => 'A compatibilidade é avaliada caso a caso, com base na tecnologia, na versão, nos acessos e no estado actual do projecto. Após a análise inicial, confirmo o que pode ser incluído no plano.'],
+                    ['q' => 'E se o meu site for atacado ou ficar indisponível?', 'a' => 'Primeiro será avaliado o problema, a disponibilidade de backups e o acesso à infraestrutura. Recuperação, limpeza de malware, incidentes críticos ou intervenção de emergência podem exigir orçamento próprio, salvo se estiverem expressamente incluídos no plano.'],
                 ];
                 foreach ($faqs as $faq): ?>
-                    <div class="faq-item">
-                        <h4><i class="fas fa-question-circle"
-                                style="color:var(--accent);margin-right:8px"></i><?= $faq['q'] ?>
-                        </h4>
-                        <p><?= $faq['a'] ?></p>
-                    </div>
+                <div class="faq-item">
+                    <h4><i class="fas fa-question-circle"
+                            style="color:var(--accent);margin-right:8px"></i><?= e($faq['q']) ?>
+                    </h4>
+                    <p><?= e($faq['a']) ?></p>
+                </div>
                 <?php endforeach; ?>
             </div>
         </div>
     </section>
 
-    <!-- Clientes que Confiam -->
-    <section class="section">
-        <div class="container">
-            <div class="section-head reveal">
-                <span class="tag">Clientes</span>
-                <h2 class="section-title">Empresas que <span class="text-gradient">Já Confiam</span></h2>
-                <p class="section-sub">Histórias reais de quem passou a dormir tranquilo após contratar a manutenção.
-                </p>
-            </div>
-            <div class="testi-grid reveal">
-                <?php
-                $testimonials = [
-                    ['quote' => 'Meu e-commerce foi hackeado e o José recuperou tudo em menos de 4 horas. Desde então, contrato a manutenção mensal e nunca mais tive problemas. A paz de espírito não tem preço.', 'author' => 'Ana Costa', 'role' => 'Loja Moda Angolana'],
-                    ['quote' => 'Tinha constantes problemas com meu site institucional lento e com erros. Desde que contrato a manutenção, o site carrega 3x mais rápido e nunca mais tive downtime. O ROI é evidente.', 'author' => 'Miguel Pereira', 'role' => 'Advocacia & Associados'],
-                    ['quote' => 'Como startup, não podíamos ter um desenvolvedor em tempo integral. A manutenção do José é a solução perfeita: custo-benefício excelente e qualidade profissional. Nosso app nunca esteve tão estável.', 'author' => 'Teresa Santos', 'role' => 'CEO, TechStartup AO'],
-                ];
-                foreach ($testimonials as $t): ?>
-                    <div class="testi-card">
-                        <div class="quote">"</div>
-                        <p class="body"><?= $t['quote'] ?></p>
-                        <div class="author"><?= $t['author'] ?></div>
-                        <div class="role"><?= $t['role'] ?></div>
-                    </div>
-                <?php endforeach; ?>
-            </div>
-        </div>
-    </section>
+    <!-- A secção de testemunhos foi retirada: só devem ser publicados testemunhos reais e autorizados. -->
 
     <!-- CTA Final -->
     <div class="cta-section"
@@ -439,24 +422,15 @@ include '../includes/header.php';
             <p class="cta-sub" style="font-size:1rem;color:var(--text-dim);margin-bottom:32px;line-height:1.7">
                 Deixe a parte técnica comigo e foque no que realmente importa: crescer o seu negócio.
             </p>
-            <div
-                style="display:grid;grid-template-columns:1fr 1fr;gap:16px;max-width:500px;margin:0 auto 32px;text-align:center">
-                <div><i class="fas fa-search" style="font-size:1.4rem;color:var(--accent);margin-bottom:6px"></i>
-                    <div style="font-size:.8rem;color:var(--text-dim)">Análise Gratuita</div>
-                    <div style="font-size:.7rem;color:var(--text-muted)">Do seu site atual</div>
-                </div>
-                <div><i class="fas fa-tag" style="font-size:1.4rem;color:var(--accent);margin-bottom:6px"></i>
-                    <div style="font-size:.8rem;color:var(--text-dim)">30% Desconto 1º Mês</div>
-                    <div style="font-size:.7rem;color:var(--text-muted)">Novos clientes</div>
-                </div>
-            </div>
+            <p style="font-size:.9rem;color:var(--text-dim);margin-bottom:28px">Antes de apresentar uma proposta, avalio
+                a tecnologia, os acessos, as necessidades e os limites do serviço pretendido.</p>
             <div class="cta-actions" style="display:flex;gap:14px;justify-content:center;flex-wrap:wrap">
                 <a href="<?= BASE_URL ?>/contact?service=Manutenção+de+Site+App" class="btn btn-primary"><i
                         class="fas fa-headset"></i>Começar
                     Agora</a>
-                <?php if ($whatsapp): ?>
-                    <a href="<?= e($whatsapp) ?>" target="_blank" class="btn btn-secondary"><i
-                            class="fab fa-whatsapp"></i>Suporte de Emergência</a>
+                <?php if ($whatsappContactUrl !== ''): ?>
+                <a href="<?= e($whatsappContactUrl) ?>" target="_blank" rel="noopener noreferrer"
+                    class="btn btn-secondary"><i class="fab fa-whatsapp"></i>Contactar por WhatsApp</a>
                 <?php endif; ?>
             </div>
         </div>

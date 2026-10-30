@@ -1,334 +1,274 @@
 /**
  * JMbenga Portfolio — main.js
- * Inicializado em todas as páginas (via includes/footer.php).
- * Cursor, navbar, reveal, back-to-top, toasts, contadores, skills.
+ * JavaScript global: carregado em todas as páginas através de includes/footer.php.
+ * Responsável por navbar/offcanvas, tema, efeitos globais, skills, toasts e utilitários.
  */
-
 "use strict";
 
-/* ══════════════════════════════════════════════════════════════
-   CURSOR PERSONALIZADO
-══════════════════════════════════════════════════════════════ */
-(function initCursor() {
-  const cur = document.getElementById("cursor");
-  const ring = document.getElementById("cursor-ring");
-  if (!cur || !ring) return;
-  if (window.matchMedia("(pointer: coarse)").matches) {
-    cur.style.display = ring.style.display = "none";
-    return;
-  }
+(function initGlobalUI() {
+  const root = document.documentElement;
+  const body = document.body;
+  const reduceMotion = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches ?? false;
 
-  let mx = 0,
-    my = 0,
-    rx = 0,
-    ry = 0;
-  document.addEventListener("mousemove", (e) => {
-    mx = e.clientX;
-    my = e.clientY;
-  });
+  /* Loading */
+  window.addEventListener("load", () => {
+    window.setTimeout(() => {
+      document.getElementById("loading")?.classList.add("hidden");
+    }, reduceMotion ? 0 : 900);
+  }, { once: true });
 
-  (function tick() {
-    rx += (mx - rx) * 0.12;
-    ry += (my - ry) * 0.12;
-    cur.style.cssText = `left:${mx - 6}px;top:${my - 6}px`;
-    ring.style.cssText = `left:${rx - 18}px;top:${ry - 18}px`;
-    requestAnimationFrame(tick);
-  })();
+  /* Cursor personalizado: mantém transformações sem as apagar a cada frame. */
+  (function initCursor() {
+    const cursor = document.getElementById("cursor");
+    const ring = document.getElementById("cursor-ring");
+    if (!cursor || !ring) return;
 
-  const hoverable = "a, button, input, textarea, select, [data-hover]";
-  document.addEventListener("mouseover", (e) => {
-    if (e.target.closest(hoverable)) {
-      cur.style.transform = "scale(2.2)";
-      ring.style.transform = "scale(1.6)";
+    if (window.matchMedia("(pointer: coarse)").matches || reduceMotion) {
+      cursor.style.display = "none";
+      ring.style.display = "none";
+      return;
     }
-  });
-  document.addEventListener("mouseout", (e) => {
-    if (e.target.closest(hoverable)) {
-      cur.style.transform = "";
-      ring.style.transform = "";
+
+    let mx = -100, my = -100, rx = -100, ry = -100;
+    document.addEventListener("mousemove", (event) => {
+      mx = event.clientX;
+      my = event.clientY;
+    }, { passive: true });
+
+    function tick() {
+      rx += (mx - rx) * 0.12;
+      ry += (my - ry) * 0.12;
+      cursor.style.left = `${mx - 6}px`;
+      cursor.style.top = `${my - 6}px`;
+      ring.style.left = `${rx - 18}px`;
+      ring.style.top = `${ry - 18}px`;
+      window.requestAnimationFrame(tick);
     }
-  });
-})();
+    window.requestAnimationFrame(tick);
 
-/* ══════════════════════════════════════════════════════════════
-   NAVBAR — scroll effect + active link
-══════════════════════════════════════════════════════════════ */
-(function initNavbar() {
-  const nav = document.getElementById("navbar");
-  if (!nav) return;
-
-  // Scroll class
-  const onScroll = () => nav.classList.toggle("scrolled", window.scrollY > 40);
-  window.addEventListener("scroll", onScroll, { passive: true });
-  onScroll();
-
-  // Active link por hash
-  const links = nav.querySelectorAll('.nav-links a[href*="#"]');
-  const sections = [];
-  links.forEach((l) => {
-    const id = l.getAttribute("href").split("#")[1];
-    const sec = document.getElementById(id);
-    if (sec) sections.push({ link: l, section: sec });
-  });
-
-  if (sections.length) {
-    const obs = new IntersectionObserver(
-      (entries) => {
-        entries.forEach((e) => {
-          const match = sections.find((s) => s.section === e.target);
-          if (match) match.link.classList.toggle("active", e.isIntersecting);
-        });
-      },
-      { threshold: 0.4 }
-    );
-    sections.forEach((s) => obs.observe(s.section));
-  }
-})();
-
-/* ══════════════════════════════════════════════════════════════
-   MENU MOBILE
-══════════════════════════════════════════════════════════════ */
-(function initMobileMenu() {
-  const toggle = document.querySelector(".nav-toggle");
-  const links = document.querySelector(".nav-links");
-  if (!toggle || !links) return;
-
-  toggle.addEventListener("click", () => {
-    const open = links.classList.toggle("open");
-    toggle.classList.toggle("open", open);
-    document.body.style.overflow = open ? "hidden" : "";
-  });
-
-  links.querySelectorAll("a").forEach((a) => {
-    a.addEventListener("click", () => {
-      links.classList.remove("open");
-      toggle.classList.remove("open");
-      document.body.style.overflow = "";
-    });
-  });
-})();
-
-/* ══════════════════════════════════════════════════════════════
-   REVEAL ON SCROLL
-══════════════════════════════════════════════════════════════ */
-(function initReveal() {
-  const els = document.querySelectorAll(".reveal");
-  if (!els.length) return;
-
-  const obs = new IntersectionObserver(
-    (entries) => {
-      entries.forEach((e) => {
-        if (e.isIntersecting) {
-          e.target.classList.add("visible");
-        }
-      });
-    },
-    { threshold: 0.08, rootMargin: "0px 0px -40px 0px" }
-  );
-
-  els.forEach((el) => obs.observe(el));
-})();
-
-/* ══════════════════════════════════════════════════════════════
-   CONTADORES NUMÉRICOS
-══════════════════════════════════════════════════════════════ */
-(function initCounters() {
-  const els = document.querySelectorAll(".counter");
-  if (!els.length) return;
-
-  const obs = new IntersectionObserver(
-    (entries) => {
-      entries.forEach((e) => {
-        if (!e.isIntersecting) return;
-        const el = e.target;
-        const end = parseInt(el.dataset.target, 10);
-        let cur = 0;
-        const step = Math.max(1, Math.ceil(end / 60));
-        const tick = setInterval(() => {
-          cur = Math.min(cur + step, end);
-          el.textContent = cur.toLocaleString("pt-AO");
-          if (cur >= end) clearInterval(tick);
-        }, 22);
-        obs.unobserve(el);
-      });
-    },
-    { threshold: 0.5 }
-  );
-
-  els.forEach((el) => obs.observe(el));
-})();
-
-/* ══════════════════════════════════════════════════════════════
-   BARRAS DE SKILL
-══════════════════════════════════════════════════════════════ */
-(function initSkillBars() {
-  const bars = document.querySelectorAll(".skill-bar-fill");
-  if (!bars.length) return;
-
-  const obs = new IntersectionObserver(
-    (entries) => {
-      entries.forEach((e) => {
-        if (e.isIntersecting) {
-          e.target.style.width = (e.target.dataset.width || 0) + "%";
-          obs.unobserve(e.target);
-        }
-      });
-    },
-    { threshold: 0.3 }
-  );
-
-  bars.forEach((b) => obs.observe(b));
-})();
-
-/* ══════════════════════════════════════════════════════════════
-   TABS DE SKILLS
-══════════════════════════════════════════════════════════════ */
-window.switchSkillTab = function (cat) {
-  document
-    .querySelectorAll(".skills-tab")
-    .forEach((t) => t.classList.toggle("active", t.dataset.tab === cat));
-  document
-    .querySelectorAll(".skills-panel")
-    .forEach((p) => p.classList.toggle("active", p.id === "tab-" + cat));
-  // Animar barras do painel recém-activado
-  document.querySelectorAll("#tab-" + cat + " .skill-bar-fill").forEach((b) => {
-    b.style.width = "0";
-    requestAnimationFrame(() => {
-      b.style.width = (b.dataset.width || 0) + "%";
-    });
-  });
-};
-
-/* ══════════════════════════════════════════════════════════════
-   BOTÃO VOLTAR AO TOPO
-══════════════════════════════════════════════════════════════ */
-(function initBackTop() {
-  const btn = document.getElementById("back-top");
-  if (!btn) return;
-
-  window.addEventListener(
-    "scroll",
-    () => {
-      btn.classList.toggle("visible", window.scrollY > 400);
-    },
-    { passive: true }
-  );
-
-  btn.addEventListener("click", () =>
-    window.scrollTo({ top: 0, behavior: "smooth" })
-  );
-})();
-
-/* ══════════════════════════════════════════════════════════════
-   TOASTS
-══════════════════════════════════════════════════════════════ */
-window.showToast = function (msg, type = "info", duration = 3500) {
-  let container = document.getElementById("toast-container");
-  if (!container) {
-    container = document.createElement("div");
-    container.id = "toast-container";
-    document.body.appendChild(container);
-  }
-
-  const toast = document.createElement("div");
-  toast.className = `toast ${type}`;
-  toast.textContent = msg;
-  container.appendChild(toast);
-
-  setTimeout(() => {
-    toast.style.opacity = "0";
-    toast.style.transform = "translateY(8px)";
-    toast.style.transition = "all .3s";
-    setTimeout(() => toast.remove(), 300);
-  }, duration);
-};
-
-/* ══════════════════════════════════════════════════════════════
-   LAZY IMAGES
-══════════════════════════════════════════════════════════════ */
-(function initLazyImages() {
-  if (!("IntersectionObserver" in window)) return;
-
-  const imgs = document.querySelectorAll('img[loading="lazy"]');
-  const obs = new IntersectionObserver((entries) => {
-    entries.forEach((e) => {
-      if (e.isIntersecting) {
-        const img = e.target;
-        if (img.dataset.src) {
-          img.src = img.dataset.src;
-          img.removeAttribute("data-src");
-        }
-        obs.unobserve(img);
+    const hoverable = "a, button, input, textarea, select, [data-hover]";
+    document.addEventListener("mouseover", (event) => {
+      const target = event.target instanceof Element ? event.target : null;
+      if (target?.closest(hoverable)) {
+        cursor.style.transform = "scale(2.2)";
+        ring.style.transform = "scale(1.6)";
       }
     });
-  });
-  imgs.forEach((img) => obs.observe(img));
-})();
-
-// ═══ THEME TOGGLE ═════════════════════════════════════════
-(function initThemeToggle() {
-  const toggle = document.getElementById("themeToggle");
-  const icon = document.getElementById("themeIcon");
-  const html = document.documentElement;
-
-  function applyTheme(theme, showNotification = false) {
-    html.dataset.theme = theme;
-    if (icon) icon.className = theme === "dark" ? "fas fa-moon" : "fas fa-sun";
-    localStorage.setItem("jm_theme", theme);
-    if (showNotification && window.showToast) {
-      showToast(`Tema ${theme === "dark" ? "escuro" : "claro"} ativado`, "info", 2000);
-    }
-  }
-
-  // Aplicar tema guardado ou padrão dark (sem notificação)
-  const saved = localStorage.getItem("jm_theme") || "dark";
-  applyTheme(saved, false);
-
-  if (toggle) {
-    toggle.addEventListener("click", () => {
-      const current = html.dataset.theme;
-      const newTheme = current === "dark" ? "light" : "dark";
-      applyTheme(newTheme, true); // Mostra notificação ao alternar
+    document.addEventListener("mouseout", (event) => {
+      const target = event.target instanceof Element ? event.target : null;
+      if (target?.closest(hoverable)) {
+        cursor.style.transform = "";
+        ring.style.transform = "";
+      }
     });
-  }
-})();
+  })();
 
-// ═══ OFF CANVAS ═══════════════════════════════════════════
-(function initOffcanvas() {
-  const toggle = document.querySelector(".nav-toggle");
+  /* Scroll progress, header e back-to-top: um único listener global. */
+  const scrollBar = document.getElementById("scroll-progress");
+  const header = document.getElementById("header");
+  const backTop = document.getElementById("back-top");
+
+  function updateScrollUI() {
+    const scrollY = window.scrollY || root.scrollTop || 0;
+    const maxScroll = Math.max(0, root.scrollHeight - window.innerHeight);
+    const percent = maxScroll > 0 ? Math.min(100, Math.max(0, (scrollY / maxScroll) * 100)) : 0;
+    if (scrollBar) scrollBar.style.width = `${percent}%`;
+    if (header) header.classList.toggle("scrolled", scrollY > 50);
+    if (backTop) backTop.classList.toggle("visible", scrollY > 400);
+  }
+  window.addEventListener("scroll", updateScrollUI, { passive: true });
+  window.addEventListener("resize", updateScrollUI, { passive: true });
+  updateScrollUI();
+
+  /* Navbar: a marcação active vem do PHP (rota actual); não a sobrescrever com hashes. */
+
+  /* Offcanvas do navbar.php: #menuToggle, #offcanvas, #backdrop. */
+  const menuToggle = document.getElementById("menuToggle");
   const offcanvas = document.getElementById("offcanvas");
   const backdrop = document.getElementById("backdrop");
 
-  if (!toggle || !offcanvas) return;
-
-  function openMenu() {
+  window.openMenu = function openMenu() {
+    if (!offcanvas) return;
     offcanvas.classList.add("open");
-    backdrop.classList.add("open");
-    toggle.classList.add("open");
-    document.body.style.overflow = "hidden";
+    backdrop?.classList.add("open");
+    menuToggle?.classList.add("open");
+    menuToggle?.setAttribute("aria-expanded", "true");
+    offcanvas.setAttribute("aria-hidden", "false");
+    body.style.overflow = "hidden";
+  };
+
+  window.closeMenu = function closeMenu() {
+    offcanvas?.classList.remove("open");
+    backdrop?.classList.remove("open");
+    menuToggle?.classList.remove("open");
+    menuToggle?.setAttribute("aria-expanded", "false");
+    offcanvas?.setAttribute("aria-hidden", "true");
+    body.style.overflow = "";
+  };
+
+  document.addEventListener("keydown", (event) => {
+    if (event.key === "Escape" && offcanvas?.classList.contains("open")) {
+      window.closeMenu();
+      menuToggle?.focus();
+    }
+  });
+  offcanvas?.querySelectorAll("a").forEach((link) => {
+    link.addEventListener("click", () => window.closeMenu());
+  });
+
+  /* Reveal on scroll (com fallback quando IntersectionObserver não existe). */
+  function observeOrShow(elements, options, onVisible) {
+    if (!elements.length) return;
+    if (!("IntersectionObserver" in window)) {
+      elements.forEach(onVisible);
+      return;
+    }
+    const observer = new IntersectionObserver((entries) => {
+      entries.forEach((entry) => {
+        if (!entry.isIntersecting) return;
+        onVisible(entry.target);
+        observer.unobserve(entry.target);
+      });
+    }, options);
+    elements.forEach((element) => observer.observe(element));
   }
 
-  window.closeMenu = function () {
-    offcanvas.classList.remove("open");
-    backdrop.classList.remove("open");
-    toggle.classList.remove("open");
-    document.body.style.overflow = "";
-  };
+  observeOrShow(
+    Array.from(document.querySelectorAll(".reveal")),
+    { threshold: 0.08, rootMargin: "0px 0px -40px 0px" },
+    (element) => element.classList.add("visible")
+  );
 
-  toggle.addEventListener("click", openMenu);
-  backdrop.addEventListener("click", closeMenu);
-  offcanvas.querySelectorAll("a").forEach((a) => {
-    a.addEventListener("click", closeMenu);
+  observeOrShow(
+    Array.from(document.querySelectorAll(".timeline-item")),
+    { threshold: 0.2 },
+    (element) => element.classList.add("visible")
+  );
+  document.querySelectorAll(".timeline-item").forEach((element, index) => {
+    element.style.transitionDelay = reduceMotion ? "0s" : `${index * 0.12}s`;
   });
-})();
 
-/* ══════════════════════════════════════════════════════════════
-   UTILITÁRIO: debounce
-══════════════════════════════════════════════════════════════ */
-window.debounce = function (fn, wait = 200) {
-  let t;
-  return (...args) => {
-    clearTimeout(t);
-    t = setTimeout(() => fn(...args), wait);
+  /* Contadores numéricos. */
+  observeOrShow(
+    Array.from(document.querySelectorAll(".counter")),
+    { threshold: 0.5 },
+    (element) => {
+      const end = Number.parseInt(element.dataset.target || "0", 10);
+      if (!Number.isFinite(end) || end <= 0 || reduceMotion) {
+        element.textContent = String(Number.isFinite(end) ? Math.max(0, end) : 0);
+        return;
+      }
+      let current = 0;
+      const step = Math.max(1, Math.ceil(end / 60));
+      const timer = window.setInterval(() => {
+        current = Math.min(current + step, end);
+        element.textContent = current.toLocaleString("pt-AO");
+        if (current >= end) window.clearInterval(timer);
+      }, 22);
+    }
+  );
+
+  /* Barras de competências. */
+  observeOrShow(
+    Array.from(document.querySelectorAll(".skill-bar-fill")),
+    { threshold: 0.3 },
+    (bar) => {
+      const raw = Number.parseFloat(bar.dataset.width || "0");
+      const width = Number.isFinite(raw) ? Math.min(100, Math.max(0, raw)) : 0;
+      bar.style.width = `${width}%`;
+    }
+  );
+
+  /* Tabs: suporta ambos os nomes usados nas versões anteriores do site. */
+  window.switchSkillTab = function switchSkillTab(category) {
+    document.querySelectorAll(".skill-tab, .skills-tab").forEach((tab) => {
+      tab.classList.toggle("active", tab.dataset.tab === category);
+      tab.setAttribute("aria-selected", String(tab.dataset.tab === category));
+    });
+    document.querySelectorAll(".skills-panel").forEach((panel) => {
+      panel.classList.toggle("active", panel.id === `tab-${category}`);
+      panel.hidden = panel.id !== `tab-${category}`;
+    });
+    document.querySelectorAll(`#tab-${CSS.escape(category)} .skill-bar-fill`).forEach((bar) => {
+      const raw = Number.parseFloat(bar.dataset.width || "0");
+      const width = Number.isFinite(raw) ? Math.min(100, Math.max(0, raw)) : 0;
+      if (reduceMotion) {
+        bar.style.width = `${width}%`;
+      } else {
+        bar.style.width = "0%";
+        window.requestAnimationFrame(() => { bar.style.width = `${width}%`; });
+      }
+    });
   };
-};
+  window.switchTab = window.switchSkillTab;
+
+  /* Botão voltar ao topo: tratado pelo listener global de scroll acima. */
+  backTop?.addEventListener("click", () => {
+    window.scrollTo({ top: 0, behavior: reduceMotion ? "auto" : "smooth" });
+  });
+
+  /* Toasts. */
+  window.showToast = function showToast(message, type = "info", duration = 3500) {
+    let container = document.getElementById("toast-container");
+    if (!container) {
+      container = document.createElement("div");
+      container.id = "toast-container";
+      body.appendChild(container);
+    }
+    const safeType = ["info", "success", "warning", "error"].includes(type) ? type : "info";
+    const toast = document.createElement("div");
+    toast.className = `toast ${safeType}`;
+    toast.textContent = String(message ?? "");
+    container.appendChild(toast);
+    window.setTimeout(() => {
+      toast.style.opacity = "0";
+      toast.style.transform = "translateY(8px)";
+      toast.style.transition = "opacity .3s, transform .3s";
+      window.setTimeout(() => toast.remove(), 300);
+    }, Math.max(0, Number(duration) || 3500));
+  };
+
+  /* Lazy images: mantém compatibilidade com elementos que usam data-src. */
+  const lazyImages = Array.from(document.querySelectorAll('img[loading="lazy"][data-src]'));
+  observeOrShow(lazyImages, { rootMargin: "100px" }, (img) => {
+    if (img.dataset.src) {
+      img.src = img.dataset.src;
+      img.removeAttribute("data-src");
+    }
+  });
+
+  /* Tema dark/light, com tratamento para armazenamento bloqueado. */
+  (function initThemeToggle() {
+    const themeButton = document.getElementById("themeToggle");
+    const icon = document.getElementById("themeIcon");
+    let saved = "dark";
+    try {
+      saved = localStorage.getItem("jm_theme") || "dark";
+    } catch (_) { /* armazenamento pode estar bloqueado */ }
+    if (!['dark', 'light'].includes(saved)) saved = "dark";
+
+    function applyTheme(theme, notify = false) {
+      root.dataset.theme = theme;
+      if (icon) icon.className = theme === "dark" ? "fas fa-moon" : "fas fa-sun";
+      themeButton?.setAttribute("aria-label", theme === "dark" ? "Activar tema claro" : "Activar tema escuro");
+      try { localStorage.setItem("jm_theme", theme); } catch (_) { /* sem persistência */ }
+      if (notify && window.showToast) {
+        window.showToast(`Tema ${theme === "dark" ? "escuro" : "claro"} activado`, "info", 2000);
+      }
+    }
+
+    applyTheme(saved);
+    themeButton?.addEventListener("click", () => {
+      applyTheme(root.dataset.theme === "dark" ? "light" : "dark", true);
+    });
+  })();
+
+  /* Debounce global. */
+  window.debounce = function debounce(fn, wait = 200) {
+    let timer;
+    return (...args) => {
+      window.clearTimeout(timer);
+      timer = window.setTimeout(() => fn(...args), Math.max(0, Number(wait) || 0));
+    };
+  };
+})();

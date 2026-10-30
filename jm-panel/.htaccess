@@ -1,48 +1,54 @@
-# ══════════════════════════════════════════════
+# ══════════════════════════════════════════════════════════════
 # JMbenga Portfolio v1.0 — .htaccess PAINEL ADMIN
 # Localização: /jm-panel/.htaccess
-# NOTA: As rotas aqui NÃO têm o prefixo "jm-panel/"
-#       porque o RewriteBase já o define.
-# ══════════════════════════════════════════════
+#
+# Ambiente local actual:
+#   /portfolio-jmbenga/jm-panel/
+# Em produção, se o painel estiver em /jm-panel/, usar:
+#   RewriteBase /jm-panel/
+# ══════════════════════════════════════════════════════════════
 
 Options -Indexes
 RewriteEngine On
-# RewriteBase /portfolio-jmbenga/jm-panel/
- RewriteBase /jm-panel/
+RewriteBase /portfolio-jmbenga/jm-panel/
+# RewriteBase /jm-panel/
 
-# Servir ficheiros e pastas reais directamente
+# ── Bloquear ficheiros/directórios internos ANTES da regra -f/-d ──
+# Se estas regras ficarem depois da verificação de ficheiros reais,
+# o acesso directo aos ficheiros existentes pode contorná-las.
+RewriteRule ^(?:include|pages/manager/include)(?:/|$) - [F,L,NC]
+
+# A raiz do painel deve abrir o dashboard antes do teste -d,
+# porque a própria pasta /jm-panel/ é um directório real.
+RewriteRule ^$ home.php [L,QSA]
+
+# Servir os restantes ficheiros e pastas reais directamente.
 RewriteCond %{REQUEST_FILENAME} -f [OR]
 RewriteCond %{REQUEST_FILENAME} -d
 RewriteRule ^ - [L]
 
-# ── Redirecionar raiz e sistema ──────────────
-RewriteRule ^$ home.php [L]
-RewriteRule ^include/  - [F,L]
-RewriteRule ^pages/manager/include/ - [F,L]
-
-# ── AUTH ──────────────────────────────────────
-RewriteRule ^(entrar|login)/?$                auth/login.php [L]
+# ── AUTH ─────────────────────────────────────────────────────────
+RewriteRule ^(entrar|login)/?$ auth/login.php [L,QSA]
 RewriteRule ^(logout|lockscreen|forgot-password|reset-password)/?$ auth/$1.php [L,QSA]
 RewriteRule ^(login|lockscreen|forgot-password|reset-password)-process/?$ auth/$1-process.php [L,QSA]
-RewriteRule ^invite/accept/?$                 auth/invite-accept.php [L,QSA]
+RewriteRule ^invite/accept/?$ auth/invite-accept.php [L,QSA]
 
-# ── DASHBOARD & PERFIL ────────────────────────
-RewriteRule ^home/?$                          home.php [L]
-RewriteRule ^profile/?$                       pages/profile/profile.php [L]
-RewriteRule ^profile-process/?$               pages/profile/profile-process.php [L]
-RewriteRule ^profile/change-password(-process)?/?$ pages/profile/change-password$1.php [L]
+# ── DASHBOARD & PERFIL ───────────────────────────────────────────
+RewriteRule ^home/?$ home.php [L]
+RewriteRule ^profile/?$ pages/profile/profile.php [L,QSA]
+RewriteRule ^profile-process/?$ pages/profile/profile-process.php [L,QSA]
+RewriteRule ^profile/change-password(-process)?/?$ pages/profile/change-password$1.php [L,QSA]
 
-# ── Mapeamento de Categorias (Dinâmico) ───────
-# Regra 1: categoria/ -> pages/categoria/all-categoria.php
+# ── Categorias com páginas de listagem ───────────────────────────
 RewriteRule ^(projects|skills|testimonials|faq|feedback|visitors)/?$ pages/$1/all-$1.php [L,QSA]
 
-# Regra 2: Excepções de "all"
-RewriteRule ^messages/?$                      pages/messages/inbox.php [L,QSA]
-RewriteRule ^analytics/?$                     pages/analytics/analytics.php [L,QSA]
-RewriteRule ^security/?$                      pages/security/security.php [L,QSA]
-RewriteRule ^settings/?$                      pages/settings/config.php [L,QSA]
+# ── Rotas especiais ──────────────────────────────────────────────
+RewriteRule ^messages/?$ pages/messages/inbox.php [L,QSA]
+RewriteRule ^analytics/?$ pages/analytics/analytics.php [L,QSA]
+RewriteRule ^security/?$ pages/security/security.php [L,QSA]
+RewriteRule ^settings/?$ pages/settings/config.php [L,QSA]
 
-# Regra 3: categoria/accao -> pages/categoria/accao.php
-# Esta regra substitui centenas de linhas para add, edit, delete, process, etc.
-RewriteCond %{REQUEST_URI} !^/jm-panel/auth/
-RewriteRule ^([^/]+)/([^/]+)/?$               pages/$1/$2.php [L,QSA]
+# ── Rotas categoria/acção ────────────────────────────────────────
+# Evita encaminhar URLs sob /auth/ para o mapeamento genérico.
+RewriteCond %{REQUEST_URI} !/jm-panel/auth/ [NC]
+RewriteRule ^([^/]+)/([^/]+)/?$ pages/$1/$2.php [L,QSA]

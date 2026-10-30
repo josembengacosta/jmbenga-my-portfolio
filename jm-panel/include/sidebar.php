@@ -1,177 +1,304 @@
 <?php
-// ── Detecção de rota activa ─────────────────────────────────
-$_currentPath = parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH);
+declare(strict_types=1);
 
-function navActive(string ...$segments): string
-{
-    global $_currentPath;
-    foreach ($segments as $seg) {
-        if (str_contains($_currentPath, $seg)) return ' active';
+// ── Detecção robusta da rota activa ─────────────────────────────
+$requestUri = isset($_SERVER['REQUEST_URI']) && is_string($_SERVER['REQUEST_URI'])
+    ? $_SERVER['REQUEST_URI']
+    : '/';
+$parsedPath = parse_url($requestUri, PHP_URL_PATH);
+$currentPath = is_string($parsedPath) && $parsedPath !== ''
+    ? '/' . trim($parsedPath, '/')
+    : '/';
+
+// Correspondência por segmentos: evita que, por exemplo, "my-projects-old"
+// seja considerado a rota "/projects". Também funciona com BASE_URL em subpasta.
+$navMatches = static function (array $segments) use ($currentPath): bool {
+    $pathForMatch = trim($currentPath, '/');
+
+    foreach ($segments as $segment) {
+        if (!is_string($segment) || trim($segment, '/') === '') {
+            continue;
+        }
+
+        $needle = trim($segment, '/');
+        $pattern = '~(?:^|/)' . preg_quote($needle, '~') . '(?:/|$)~';
+
+        if (preg_match($pattern, $pathForMatch) === 1) {
+            return true;
+        }
     }
-    return '';
-}
-function navOpen(array $segments): string
-{
-    global $_currentPath;
-    foreach ($segments as $seg) {
-        if (str_contains($_currentPath, $seg)) return ' open';
+
+    return false;
+};
+
+$navActive = static fn(array|string $segments): string =>
+    $navMatches(is_array($segments) ? $segments : [$segments]) ? ' active' : '';
+
+$navOpen = static fn(array $segments): string =>
+    $navMatches($segments) ? ' open' : '';
+
+$adminBase = rtrim((string) BASE_URL, '/') . '/jm-panel';
+
+/*
+ * Os contadores do menu não podem depender de variáveis definidas apenas
+ * no dashboard ou na página de analytics. Quando a página atual ainda não
+ * calculou esses valores, obtê-los aqui para manter os badges consistentes
+ * em todo o painel (Mensagens, FAQ, Projectos, etc.).
+ *
+ * Se uma página já tiver calculado um valor, preservá-lo para evitar
+ * sobrescrever dados específicos dessa página.
+ */
+$sidebarDb = $GLOBALS['pdo'] ?? null;
+
+if ($sidebarDb instanceof PDO) {
+    if (!isset($totalProjects) || !is_numeric($totalProjects)) {
+        try {
+            $totalProjects = (int) $sidebarDb
+                ->query("SELECT COUNT(*) FROM _projects WHERE status_project = 'published'")
+                ->fetchColumn();
+        } catch (Throwable $e) {
+            $totalProjects = 0;
+            error_log('[ADMIN SIDEBAR] Não foi possível carregar o contador de projectos: ' . $e->getMessage());
+        }
     }
-    return '';
+
+    if (!isset($unreadMessages) || !is_numeric($unreadMessages)) {
+        try {
+            $unreadMessages = (int) $sidebarDb
+                ->query("SELECT COUNT(*) FROM _contact_message WHERE status_msg = 'new'")
+                ->fetchColumn();
+        } catch (Throwable $e) {
+            $unreadMessages = 0;
+            error_log('[ADMIN SIDEBAR] Não foi possível carregar o contador de mensagens: ' . $e->getMessage());
+        }
+    }
+
+    if (!isset($onlineVisitors) || !is_numeric($onlineVisitors)) {
+        try {
+            $onlineVisitors = (int) $sidebarDb
+                ->query("SELECT COUNT(*) FROM _visitor WHERE is_online = 1")
+                ->fetchColumn();
+        } catch (Throwable $e) {
+            $onlineVisitors = 0;
+            error_log('[ADMIN SIDEBAR] Não foi possível carregar o contador de visitantes online: ' . $e->getMessage());
+        }
+    }
 }
+
+$totalProjectsBadge = max(0, (int) ($totalProjects ?? 0));
+$unreadMessagesBadge = max(0, (int) ($unreadMessages ?? 0));
+$onlineVisitorsBadge = max(0, (int) ($onlineVisitors ?? 0));
+
+$contentRoutes = ['/projects', '/skills', '/testimonials', '/faq'];
+$communicationRoutes = ['/messages', '/feedback'];
+$systemRoutes = ['/settings', '/security', '/profile'];
+$contentOpen = $navMatches($contentRoutes);
+$communicationOpen = $navMatches($communicationRoutes);
+$systemOpen = $navMatches($systemRoutes);
 ?>
-<aside class="sidebar" id="sidebar">
 
-    <!-- Brand -->
-    <a href="<?= BASE_URL ?>/jm-panel/home" class="sidebar-brand">
-        <span class="sidebar-brand-icon"><i class="fas fa-chart-pie"></i></span>
+<aside class="sidebar" id="sidebar" aria-label="Navegação administrativa">
+
+    <!-- Marca -->
+    <a href="<?= e($adminBase) ?>/home" class="sidebar-brand">
+        <span class="sidebar-brand-icon"><i class="fas fa-chart-pie" aria-hidden="true"></i></span>
         <span>J<span class="brand-accent">Mbenga</span></span>
     </a>
 
-    <nav class="sidebar-nav">
+    <nav class="sidebar-nav" aria-label="Menu principal">
 
         <!-- Dashboard -->
-        <a href="<?= BASE_URL ?>/jm-panel/home" class="nav-item<?= navActive('/jm-panel/home') ?>">
-            <i class="fas fa-home"></i>
+        <a href="<?= e($adminBase) ?>/home" class="nav-item<?= $navActive('/jm-panel/home') ?>">
+            <i class="fas fa-home" aria-hidden="true"></i>
             <span>Dashboard</span>
         </a>
 
-        <!-- ── CONTEÚDO ─────────────────────────────── -->
+        <!-- Conteúdo -->
         <div class="nav-section-label">Conteúdo</div>
 
         <div class="nav-group">
-            <div class="nav-item<?= navOpen(['/projects', '/skills', '/testimonials', '/faq']) ?>"
-                data-submenu="content-sub">
-                <i class="fas fa-folder-open"></i>
+            <div class="nav-item<?= $contentOpen ? ' open' : '' ?>" role="button" tabindex="0"
+                data-submenu="content-sub" aria-controls="content-sub"
+                aria-expanded="<?= $contentOpen ? 'true' : 'false' ?>">
+                <i class="fas fa-folder-open" aria-hidden="true"></i>
                 <span>Conteúdo</span>
-                <i class="fas fa-chevron-right arrow"></i>
+                <i class="fas fa-chevron-right arrow" aria-hidden="true"></i>
             </div>
-            <div class="submenu<?= navOpen(['/projects', '/skills', '/testimonials', '/faq']) ? ' open' : '' ?>"
-                id="content-sub">
-                <a href="<?= BASE_URL ?>/jm-panel/projects" class="<?= navActive('/projects') ?>">
-                    <i class="fas fa-briefcase"></i>
-                    Projectos
-                    <span class="badge"><?= $totalProjects ?? 0 ?></span>
+            <div class="submenu<?= $contentOpen ? ' open' : '' ?>" id="content-sub">
+                <a href="<?= e($adminBase) ?>/projects" class="<?= trim($navActive('/projects')) ?>">
+                    <i class="fas fa-briefcase" aria-hidden="true"></i>
+                    <span>Projectos</span>
+                    <span class="badge"><?= $totalProjectsBadge ?></span>
                 </a>
-                <a href="<?= BASE_URL ?>/jm-panel/skills" class="<?= navActive('/skills') ?>">
-                    <i class="fas fa-code"></i>
-                    Skills
+                <a href="<?= e($adminBase) ?>/skills" class="<?= trim($navActive('/skills')) ?>">
+                    <i class="fas fa-code" aria-hidden="true"></i>
+                    <span>Skills</span>
                 </a>
-                <a href="<?= BASE_URL ?>/jm-panel/testimonials" class="<?= navActive('/testimonials') ?>">
-                    <i class="fas fa-star"></i>
-                    Depoimentos
+                <a href="<?= e($adminBase) ?>/testimonials" class="<?= trim($navActive('/testimonials')) ?>">
+                    <i class="fas fa-star" aria-hidden="true"></i>
+                    <span>Depoimentos</span>
                 </a>
-                <a href="<?= BASE_URL ?>/jm-panel/faq" class="<?= navActive('/faq') ?>">
-                    <i class="fas fa-circle-question"></i>
-                    FAQ
+                <a href="<?= e($adminBase) ?>/faq" class="<?= trim($navActive('/faq')) ?>">
+                    <i class="fas fa-circle-question" aria-hidden="true"></i>
+                    <span>FAQ</span>
                 </a>
             </div>
         </div>
 
-        <!-- ── COMUNICAÇÃO ──────────────────────────── -->
+        <!-- Comunicação -->
         <div class="nav-section-label">Comunicação</div>
 
         <div class="nav-group">
-            <div class="nav-item<?= navOpen(['/messages', '/feedback']) ?>" data-submenu="comm-sub">
-                <i class="fas fa-comments"></i>
+            <div class="nav-item<?= $communicationOpen ? ' open' : '' ?>" role="button" tabindex="0"
+                data-submenu="comm-sub" aria-controls="comm-sub"
+                aria-expanded="<?= $communicationOpen ? 'true' : 'false' ?>">
+                <i class="fas fa-comments" aria-hidden="true"></i>
                 <span>Comunicação</span>
-                <i class="fas fa-chevron-right arrow"></i>
+                <i class="fas fa-chevron-right arrow" aria-hidden="true"></i>
             </div>
-            <div class="submenu<?= navOpen(['/messages', '/feedback']) ? ' open' : '' ?>" id="comm-sub">
-                <a href="<?= BASE_URL ?>/jm-panel/messages" class="<?= navActive('/messages') ?>">
-                    <i class="fas fa-envelope"></i>
-                    Mensagens
-                    <?php if (($unreadMessages ?? 0) > 0): ?>
-                    <span class="badge"><?= $unreadMessages ?></span>
+            <div class="submenu<?= $communicationOpen ? ' open' : '' ?>" id="comm-sub">
+                <a href="<?= e($adminBase) ?>/messages" class="<?= trim($navActive('/messages')) ?>">
+                    <i class="fas fa-envelope" aria-hidden="true"></i>
+                    <span>Mensagens</span>
+                    <?php if ($unreadMessagesBadge > 0): ?>
+                    <span class="badge"><?= $unreadMessagesBadge ?></span>
                     <?php endif; ?>
                 </a>
-                <a href="<?= BASE_URL ?>/jm-panel/feedback" class="<?= navActive('/feedback') ?>">
-                    <i class="fas fa-comment-dots"></i>
-                    Feedback
+                <a href="<?= e($adminBase) ?>/feedback" class="<?= trim($navActive('/feedback')) ?>">
+                    <i class="fas fa-comment-dots" aria-hidden="true"></i>
+                    <span>Feedback</span>
                 </a>
             </div>
         </div>
 
-        <!-- ── ANALÍTICA ─────────────────────────────── -->
+        <!-- Analítica -->
         <div class="nav-section-label">Analítica</div>
 
-        <a href="<?= BASE_URL ?>/jm-panel/visitors" class="nav-item<?= navActive('/visitors') ?>">
-            <i class="fas fa-users"></i>
+        <a href="<?= e($adminBase) ?>/visitors" class="nav-item<?= $navActive('/visitors') ?>">
+            <i class="fas fa-users" aria-hidden="true"></i>
             <span>Visitantes</span>
-            <?php if (($onlineVisitors ?? 0) > 0): ?>
-            <span class="badge badge-success"><?= $onlineVisitors ?></span>
+            <?php if ($onlineVisitorsBadge > 0): ?>
+            <span class="badge badge-success"><?= $onlineVisitorsBadge ?></span>
             <?php endif; ?>
         </a>
 
-        <a href="<?= BASE_URL ?>/jm-panel/analytics" class="nav-item<?= navActive('/analytics') ?>">
-            <i class="fas fa-chart-line"></i>
+        <a href="<?= e($adminBase) ?>/analytics" class="nav-item<?= $navActive('/analytics') ?>">
+            <i class="fas fa-chart-line" aria-hidden="true"></i>
             <span>Analytics</span>
         </a>
 
-        <!-- ── SISTEMA ────────────────────────────────── -->
+        <!-- Sistema -->
         <div class="nav-section-label">Sistema</div>
 
         <div class="nav-group">
-            <div class="nav-item<?= navOpen(['/settings', '/security', '/profile']) ?>" data-submenu="sys-sub">
-                <i class="fas fa-cog"></i>
+            <div class="nav-item<?= $systemOpen ? ' open' : '' ?>" role="button" tabindex="0" data-submenu="sys-sub"
+                aria-controls="sys-sub" aria-expanded="<?= $systemOpen ? 'true' : 'false' ?>">
+                <i class="fas fa-cog" aria-hidden="true"></i>
                 <span>Sistema</span>
-                <i class="fas fa-chevron-right arrow"></i>
+                <i class="fas fa-chevron-right arrow" aria-hidden="true"></i>
             </div>
-            <div class="submenu<?= navOpen(['/settings', '/security', '/profile']) ? ' open' : '' ?>" id="sys-sub">
-                <a href="<?= BASE_URL ?>/jm-panel/settings" class="<?= navActive('/settings') ?>">
-                    <i class="fas fa-sliders-h"></i>
-                    Configurações
+            <div class="submenu<?= $systemOpen ? ' open' : '' ?>" id="sys-sub">
+                <a href="<?= e($adminBase) ?>/settings" class="<?= trim($navActive('/settings')) ?>">
+                    <i class="fas fa-sliders-h" aria-hidden="true"></i>
+                    <span>Configurações</span>
                 </a>
-                <a href="<?= BASE_URL ?>/jm-panel/security" class="<?= navActive('/security') ?>">
-                    <i class="fas fa-shield-alt"></i>
-                    Segurança
+                <a href="<?= e($adminBase) ?>/security" class="<?= trim($navActive('/security')) ?>">
+                    <i class="fas fa-shield-alt" aria-hidden="true"></i>
+                    <span>Segurança</span>
                 </a>
-                <a href="<?= BASE_URL ?>/jm-panel/profile" class="<?= navActive('/profile') ?>">
-                    <i class="fas fa-user-circle"></i>
-                    Meu Perfil
+                <a href="<?= e($adminBase) ?>/profile" class="<?= trim($navActive('/profile')) ?>">
+                    <i class="fas fa-user-circle" aria-hidden="true"></i>
+                    <span>Meu Perfil</span>
                 </a>
             </div>
         </div>
 
-        <!-- Terminar Sessão -->
+        <!-- Terminar sessão -->
         <a href="#" class="nav-item nav-logout" id="sidebarLogoutBtn">
-            <i class="fas fa-sign-out-alt"></i>
+            <i class="fas fa-sign-out-alt" aria-hidden="true"></i>
             <span>Terminar Sessão</span>
         </a>
 
     </nav>
 
-    <!-- Footer da sidebar -->
     <div class="sidebar-footer">
-        <span class="status-dot"></span>
+        <span class="status-dot" aria-hidden="true"></span>
         <span>Sistema operacional</span>
-        <span style="margin-left:auto;font-family:var(--font-mono);font-size:.65rem;opacity:.6">v2.0</span>
+        <span class="sidebar-version">v2.0</span>
     </div>
-
 </aside>
 
-<script>
-document.addEventListener('DOMContentLoaded', function() {
-    var groups = document.querySelectorAll('.nav-item[data-submenu]');
-    groups.forEach(function(item) {
-        var id = item.dataset.submenu;
-        var sub = document.getElementById(id);
-        if (!sub) return;
+<style>
+.sidebar .nav-item[role="button"]:focus-visible,
+.sidebar .submenu a:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+}
+</style>
 
-        if (!sub.classList.contains('open')) {
-            var saved = localStorage.getItem('jm_sub_' + id);
-            if (saved === '1') {
-                sub.classList.add('open');
+<script>
+(function() {
+    'use strict';
+
+    function safeStorageGet(key) {
+        try {
+            return window.localStorage.getItem(key);
+        } catch (error) {
+            return null;
+        }
+    }
+
+    function safeStorageSet(key, value) {
+        try {
+            window.localStorage.setItem(key, value);
+        } catch (error) {
+            // A navegação continua funcional mesmo quando o armazenamento é bloqueado.
+        }
+    }
+
+    function initialiseSidebars() {
+        var groups = document.querySelectorAll('.sidebar .nav-item[data-submenu]');
+
+        groups.forEach(function(item) {
+            var submenuId = item.getAttribute('data-submenu');
+            var submenu = submenuId ? document.getElementById(submenuId) : null;
+            if (!submenu) return;
+
+            var storageKey = 'jm_sub_' + submenuId;
+            var isOpen = submenu.classList.contains('open');
+
+            if (!isOpen && safeStorageGet(storageKey) === '1') {
+                isOpen = true;
+                submenu.classList.add('open');
                 item.classList.add('open');
             }
-        } else {
-            item.classList.add('open');
-        }
 
-        item.addEventListener('click', function() {
-            var isOpen = sub.classList.toggle('open');
-            item.classList.toggle('open', isOpen);
-            localStorage.setItem('jm_sub_' + id, isOpen ? '1' : '0');
+            item.setAttribute('aria-expanded', isOpen ? 'true' : 'false');
+
+            function toggleSubmenu() {
+                var nextOpen = !submenu.classList.contains('open');
+                submenu.classList.toggle('open', nextOpen);
+                item.classList.toggle('open', nextOpen);
+                item.setAttribute('aria-expanded', nextOpen ? 'true' : 'false');
+                safeStorageSet(storageKey, nextOpen ? '1' : '0');
+            }
+
+            item.addEventListener('click', toggleSubmenu);
+            item.addEventListener('keydown', function(event) {
+                if (event.key === 'Enter' || event.key === ' ') {
+                    event.preventDefault();
+                    toggleSubmenu();
+                }
+            });
         });
-    });
-});
+    }
+
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', initialiseSidebars, {
+            once: true
+        });
+    } else {
+        initialiseSidebars();
+    }
+})();
 </script>

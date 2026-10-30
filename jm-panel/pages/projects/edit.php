@@ -4,6 +4,32 @@
 // ══════════════════════════════════════════════════════════════
 require_once __DIR__ . '/../../include/functions_admin.php';
 
+// Usa MAX_UPLOAD_SIZE quando configurado; caso contrário, respeita os limites PHP.
+if (!defined('MAX_UPLOAD_SIZE')) {
+    $jmbengaIniSizeToBytes = static function (string $value): int {
+        $value = trim($value);
+        if ($value === '' || !preg_match('/^([0-9]+(?:\.[0-9]+)?)\s*([KMG]?)B?$/i', $value, $matches)) {
+            return 0;
+        }
+        $number = (float) $matches[1];
+        $unit = strtoupper($matches[2] ?? '');
+        $factor = match ($unit) {
+            'G' => 1024 ** 3,
+            'M' => 1024 ** 2,
+            'K' => 1024,
+            default => 1,
+        };
+        return (int) min(PHP_INT_MAX, round($number * $factor));
+    };
+    $uploadLimit = $jmbengaIniSizeToBytes((string) ini_get('upload_max_filesize'));
+    $postLimit = $jmbengaIniSizeToBytes((string) ini_get('post_max_size'));
+    if ($postLimit > 262144) {
+        $postLimit -= 262144;
+    }
+    $limits = array_values(array_filter([$uploadLimit, $postLimit], static fn (int $size): bool => $size > 0));
+    define('MAX_UPLOAD_SIZE', $limits ? min($limits) : 5 * 1024 * 1024);
+}
+
 startAdminSession();
 checkAdminRememberMe();
 requireAdminLogin();
@@ -64,12 +90,22 @@ if (empty($formData)) {
     $formData = $project;
 }
 
-// Tech stack
+// Tech stack: aceita JSON armazenado na base de dados ou um array recuperado da sessão.
 $techArray = [];
-if (!empty($formData['tech_stack'])) {
-    $decoded = json_decode($formData['tech_stack'], true);
-    if (is_array($decoded)) $techArray = $decoded;
+$rawTechStack = $formData['tech_stack'] ?? '';
+if (is_array($rawTechStack)) {
+    $techArray = array_values(array_filter($rawTechStack, static fn ($item): bool => is_string($item)));
+} elseif (is_string($rawTechStack) && $rawTechStack !== '') {
+    $decoded = json_decode($rawTechStack, true);
+    if (is_array($decoded)) {
+        $techArray = array_values(array_filter($decoded, static fn ($item): bool => is_string($item)));
+    }
 }
+$techStackJson = json_encode($techArray, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_AMP | JSON_HEX_QUOT);
+if (!is_string($techStackJson)) {
+    $techStackJson = '[]';
+}
+$currentCover = basename((string) ($project['cover_project'] ?? ''));
 ?>
 <!DOCTYPE html>
 <html lang="pt" data-theme="dark" data-base-url="<?= BASE_URL ?>">
@@ -83,7 +119,7 @@ if (!empty($formData['tech_stack'])) {
     <div class="main">
         <?php include __DIR__ . '/../../include/header.php'; ?>
 
-        <div class="content">
+        <div class="content project-form-page">
 
             <!-- ═══ CABEÇALHO + BREADCRUMB ════════════════════════════════ -->
             <div class="page-top">
@@ -125,9 +161,10 @@ if (!empty($formData['tech_stack'])) {
             <?php endif; ?>
 
             <!-- ═══ FORMULÁRIO ════════════════════════════════════════════ -->
-            <form id="projectForm" novalidate data-api="<?= BASE_URL ?>/jm-panel/projects/edit-process">
+            <form id="projectForm" novalidate data-api="<?= e(BASE_URL) ?>/jm-panel/pages/projects/edit-process.php">
 
-                <input type="hidden" name="csrf_token" id="csrf_token" value="<?= $_SESSION['admin_csrf_token'] ?>">
+                <input type="hidden" name="csrf_token" id="csrf_token"
+                    value="<?= e((string) ($_SESSION['admin_csrf_token'] ?? '')) ?>">
                 <input type="hidden" name="id_project" value="<?= $editId ?>">
 
                 <!-- ═══ SECÇÃO 1 — INFORMAÇÕES BÁSICAS ════════════════════ -->
@@ -135,8 +172,8 @@ if (!empty($formData['tech_stack'])) {
                     <div class="section-header">
                         <span class="section-icon"><i class="fas fa-info-circle"></i></span>
                         <div>
-                            <h3>Informações Básicas</h3>
-                            <p>Título, slug, categoria e estado do projecto.</p>
+                            <h3>Informação principal e publicação</h3>
+                            <p>Título, slug, categoria e estado público do projecto.</p>
                         </div>
                     </div>
                     <div class="form-grid">
@@ -236,11 +273,13 @@ if (!empty($formData['tech_stack'])) {
                         <div class="form-group">
                             <label class="form-label" for="display_order">Ordem de Exibição</label>
                             <div class="number-input">
-                                <button type="button" class="num-btn" onclick="changeOrder(-1)">−</button>
+                                <button type="button" class="num-btn" id="orderDownBtn"
+                                    aria-label="Diminuir ordem">−</button>
                                 <input type="number" id="display_order" name="display_order"
                                     class="form-control num-field" value="<?= $formData['display_order'] ?? 0 ?>"
                                     min="0">
-                                <button type="button" class="num-btn" onclick="changeOrder(1)">+</button>
+                                <button type="button" class="num-btn" id="orderUpBtn"
+                                    aria-label="Aumentar ordem">+</button>
                             </div>
                         </div>
                     </div>
@@ -251,8 +290,9 @@ if (!empty($formData['tech_stack'])) {
                     <div class="section-header">
                         <span class="section-icon"><i class="fas fa-align-left"></i></span>
                         <div>
-                            <h3>Conteúdo</h3>
-                            <p>Resumo curto e descrição completa do projecto.</p>
+                            <h3>Estudo de caso</h3>
+                            <p>Resumo, objectivos, funcionalidades, descrição e contributo técnico. Use texto simples.
+                            </p>
                         </div>
                     </div>
                     <div class="form-grid">
@@ -267,7 +307,24 @@ if (!empty($formData['tech_stack'])) {
                         <div class="form-group full-width">
                             <label class="form-label" for="body_project">Descrição Completa</label>
                             <textarea id="body_project" name="body_project" class="form-control textarea-lg" rows="8"
+                                maxlength="20000"
                                 placeholder="Descrição detalhada do projecto..."><?= e($formData['body_project'] ?? '') ?></textarea>
+                            <span class="form-hint">Texto simples, sem HTML. As quebras de linha são preservadas.</span>
+                        </div>
+                        <div class="form-group full-width"><label class="form-label"
+                                for="objectives_project">Objectivos</label><textarea id="objectives_project"
+                                name="objectives_project" class="form-control" rows="4" maxlength="10000"
+                                placeholder="Que necessidade ou objectivo este projecto aborda?"><?= e($formData['objectives_project'] ?? '') ?></textarea>
+                        </div>
+                        <div class="form-group full-width"><label class="form-label"
+                                for="features_project">Funcionalidades</label><textarea id="features_project"
+                                name="features_project" class="form-control" rows="4" maxlength="10000"
+                                placeholder="Descreve as funcionalidades implementadas, uma por linha se preferires."><?= e($formData['features_project'] ?? '') ?></textarea>
+                        </div>
+                        <div class="form-group full-width"><label class="form-label"
+                                for="contribution_project">Contributo técnico</label><textarea id="contribution_project"
+                                name="contribution_project" class="form-control" rows="4" maxlength="10000"
+                                placeholder="Descreve o teu contributo técnico neste projecto."><?= e($formData['contribution_project'] ?? '') ?></textarea>
                         </div>
                     </div>
                 </div>
@@ -277,7 +334,7 @@ if (!empty($formData['tech_stack'])) {
                     <div class="section-header">
                         <span class="section-icon"><i class="fas fa-code"></i></span>
                         <div>
-                            <h3>Tech Stack</h3>
+                            <h3>Tecnologias</h3>
                             <p>Adiciona as tecnologias utilizadas no projecto.</p>
                         </div>
                     </div>
@@ -286,9 +343,9 @@ if (!empty($formData['tech_stack'])) {
                             <?php foreach ($techArray as $tag): ?>
                             <span class="tag-item">
                                 <i class="fas fa-code"></i>
-                                <span><?= e($tag) ?></span>
-                                <button type="button" class="tag-remove"
-                                    onclick="this.parentElement.remove();updateHiddenTech()">
+                                <span class="tag-text"><?= e($tag) ?></span>
+                                <button type="button" class="tag-remove" data-remove-tech
+                                    aria-label="Remover tecnologia <?= e((string) $tag) ?>">
                                     <i class="fas fa-times"></i>
                                 </button>
                             </span>
@@ -300,12 +357,11 @@ if (!empty($formData['tech_stack'])) {
                                 <input type="text" id="tagInput" class="form-control"
                                     placeholder="Ex: PHP, React, Node.js..." style="padding-left:2.5rem">
                             </div>
-                            <button type="button" class="btn btn-secondary" onclick="addTag()">
+                            <button type="button" class="btn btn-secondary" id="addTagBtn">
                                 <i class="fas fa-plus"></i> Adicionar
                             </button>
                         </div>
-                        <input type="hidden" name="tech_stack" id="techStackHidden"
-                            value='<?= e($formData['tech_stack'] ?? '[]') ?>'>
+                        <input type="hidden" name="tech_stack" id="techStackHidden" value='<?= e($techStackJson) ?>'>
                     </div>
                 </div>
 
@@ -314,8 +370,8 @@ if (!empty($formData['tech_stack'])) {
                     <div class="section-header">
                         <span class="section-icon"><i class="fas fa-link"></i></span>
                         <div>
-                            <h3>Links do Projecto</h3>
-                            <p>URLs para demonstração, repositório e site ao vivo.</p>
+                            <h3>Links independentes</h3>
+                            <p>URLs externos da demonstração, do repositório e do site ao vivo.</p>
                         </div>
                     </div>
                     <div class="form-grid-3">
@@ -346,36 +402,71 @@ if (!empty($formData['tech_stack'])) {
 
                 <!-- ═══ SECÇÃO 6 — IMAGEM DE CAPA ═════════════════════════ -->
                 <div class="form-section">
+                    <div class="section-header"><span class="section-icon"><i class="fas fa-desktop"></i></span>
+                        <div>
+                            <h3>Demonstração configurada</h3>
+                            <p>Define o modo, a disponibilidade e o destino da demonstração gerida pelo preview.</p>
+                        </div>
+                    </div>
+                    <div class="form-grid-3">
+                        <div class="form-group"><label class="form-label" for="preview_mode">Modo</label><select
+                                id="preview_mode" name="preview_mode" class="form-control">
+                                <option value="disabled"
+                                    <?= ($formData['preview_mode'] ?? 'disabled') === 'disabled' ? 'selected' : '' ?>>
+                                    Desactivado</option>
+                                <option value="external_embed"
+                                    <?= ($formData['preview_mode'] ?? '') === 'external_embed' ? 'selected' : '' ?>>URL
+                                    externa incorporada</option>
+                                <option value="external_link"
+                                    <?= ($formData['preview_mode'] ?? '') === 'external_link' ? 'selected' : '' ?>>URL
+                                    externa, abrir separadamente</option>
+                                <option value="internal"
+                                    <?= ($formData['preview_mode'] ?? '') === 'internal' ? 'selected' : '' ?>>
+                                    Demonstração estática interna</option>
+                                <option value="gallery"
+                                    <?= ($formData['preview_mode'] ?? '') === 'gallery' ? 'selected' : '' ?>>Galeria
+                                    visual</option>
+                            </select></div>
+                        <div class="form-group"><label class="form-label" for="preview_url">URL / caminho</label><input
+                                type="text" id="preview_url" name="preview_url" class="form-control"
+                                value="<?= e($formData['preview_url'] ?? '') ?>"
+                                placeholder="https://demo.example.com ou /demos/project/index.html"></div>
+                        <div class="form-group"><label class="form-label"><input type="checkbox" name="preview_enabled"
+                                    value="1" <?= !empty($formData['preview_enabled']) ? 'checked' : '' ?>>
+                                Disponibilizar preview ao público</label></div>
+                    </div>
+                </div>
+                <div class="form-section">
                     <div class="section-header">
                         <span class="section-icon"><i class="fas fa-image"></i></span>
                         <div>
                             <h3>Imagem de Capa</h3>
                             <p>Imagem principal do projecto. Formatos: JPEG, PNG ou WebP. Máx:
-                                <?= MAX_UPLOAD_SIZE / 1024 / 1024 ?> MB. Deixa vazio para manter a actual.</p>
+                                <?= number_format(MAX_UPLOAD_SIZE / 1024 / 1024, 2, ',', '.') ?> MB. Deixa vazio para
+                                manter a actual.</p>
                         </div>
                     </div>
-                    <div class="upload-area" id="uploadArea"
-                        style="<?= !empty($project['cover_project']) ? 'border-style:solid;padding:0;' : '' ?>">
+                    <div class="upload-area<?= $currentCover !== '' ? ' has-image' : '' ?>" id="uploadArea"
+                        data-current-cover="<?= e($currentCover) ?>" tabindex="0" role="button"
+                        aria-label="Seleccionar ou substituir imagem de capa">
                         <input type="file" id="cover_project" name="cover_project"
                             accept="image/jpeg,image/png,image/webp" hidden>
                         <div class="upload-preview" id="coverPreview">
-                            <?php if (!empty($project['cover_project'])): ?>
-                            <img src="<?= BASE_URL ?>/assets/img/projects/<?= e($project['cover_project']) ?>"
+                            <?php if ($currentCover !== ''): ?>
+                            <img src="<?= e(BASE_URL) ?>/assets/img/projects/<?= e(rawurlencode($currentCover)) ?>"
                                 alt="Capa actual">
                             <?php else: ?>
                             <i class="fas fa-cloud-upload-alt upload-icon"></i>
-                            <h4>Arrasta ou clica para fazer upload</h4>
+                            <h4>Arrasta ou clica para seleccionar a capa</h4>
                             <p>JPEG, PNG ou WebP</p>
                             <?php endif; ?>
                         </div>
-                        <div class="upload-actions" id="uploadActions"
-                            style="display:<?= !empty($project['cover_project']) ? 'flex' : 'none' ?>;justify-content:center;gap:.5rem;margin-top:1rem">
-                            <button type="button" class="btn btn-secondary"
-                                onclick="document.getElementById('cover_project').click()">
+                        <div class="upload-actions<?= $currentCover !== '' ? ' is-visible' : '' ?>" id="uploadActions">
+                            <button type="button" class="btn btn-secondary" id="changeCoverBtn">
                                 <i class="fas fa-sync-alt"></i> Trocar
                             </button>
-                            <button type="button" class="btn btn-secondary" onclick="removeCover()">
-                                <i class="fas fa-trash"></i> Remover
+                            <button type="button" class="btn btn-secondary" id="restoreCoverBtn">
+                                <i class="fas fa-undo"></i> Restaurar capa actual
                             </button>
                         </div>
                     </div>
@@ -386,7 +477,7 @@ if (!empty($formData['tech_stack'])) {
                     <div class="section-header">
                         <span class="section-icon"><i class="fas fa-images"></i></span>
                         <div>
-                            <h3>Imagens do Projecto</h3>
+                            <h3>Media do projecto</h3>
                             <p>Gere as screenshots e imagens associadas.</p>
                         </div>
                         <a href="<?= BASE_URL ?>/jm-panel/projects/media?id=<?= $editId ?>" class="btn btn-secondary"
@@ -433,828 +524,385 @@ if (!empty($formData['tech_stack'])) {
 
     <?php include __DIR__ . '/../../include/modal_logout.php'; ?>
 
-    <!-- ═══ ESTILOS (idênticos aos do add.php) ══════════════════ -->
-    <style>
-    /* (manter exactamente o mesmo CSS do add.php) */
-    .breadcrumb {
-        display: flex;
-        align-items: center;
-        gap: .5rem;
-        font-size: .78rem;
-        color: var(--text-muted);
-        margin-bottom: .5rem
-    }
 
-    .breadcrumb a {
-        color: var(--text-dim);
-        text-decoration: none;
-        transition: color .2s
-    }
-
-    .breadcrumb a:hover {
-        color: var(--accent)
-    }
-
-    .breadcrumb i {
-        font-size: .6rem
-    }
-
-    .page-top {
-        display: flex;
-        justify-content: space-between;
-        align-items: flex-start;
-        flex-wrap: wrap;
-        gap: 1rem;
-        margin-bottom: 1.5rem
-    }
-
-    .page-title {
-        font-family: var(--font-head);
-        font-size: 1.5rem;
-        font-weight: 800;
-        letter-spacing: -.02em;
-        margin-bottom: .2rem
-    }
-
-    .page-sub {
-        font-size: .8rem;
-        color: var(--text-muted)
-    }
-
-    .alert {
-        padding: 1rem 1.2rem;
-        border-radius: var(--radius);
-        margin-bottom: 1.5rem;
-        display: flex;
-        align-items: flex-start;
-        gap: .75rem;
-        font-size: .85rem
-    }
-
-    .alert-danger {
-        background: rgba(239, 68, 68, .1);
-        border: 1px solid rgba(239, 68, 68, .3);
-        color: #f87171
-    }
-
-    .alert-close {
-        margin-left: auto;
-        background: none;
-        border: none;
-        color: inherit;
-        cursor: pointer;
-        opacity: .6;
-        font-size: .9rem
-    }
-
-    .alert-close:hover {
-        opacity: 1
-    }
-
-    .form-section {
-        background: var(--bg-card);
-        border: 1px solid var(--border);
-        border-radius: var(--radius-lg);
-        padding: 1.8rem;
-        margin-bottom: 1.2rem;
-        transition: border-color .25s
-    }
-
-    .form-section:focus-within {
-        border-color: var(--border-acc)
-    }
-
-    .section-header {
-        display: flex;
-        align-items: flex-start;
-        gap: 1rem;
-        margin-bottom: 1.5rem;
-        padding-bottom: 1.2rem;
-        border-bottom: 1px solid var(--border)
-    }
-
-    .section-icon {
-        width: 40px;
-        height: 40px;
-        border-radius: 10px;
-        background: var(--accent-glow);
-        border: 1px solid var(--border-acc);
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        color: var(--accent);
-        font-size: .95rem;
-        flex-shrink: 0
-    }
-
-    .section-header h3 {
-        font-family: var(--font-head);
-        font-size: 1rem;
-        font-weight: 700;
-        margin-bottom: .15rem
-    }
-
-    .section-header p {
-        font-size: .78rem;
-        color: var(--text-muted)
-    }
-
-    .form-grid {
-        display: grid;
-        grid-template-columns: 1fr 1fr;
-        gap: 1.2rem
-    }
-
-    .form-grid-3 {
-        display: grid;
-        grid-template-columns: 1fr 1fr;
-        gap: 1.2rem
-    }
-
-    .media-preview-grid {
-        display: flex;
-        gap: .5rem;
-        flex-wrap: wrap;
-        margin-top: .5rem
-    }
-
-    .media-thumb-small {
-        width: 80px;
-        height: 60px;
-        border-radius: 6px;
-        overflow: hidden;
-        border: 1px solid var(--border)
-    }
-
-    .media-thumb-small img {
-        width: 100%;
-        height: 100%;
-        object-fit: cover
-    }
-
-    .media-more {
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        width: 80px;
-        height: 60px;
-        background: var(--bg);
-        border: 1px dashed var(--border);
-        border-radius: 6px;
-        font-size: .75rem;
-        color: var(--accent);
-        text-decoration: none
-    }
-
-    .media-more:hover {
-        background: var(--accent-glow)
-    }
-
-    @media(max-width:768px) {
-
-        .form-grid,
-        .form-grid-3 {
-            grid-template-columns: 1fr
-        }
-
-        .category-select-grid {
-            grid-template-columns: repeat(3, 1fr)
-        }
-    }
-
-    @media(max-width:480px) {
-        .category-select-grid {
-            grid-template-columns: repeat(2, 1fr)
-        }
-    }
-
-    .form-group {
-        display: flex;
-        flex-direction: column;
-        gap: .35rem
-    }
-
-    .form-group.full-width {
-        grid-column: 1/-1
-    }
-
-    .form-label {
-        font-size: .75rem;
-        font-weight: 600;
-        text-transform: uppercase;
-        letter-spacing: .04em;
-        color: var(--text-dim)
-    }
-
-    .required {
-        color: var(--danger)
-    }
-
-    .form-control {
-        padding: .65rem .85rem;
-        background: var(--bg);
-        border: 1px solid var(--border);
-        border-radius: 8px;
-        color: var(--text);
-        font-family: var(--font-body);
-        font-size: .88rem;
-        outline: none;
-        transition: border-color .2s, box-shadow .2s
-    }
-
-    .form-control:focus {
-        border-color: var(--accent);
-        box-shadow: 0 0 0 3px var(--accent-glow)
-    }
-
-    .form-control::placeholder {
-        color: var(--text-muted)
-    }
-
-    .form-hint {
-        font-size: .7rem;
-        color: var(--text-muted);
-        margin-top: .15rem
-    }
-
-    .textarea-lg {
-        resize: vertical;
-        min-height: 160px;
-        line-height: 1.7
-    }
-
-    .input-with-icon {
-        position: relative;
-        display: flex;
-        align-items: center
-    }
-
-    .input-with-icon .form-control {
-        flex: 1
-    }
-
-    .input-icon-btn {
-        position: absolute;
-        right: .5rem;
-        background: none;
-        border: none;
-        color: var(--text-muted);
-        cursor: pointer;
-        font-size: .85rem;
-        padding: .3rem;
-        transition: color .2s
-    }
-
-    .input-icon-btn:hover {
-        color: var(--accent)
-    }
-
-    .input-icon-left {
-        position: absolute;
-        left: .7rem;
-        color: var(--text-muted);
-        font-size: .8rem;
-        pointer-events: none;
-        z-index: 1
-    }
-
-    .category-select-grid {
-        display: grid;
-        grid-template-columns: repeat(3, 1fr);
-        gap: .5rem
-    }
-
-    .category-option {
-        display: flex;
-        align-items: center;
-        gap: .5rem;
-        padding: .6rem .8rem;
-        border-radius: 8px;
-        border: 1px solid var(--border);
-        cursor: pointer;
-        transition: all .2s;
-        position: relative
-    }
-
-    .category-option:hover {
-        border-color: var(--border-acc)
-    }
-
-    .category-option.selected {
-        border-color: var(--cat-color);
-        background: color-mix(in srgb, var(--cat-color) 10%, transparent)
-    }
-
-    .category-option input {
-        display: none
-    }
-
-    .category-option i {
-        color: var(--cat-color);
-        font-size: .85rem;
-        width: 16px;
-        text-align: center
-    }
-
-    .category-option span {
-        font-size: .82rem;
-        font-weight: 500
-    }
-
-    .radio-group {
-        display: flex;
-        gap: .5rem;
-        flex-wrap: wrap
-    }
-
-    .radio-item input {
-        display: none
-    }
-
-    .radio-badge {
-        display: inline-flex;
-        align-items: center;
-        gap: .35rem;
-        padding: .5rem .85rem;
-        border-radius: 8px;
-        border: 1px solid var(--border);
-        font-size: .8rem;
-        font-weight: 500;
-        cursor: pointer;
-        transition: all .2s
-    }
-
-    .radio-item input:checked+.radio-badge {
-        border-color: var(--accent);
-        background: var(--accent-glow)
-    }
-
-    .radio-badge:hover {
-        border-color: var(--border-acc)
-    }
-
-    .switch {
-        display: flex;
-        align-items: center;
-        gap: .75rem;
-        cursor: pointer
-    }
-
-    .switch input {
-        display: none
-    }
-
-    .switch-slider {
-        width: 42px;
-        height: 24px;
-        border-radius: 12px;
-        background: var(--border);
-        transition: background .25s;
-        position: relative;
-        flex-shrink: 0
-    }
-
-    .switch-slider::after {
-        content: '';
-        position: absolute;
-        top: 3px;
-        left: 3px;
-        width: 18px;
-        height: 18px;
-        border-radius: 50%;
-        background: #fff;
-        transition: transform .25s
-    }
-
-    .switch input:checked+.switch-slider {
-        background: var(--accent)
-    }
-
-    .switch input:checked+.switch-slider::after {
-        transform: translateX(18px)
-    }
-
-    .switch-label {
-        font-size: .82rem;
-        font-weight: 500
-    }
-
-    .number-input {
-        display: flex;
-        align-items: center;
-        gap: .3rem
-    }
-
-    .num-btn {
-        width: 32px;
-        height: 32px;
-        border-radius: 6px;
-        background: var(--bg);
-        border: 1px solid var(--border);
-        color: var(--text-dim);
-        cursor: pointer;
-        font-size: .9rem;
-        transition: all .15s;
-        display: flex;
-        align-items: center;
-        justify-content: center
-    }
-
-    .num-btn:hover {
-        border-color: var(--accent);
-        color: var(--accent)
-    }
-
-    .num-field {
-        width: 70px;
-        text-align: center;
-        appearance: textfield
-    }
-
-    .num-field::-webkit-outer-spin-button,
-    .num-field::-webkit-inner-spin-button {
-        -webkit-appearance: none;
-        margin: 0
-    }
-
-    .tags-wrap {
-        display: flex;
-        flex-wrap: wrap;
-        gap: .5rem;
-        margin-bottom: .75rem
-    }
-
-    .tag-item {
-        display: inline-flex;
-        align-items: center;
-        gap: .4rem;
-        padding: .35rem .7rem;
-        background: rgba(37, 99, 235, .1);
-        border: 1px solid rgba(37, 99, 235, .2);
-        border-radius: 99px;
-        font-size: .78rem;
-        color: var(--accent);
-        font-family: var(--font-mono)
-    }
-
-    .tag-item i {
-        font-size: .65rem;
-        opacity: .6
-    }
-
-    .tag-remove {
-        background: none;
-        border: none;
-        color: var(--accent);
-        cursor: pointer;
-        font-size: .65rem;
-        padding: 0 0 0 .2rem;
-        opacity: .5
-    }
-
-    .tag-remove:hover {
-        opacity: 1
-    }
-
-    .tag-input-row {
-        display: flex;
-        gap: .5rem
-    }
-
-    .upload-area {
-        border: 2px dashed var(--border);
-        border-radius: var(--radius-lg);
-        padding: 2rem;
-        text-align: center;
-        cursor: pointer;
-        transition: all .25s
-    }
-
-    .upload-area:hover {
-        border-color: var(--accent);
-        background: rgba(37, 99, 235, .03)
-    }
-
-    .upload-area.has-image {
-        border-style: solid;
-        padding: 0;
-        border-radius: var(--radius-lg);
-        overflow: hidden
-    }
-
-    .upload-preview {
-        pointer-events: none
-    }
-
-    .upload-preview img {
-        width: 100%;
-        max-height: 300px;
-        object-fit: cover;
-        border-radius: var(--radius-lg);
-        display: block
-    }
-
-    .upload-icon {
-        font-size: 2.5rem;
-        color: var(--text-muted);
-        margin-bottom: .8rem
-    }
-
-    .upload-preview h4 {
-        font-family: var(--font-head);
-        font-size: 1rem;
-        margin-bottom: .2rem
-    }
-
-    .upload-preview p {
-        font-size: .8rem;
-        color: var(--text-muted)
-    }
-
-    .upload-actions {
-        display: flex;
-        gap: .5rem;
-        margin-top: 1rem;
-        justify-content: center
-    }
-
-    .btn {
-        display: inline-flex;
-        align-items: center;
-        gap: .45rem;
-        padding: .55rem 1.1rem;
-        border-radius: 8px;
-        font-family: var(--font-body);
-        font-size: .83rem;
-        font-weight: 500;
-        cursor: pointer;
-        transition: all .2s;
-        text-decoration: none;
-        border: 1px solid var(--border);
-        white-space: nowrap
-    }
-
-    .btn-primary {
-        background: var(--accent);
-        color: #fff;
-        border-color: var(--accent)
-    }
-
-    .btn-primary:hover {
-        background: #1d4ed8;
-        transform: translateY(-1px);
-        box-shadow: 0 4px 16px var(--accent-glow)
-    }
-
-    .btn-secondary {
-        background: transparent;
-        border: 1px solid var(--border);
-        color: var(--text-dim)
-    }
-
-    .btn-secondary:hover {
-        background: var(--bg-hover);
-        border-color: var(--border-acc);
-        color: var(--text)
-    }
-
-    .btn-lg {
-        padding: .7rem 1.5rem;
-        font-size: .9rem
-    }
-
-    .form-actions {
-        display: flex;
-        gap: .75rem;
-        justify-content: flex-end;
-        margin-top: 1.5rem;
-        padding-top: 1.5rem;
-        border-top: 1px solid var(--border)
-    }
-
-    @media(max-width:600px) {
-        .page-top {
-            flex-direction: column
-        }
-
-        .form-section {
-            padding: 1.2rem
-        }
-
-        .radio-group {
-            flex-direction: column
-        }
-    }
-    </style>
 
     <script>
-    const BASE = '<?= BASE_URL ?>';
+    'use strict';
+    const BASE = <?= json_encode(BASE_URL, JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_AMP | JSON_HEX_QUOT) ?>;
+    const MAX_UPLOAD_SIZE_BYTES = <?= (int) MAX_UPLOAD_SIZE ?>;
     const form = document.getElementById('projectForm');
     const submitBtns = document.querySelectorAll('#submitBtn, #submitBtn2');
+    const coverInput = document.getElementById('cover_project');
+    const uploadArea = document.getElementById('uploadArea');
+    const coverPreview = document.getElementById('coverPreview');
+    const uploadActions = document.getElementById('uploadActions');
+    const currentCoverName = uploadArea.dataset.currentCover || '';
 
-    // ── Toast helper ─────────────────────────────────────────────
     function showToast(message, type = 'success') {
-        const container = document.getElementById('toast-container') || createToastContainer();
+        let container = document.getElementById('toast-container');
+        if (!container) {
+            container = document.createElement('div');
+            container.id = 'toast-container';
+            container.className = 'project-form-toast-container';
+            document.body.appendChild(container);
+        }
         const toast = document.createElement('div');
-        toast.className = `toast toast-${type}`;
-        toast.innerHTML =
-            `<i class="fas fa-${type === 'success' ? 'check-circle' : type === 'error' ? 'times-circle' : 'info-circle'}"></i> ${message}`;
+        toast.className = `toast ${type === 'error' ? 'error' : 'success'}`;
+        const icon = document.createElement('i');
+        icon.className = `fas ${type === 'error' ? 'fa-times-circle' : 'fa-check-circle'}`;
+        icon.setAttribute('aria-hidden', 'true');
+        const text = document.createElement('span');
+        text.textContent = String(message);
+        toast.append(icon, text);
         container.appendChild(toast);
-        setTimeout(() => {
-            toast.style.opacity = '0';
-            toast.style.transform = 'translateX(20px)';
-            setTimeout(() => toast.remove(), 300);
-        }, 4000);
+        window.setTimeout(() => {
+            toast.classList.add('is-leaving');
+            window.setTimeout(() => toast.remove(), 300);
+        }, 4500);
     }
 
-    function createToastContainer() {
-        const container = document.createElement('div');
-        container.id = 'toast-container';
-        container.style.cssText =
-            'position:fixed;top:1rem;right:1rem;z-index:9999;display:flex;flex-direction:column;gap:.5rem';
-        document.body.appendChild(container);
-        return container;
+    function setBusy(busy) {
+        submitBtns.forEach(btn => {
+            btn.disabled = busy;
+            btn.innerHTML = busy ?
+                '<i class="fas fa-spinner fa-spin" aria-hidden="true"></i> A actualizar…' :
+                '<i class="fas fa-save" aria-hidden="true"></i> Actualizar Projecto';
+        });
     }
 
-    // ── Slug automático ──────────────────────────────────────────
+    // Slug automático: deixa de actualizar quando o utilizador edita o slug manualmente.
     const titleInput = document.getElementById('title_project');
     const slugInput = document.getElementById('slug_project');
-    const genBtn = document.getElementById('generateSlugBtn');
+    const generateSlugBtn = document.getElementById('generateSlugBtn');
+    slugInput.dataset.manual = 'false';
 
-    function slugify(text) {
-        return text.toString().toLowerCase().trim()
+    function slugify(value) {
+        return String(value || '').toLowerCase().trim()
             .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
             .replace(/[^a-z0-9\s-]/g, '').replace(/[\s_]+/g, '-')
             .replace(/-+/g, '-').replace(/^-+|-+$/g, '');
     }
-
     titleInput.addEventListener('input', function() {
-        if (!slugInput.dataset.manual || slugInput.dataset.manual === 'false') {
-            slugInput.value = slugify(this.value);
-        }
+        if (slugInput.dataset.manual !== 'true') slugInput.value = slugify(this.value);
     });
-
-    genBtn.addEventListener('click', function() {
+    generateSlugBtn.addEventListener('click', function() {
         slugInput.value = slugify(titleInput.value);
         slugInput.dataset.manual = 'true';
+        slugInput.dispatchEvent(new Event('input', {
+            bubbles: true
+        }));
     });
-
     slugInput.addEventListener('input', function() {
         this.dataset.manual = 'true';
     });
 
-    // ── Categoria select visual ──────────────────────────────────
-    document.querySelectorAll('.category-option').forEach(opt => {
-        opt.addEventListener('click', function() {
-            const radio = this.querySelector('input');
-            radio.checked = true;
-            document.querySelectorAll('.category-option').forEach(o => o.classList.remove('selected'));
-            this.classList.add('selected');
+    // Categoria e estado: actualiza o cartão seleccionado.
+    document.querySelectorAll('.category-option input').forEach(input => {
+        input.addEventListener('change', () => {
+            document.querySelectorAll('.category-option').forEach(option => {
+                option.classList.toggle('selected', option.querySelector('input').checked);
+            });
+        });
+    });
+    document.querySelectorAll('.radio-item input').forEach(input => {
+        input.addEventListener('change', () => {
+            document.querySelectorAll('.radio-item').forEach(item => {
+                item.classList.toggle('selected', item.querySelector('input').checked);
+            });
         });
     });
 
-    // ── Upload com preview ────────────────────────────────────────
-    const uploadArea = document.getElementById('uploadArea');
-    const coverInput = document.getElementById('cover_project');
-    const coverPreview = document.getElementById('coverPreview');
-    const uploadActions = document.getElementById('uploadActions');
+    // Actualiza o texto do interruptor de destaque.
+    const featuredInput = form.querySelector('input[name="is_featured"]');
+    const featuredLabel = form.querySelector('.switch-label');
 
-    uploadArea.addEventListener('click', function(e) {
-        if (e.target === coverInput) return;
-        coverInput.click();
-    });
+    function syncFeaturedLabel() {
+        if (featuredLabel && featuredInput) featuredLabel.textContent = featuredInput.checked ? 'Sim ⭐' : 'Não';
+    }
+    if (featuredInput) featuredInput.addEventListener('change', syncFeaturedLabel);
+    syncFeaturedLabel();
 
-    coverInput.addEventListener('change', function() {
-        const file = this.files[0];
-        if (!file) return;
-        const reader = new FileReader();
-        reader.onload = function(e) {
-            coverPreview.innerHTML = '<img src="' + e.target.result + '" alt="Preview">';
+    // Capa: num formulário de edição, restaurar significa voltar à capa guardada no servidor.
+    function renderPlaceholder() {
+        coverPreview.replaceChildren();
+        const icon = document.createElement('i');
+        icon.className = 'fas fa-cloud-upload-alt upload-icon';
+        icon.setAttribute('aria-hidden', 'true');
+        const heading = document.createElement('h4');
+        heading.textContent = 'Arrasta ou clica para seleccionar a capa';
+        const detail = document.createElement('p');
+        detail.textContent = 'JPEG, PNG ou WebP';
+        coverPreview.append(icon, heading, detail);
+    }
+
+    function renderCurrentCover() {
+        coverInput.value = '';
+        if (currentCoverName) {
+            coverPreview.replaceChildren();
+            const image = document.createElement('img');
+            image.src = `${BASE}/assets/img/projects/${encodeURIComponent(currentCoverName)}`;
+            image.alt = 'Capa actual';
+            coverPreview.appendChild(image);
             uploadArea.classList.add('has-image');
-            uploadActions.style.display = 'flex';
+            uploadActions.classList.add('is-visible');
+        } else {
+            renderPlaceholder();
+            uploadArea.classList.remove('has-image');
+            uploadActions.classList.remove('is-visible');
+        }
+    }
+
+    function previewCoverFile(file) {
+        if (!file) return;
+        const allowedTypes = ['image/jpeg', 'image/png', 'image/webp'];
+        if (!allowedTypes.includes(file.type)) {
+            showToast('Formato inválido. Usa JPEG, PNG ou WebP.', 'error');
+            renderCurrentCover();
+            return;
+        }
+        if (file.size <= 0 || file.size > MAX_UPLOAD_SIZE_BYTES) {
+            showToast(
+                `A imagem deve ter entre 1 byte e ${(MAX_UPLOAD_SIZE_BYTES / 1024 / 1024).toLocaleString('pt-PT', { maximumFractionDigits: 2 })} MB.`,
+                'error');
+            renderCurrentCover();
+            return;
+        }
+        const reader = new FileReader();
+        reader.onload = event => {
+            const image = document.createElement('img');
+            image.src = String(event.target && event.target.result || '');
+            image.alt = 'Pré-visualização da nova capa';
+            coverPreview.replaceChildren(image);
+            uploadArea.classList.add('has-image');
+            uploadActions.classList.add('is-visible');
+        };
+        reader.onerror = () => {
+            showToast('Não foi possível pré-visualizar esta imagem.', 'error');
+            renderCurrentCover();
         };
         reader.readAsDataURL(file);
+    }
+    coverInput.addEventListener('change', () => previewCoverFile(coverInput.files && coverInput.files[0]));
+    uploadArea.addEventListener('click', event => {
+        if (event.target.closest('button') || event.target.closest('a')) return;
+        if (event.target === coverInput) return;
+        coverInput.click();
     });
-
-    function removeCover() {
-        coverInput.value = '';
-        coverPreview.innerHTML =
-            '<i class="fas fa-cloud-upload-alt upload-icon"></i><h4>Arrasta ou clica para fazer upload</h4><p>JPEG, PNG ou WebP</p>';
-        uploadArea.classList.remove('has-image');
-        uploadActions.style.display = 'none';
-    }
-
-    // ── Tags (tech stack) ─────────────────────────────────────────
-    const tagInput = document.getElementById('tagInput');
-
-    function addTag() {
-        const val = tagInput.value.trim();
-        if (val === '') return;
-        const wrap = document.getElementById('tagsWrap');
-        const span = document.createElement('span');
-        span.className = 'tag-item';
-        span.innerHTML = '<i class="fas fa-code"></i><span>' + val + '</span>' +
-            '<button type="button" class="tag-remove" onclick="this.parentElement.remove();updateHiddenTech()"><i class="fas fa-times"></i></button>';
-        wrap.appendChild(span);
-        tagInput.value = '';
-        updateHiddenTech();
-    }
-
-    tagInput.addEventListener('keydown', function(e) {
-        if (e.key === 'Enter') {
-            e.preventDefault();
-            addTag();
+    uploadArea.addEventListener('keydown', event => {
+        if (event.target !== uploadArea) return;
+        if (event.key === 'Enter' || event.key === ' ') {
+            event.preventDefault();
+            coverInput.click();
+        }
+    });
+    document.getElementById('changeCoverBtn').addEventListener('click', () => coverInput.click());
+    document.getElementById('restoreCoverBtn').addEventListener('click', renderCurrentCover);
+    ['dragenter', 'dragover'].forEach(name => uploadArea.addEventListener(name, event => {
+        event.preventDefault();
+        uploadArea.classList.add('drag-over');
+    }));
+    ['dragleave', 'drop'].forEach(name => uploadArea.addEventListener(name, event => {
+        event.preventDefault();
+        uploadArea.classList.remove('drag-over');
+    }));
+    uploadArea.addEventListener('drop', event => {
+        const file = event.dataTransfer && event.dataTransfer.files && event.dataTransfer.files[0];
+        if (!file) return;
+        try {
+            const transfer = new DataTransfer();
+            transfer.items.add(file);
+            coverInput.files = transfer.files;
+            previewCoverFile(file);
+        } catch (error) {
+            showToast('Não foi possível receber a imagem arrastada. Usa o botão Trocar.', 'error');
         }
     });
 
+    // Tecnologias: cria elementos via DOM, sem inserir o texto do utilizador em HTML.
+    const tagInput = document.getElementById('tagInput');
+    const tagsWrap = document.getElementById('tagsWrap');
+    const techStackHidden = document.getElementById('techStackHidden');
+
     function updateHiddenTech() {
-        const tags = [];
-        document.querySelectorAll('#tagsWrap .tag-item span:first-of-type').forEach(el => {
-            tags.push(el.textContent.trim());
-        });
-        document.getElementById('techStackHidden').value = JSON.stringify(tags);
+        const tags = Array.from(tagsWrap.querySelectorAll('.tag-item .tag-text'))
+            .map(item => item.textContent.trim()).filter(Boolean);
+        techStackHidden.value = JSON.stringify(tags);
     }
 
-    // ── Ordem +/− ──────────────────────────────────────────────
+    function addTag() {
+        const value = tagInput.value.trim();
+        if (!value) return;
+        if (value.length > 80) {
+            showToast('Cada tecnologia deve ter no máximo 80 caracteres.', 'error');
+            return;
+        }
+        const existing = Array.from(tagsWrap.querySelectorAll('.tag-text')).some(node => node.textContent.trim()
+            .toLowerCase() === value.toLowerCase());
+        if (existing) {
+            showToast('Esta tecnologia já foi adicionada.', 'error');
+            return;
+        }
+        if (tagsWrap.querySelectorAll('.tag-item').length >= 100) {
+            showToast('O máximo é de 100 tecnologias por projecto.', 'error');
+            return;
+        }
+        const item = document.createElement('span');
+        item.className = 'tag-item';
+        const icon = document.createElement('i');
+        icon.className = 'fas fa-code';
+        icon.setAttribute('aria-hidden', 'true');
+        const label = document.createElement('span');
+        label.className = 'tag-text';
+        label.textContent = value;
+        const remove = document.createElement('button');
+        remove.type = 'button';
+        remove.className = 'tag-remove';
+        remove.dataset.removeTech = '1';
+        remove.setAttribute('aria-label', `Remover tecnologia ${value}`);
+        const removeIcon = document.createElement('i');
+        removeIcon.className = 'fas fa-times';
+        removeIcon.setAttribute('aria-hidden', 'true');
+        remove.appendChild(removeIcon);
+        item.append(icon, label, remove);
+        tagsWrap.appendChild(item);
+        tagInput.value = '';
+        updateHiddenTech();
+    }
+    document.getElementById('addTagBtn').addEventListener('click', addTag);
+    tagInput.addEventListener('keydown', event => {
+        if (event.key === 'Enter') {
+            event.preventDefault();
+            addTag();
+        }
+    });
+    tagsWrap.addEventListener('click', event => {
+        const remove = event.target.closest('[data-remove-tech]');
+        if (remove) {
+            remove.closest('.tag-item').remove();
+            updateHiddenTech();
+        }
+    });
+    // Sincroniza o JSON inicial com os chips renderizados, preservando o conteúdo actual.
+    updateHiddenTech();
+
+    // Ordem de apresentação.
+    const orderField = document.getElementById('display_order');
+
     function changeOrder(delta) {
-        const field = document.getElementById('display_order');
-        let val = parseInt(field.value) || 0;
-        val = Math.max(0, val + delta);
-        field.value = val;
+        const value = Number.parseInt(orderField.value, 10) || 0;
+        orderField.value = String(Math.max(0, value + delta));
     }
+    document.getElementById('orderDownBtn').addEventListener('click', () => changeOrder(-1));
+    document.getElementById('orderUpBtn').addEventListener('click', () => changeOrder(1));
 
-    // ── Contador de resumo ───────────────────────────────────────
+    // Contador do resumo.
     const summaryInput = document.getElementById('summary_project');
     const summaryCount = document.getElementById('summaryCount');
     if (summaryInput && summaryCount) {
-        summaryInput.addEventListener('input', function() {
-            const len = this.value.length;
-            summaryCount.textContent = len + '/300 caracteres';
-            summaryCount.style.color = len > 280 ? 'var(--danger)' : 'var(--text-muted)';
-        });
-        summaryInput.dispatchEvent(new Event('input'));
+        const updateSummaryCount = () => {
+            summaryCount.textContent = `${summaryInput.value.length}/300 caracteres`;
+            summaryCount.classList.toggle('is-near-limit', summaryInput.value.length > 280);
+        };
+        summaryInput.addEventListener('input', updateSummaryCount);
+        updateSummaryCount();
     }
 
-    // ── Submissão AJAX ───────────────────────────────────────────
-    form.addEventListener('submit', async function(e) {
-        e.preventDefault();
-
-        let clientValid = true;
+    // Submissão AJAX. A resposta é lida como texto para diagnosticar redirects/erros PHP sem os mascarar como rede.
+    form.addEventListener('submit', async event => {
+        event.preventDefault();
+        let valid = true;
         form.querySelectorAll('[required]').forEach(field => {
-            if (!field.value.trim()) {
+            if (!String(field.value || '').trim()) {
                 field.classList.add('error');
-                clientValid = false;
+                valid = false;
             } else {
                 field.classList.remove('error');
             }
         });
-        if (!clientValid) {
-            showToast('Preenche todos os campos obrigatórios.', 'error');
+        if (!/^[a-z0-9-]{2,200}$/.test(slugInput.value)) {
+            slugInput.classList.add('error');
+            valid = false;
+            showToast('O slug só pode conter letras minúsculas, números e hífens.', 'error');
+        }
+        if (!form.querySelector('input[name="category_project"]:checked')) {
+            valid = false;
+            showToast('Selecciona uma categoria para o projecto.', 'error');
+        }
+        if (!form.querySelector('input[name="status_project"]:checked')) {
+            valid = false;
+            showToast('Selecciona o estado do projecto.', 'error');
+        }
+        if (!valid) {
+            if (!slugInput.classList.contains('error')) showToast('Corrige os campos obrigatórios.',
+                'error');
             return;
         }
 
-        submitBtns.forEach(btn => {
-            btn.disabled = true;
-            btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> A actualizar…';
-        });
-
+        setBusy(true);
+        const endpoint = form.dataset.api;
         try {
-            const formData = new FormData(form);
-            const res = await fetch(form.dataset.api, {
+            const response = await fetch(endpoint, {
                 method: 'POST',
-                body: formData,
+                credentials: 'same-origin',
+                cache: 'no-store',
+                body: new FormData(form),
                 headers: {
                     'X-Requested-With': 'XMLHttpRequest',
-                    'X-CSRF-Token': document.getElementById('csrf_token').value
+                    'X-CSRF-Token': document.getElementById('csrf_token').value,
+                    'Accept': 'application/json'
                 }
             });
-
-            const data = await res.json();
-
-            if (!res.ok || !data.success) {
-                if (data.errors) {
-                    data.errors.forEach(err => showToast(err, 'error'));
-                } else {
-                    showToast(data.message || 'Erro ao actualizar projecto.', 'error');
-                }
-                submitBtns.forEach(btn => {
-                    btn.disabled = false;
-                    btn.innerHTML = '<i class="fas fa-save"></i> Actualizar Projecto';
+            const responseText = await response.text();
+            let data;
+            try {
+                data = JSON.parse(responseText);
+            } catch (parseError) {
+                console.error('[JMbenga edit project] O endpoint não devolveu JSON.', {
+                    status: response.status,
+                    redirected: response.redirected,
+                    responseUrl: response.url,
+                    endpoint,
+                    responsePreview: responseText.slice(0, 1200)
                 });
+                const finalUrl = String(response.url || '').toLowerCase();
+                if (response.redirected && /(entrar|login)/.test(finalUrl)) {
+                    showToast(
+                        'A sessão administrativa expirou. Actualiza a página, inicia sessão novamente e tenta guardar.',
+                        'error');
+                } else if (response.redirected && /lockscreen/.test(finalUrl)) {
+                    showToast('O painel está bloqueado. Desbloqueia a sessão e tenta novamente.', 'error');
+                } else {
+                    showToast(
+                        `O servidor devolveu uma resposta inesperada (HTTP ${response.status}). Consulta a consola (F12).`,
+                        'error');
+                }
+                setBusy(false);
                 return;
             }
-
-            showToast('Projecto actualizado com sucesso!', 'success');
-            setTimeout(() => {
-                window.location.href = BASE + '/jm-panel/projects?msg=updated';
+            if (!response.ok || !data.success) {
+                if (Array.isArray(data.errors) && data.errors.length) {
+                    data.errors.forEach(error => showToast(String(error), 'error'));
+                } else {
+                    showToast(String(data.message ||
+                            `Não foi possível actualizar o projecto (HTTP ${response.status}).`),
+                        'error');
+                }
+                setBusy(false);
+                return;
+            }
+            showToast(data.message || 'Projecto actualizado com sucesso!', 'success');
+            window.setTimeout(() => {
+                window.location.href = `${BASE}/jm-panel/projects?msg=updated`;
             }, 800);
-
-        } catch (err) {
-            showToast('Erro de rede. Tenta novamente.', 'error');
-            submitBtns.forEach(btn => {
-                btn.disabled = false;
-                btn.innerHTML = '<i class="fas fa-save"></i> Actualizar Projecto';
+        } catch (error) {
+            console.error('[JMbenga edit project] Falha ao contactar o endpoint:', {
+                endpoint,
+                error
             });
+            showToast(
+                'Não foi possível contactar o processador do projecto. Confirma o servidor e a rota; consulta a consola (F12).',
+                'error');
+            setBusy(false);
         }
     });
     </script>

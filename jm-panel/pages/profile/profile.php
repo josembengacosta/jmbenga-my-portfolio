@@ -17,8 +17,7 @@ $stmt = $db->prepare("
     SELECT e.*,
            s.recovery_key, s.login_attempts, s.block_until, s.block_level,
            s.last_login_at, s.last_login_ip, s.lockscreen, s.access_code,
-           s.invite_token, s.invite_token_expires, s.invite_used, s.invited_by,
-           s.remember_token, s.creat_sec_emp, s.modif_sec_emp
+           s.invited_by
     FROM _employees e
     LEFT JOIN _employees_security s ON s.id_employees = e.id_employees
     WHERE e.id_employees = ?
@@ -61,7 +60,9 @@ $auditLogs = $auditStmt->fetchAll(PDO::FETCH_ASSOC);
 $totalProjects  = (int) $db->query("SELECT COUNT(*) FROM _projects WHERE status_project = 'published'")->fetchColumn();
 $unreadMessages = (int) $db->query("SELECT COUNT(*) FROM _contact_message WHERE status_msg = 'new'")->fetchColumn();
 $onlineVisitors = (int) $db->query("SELECT COUNT(*) FROM _visitor WHERE is_online = 1")->fetchColumn();
-$totalAudit     = (int) $db->query("SELECT COUNT(*) FROM _audit_log WHERE id_employees = $adminId")->fetchColumn();
+$auditCountStmt = $db->prepare('SELECT COUNT(*) FROM _audit_log WHERE id_employees = ?');
+$auditCountStmt->execute([$adminId]);
+$totalAudit = (int) $auditCountStmt->fetchColumn();
 
 // ── Sessão ────────────────────────────────────────────────────
 $loginTime   = $_SESSION['admin_login_time'] ?? time();
@@ -108,1038 +109,16 @@ $memberSince = !empty($admin['creat_employees']) ? date('d/m/Y', strtotime($admi
 <!DOCTYPE html>
 <html lang="pt" data-theme="dark" data-base-url="<?= BASE_URL ?>">
 <?php include __DIR__ . '/../../include/head.php'; ?>
+<?php
+$profileCssPath = ROOT_PATH . '/assets/css/jmbenga-profile.css';
+$profileCssVersion = is_file($profileCssPath) ? (string) filemtime($profileCssPath) : '1.0.0';
+?>
+<link rel="stylesheet"
+    href="<?= e(rtrim(BASE_URL, '/') . '/assets/css/jmbenga-profile.css') ?>?v=<?= e($profileCssVersion) ?>">
 </head>
-<style>
-/* ── Reset / Variables ───────────────────────────────────── */
-:root {
-    --profile-radius: 14px;
-    --tab-h: 44px;
-}
 
-/* ── Layout ──────────────────────────────────────────────── */
-.page-top {
-    display: flex;
-    justify-content: space-between;
-    align-items: flex-start;
-    flex-wrap: wrap;
-    gap: 1rem;
-    margin-bottom: 1.5rem
-}
 
-.breadcrumb {
-    display: flex;
-    align-items: center;
-    gap: .5rem;
-    font-size: .78rem;
-    color: var(--text-muted);
-    margin-bottom: .5rem
-}
-
-.breadcrumb a {
-    color: var(--text-dim);
-    text-decoration: none;
-    transition: color .2s
-}
-
-.breadcrumb a:hover {
-    color: var(--accent)
-}
-
-.breadcrumb i {
-    font-size: .6rem
-}
-
-.page-title {
-    font-family: var(--font-head);
-    font-size: 1.5rem;
-    font-weight: 800;
-    letter-spacing: -.02em;
-    margin-bottom: .2rem
-}
-
-.profile-layout {
-    display: grid;
-    grid-template-columns: 290px 1fr;
-    gap: 1.5rem;
-    align-items: start
-}
-
-@media(max-width:960px) {
-    .profile-layout {
-        grid-template-columns: 1fr
-    }
-}
-
-/* ── Cards ───────────────────────────────────────────────── */
-.pcard {
-    background: var(--bg-card);
-    border: 1px solid var(--border);
-    border-radius: var(--profile-radius);
-    padding: 1.5rem;
-    margin-bottom: 1.25rem
-}
-
-.pcard:last-child {
-    margin-bottom: 0
-}
-
-.pcard-title {
-    font-family: var(--font-head);
-    font-size: .85rem;
-    font-weight: 700;
-    text-transform: uppercase;
-    letter-spacing: .06em;
-    color: var(--text-muted);
-    margin-bottom: 1rem;
-    display: flex;
-    align-items: center;
-    gap: .5rem
-}
-
-.pcard-title i {
-    color: var(--accent);
-    font-size: .8rem
-}
-
-/* ── Sidebar ─────────────────────────────────────────────── */
-.avatar-zone {
-    position: relative;
-    width: 96px;
-    height: 96px;
-    margin: 0 auto 1rem;
-    cursor: pointer
-}
-
-.avatar-zone input[type=file] {
-    display: none
-}
-
-.avatar-ring {
-    width: 96px;
-    height: 96px;
-    border-radius: 50%;
-    overflow: hidden;
-    border: 2.5px solid var(--border-acc);
-    transition: border-color .25s
-}
-
-.avatar-zone:hover .avatar-ring {
-    border-color: var(--accent)
-}
-
-.avatar-zone:hover .avatar-overlay {
-    opacity: 1
-}
-
-.avatar-img {
-    width: 100%;
-    height: 100%;
-    object-fit: cover;
-    display: block
-}
-
-.avatar-placeholder {
-    width: 100%;
-    height: 100%;
-    background: linear-gradient(135deg, var(--accent) 0%, #7c3aed 100%);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-family: var(--font-head);
-    font-size: 2rem;
-    font-weight: 800;
-    color: #fff;
-    letter-spacing: -.04em;
-    user-select: none
-}
-
-.avatar-overlay {
-    position: absolute;
-    inset: 0;
-    border-radius: 50%;
-    background: rgba(0, 0, 0, .55);
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    opacity: 0;
-    transition: opacity .2s;
-    color: #fff;
-    font-size: .7rem;
-    gap: .2rem;
-    pointer-events: none
-}
-
-.avatar-overlay i {
-    font-size: 1.1rem
-}
-
-.avatar-zone.drag-over .avatar-ring {
-    border-color: var(--accent);
-    box-shadow: 0 0 0 4px var(--accent-glow)
-}
-
-.admin-name {
-    font-family: var(--font-head);
-    font-size: 1.1rem;
-    font-weight: 800;
-    text-align: center;
-    margin-bottom: .15rem
-}
-
-.admin-email {
-    font-size: .78rem;
-    color: var(--text-muted);
-    text-align: center;
-    margin-bottom: .75rem;
-    word-break: break-all
-}
-
-/* ── Badges ──────────────────────────────────────────────── */
-.badge-row {
-    display: flex;
-    gap: .4rem;
-    justify-content: center;
-    flex-wrap: wrap;
-    margin-bottom: 1rem
-}
-
-.badge-pill {
-    display: inline-flex;
-    align-items: center;
-    gap: .3rem;
-    padding: 3px 9px;
-    border-radius: 999px;
-    font-size: .68rem;
-    font-weight: 700;
-    letter-spacing: .02em
-}
-
-.badge-success {
-    background: rgba(16, 185, 129, .12);
-    color: #34d399;
-    border: 1px solid rgba(16, 185, 129, .25)
-}
-
-.badge-warning {
-    background: rgba(245, 158, 11, .12);
-    color: #fbbf24;
-    border: 1px solid rgba(245, 158, 11, .25)
-}
-
-.badge-danger {
-    background: rgba(239, 68, 68, .12);
-    color: #f87171;
-    border: 1px solid rgba(239, 68, 68, .25)
-}
-
-.badge-muted {
-    background: rgba(148, 163, 184, .12);
-    color: var(--text-muted);
-    border: 1px solid var(--border)
-}
-
-.role-super {
-    background: rgba(251, 191, 36, .1);
-    color: #fbbf24;
-    border: 1px solid rgba(251, 191, 36, .2)
-}
-
-.role-admin {
-    background: rgba(59, 130, 246, .1);
-    color: var(--accent);
-    border: 1px solid rgba(59, 130, 246, .2)
-}
-
-.role-editor {
-    background: rgba(139, 92, 246, .1);
-    color: #a78bfa;
-    border: 1px solid rgba(139, 92, 246, .2)
-}
-
-/* ── Mini stats ──────────────────────────────────────────── */
-.stat-grid {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: .6rem;
-    margin-bottom: 1rem
-}
-
-.stat-box {
-    background: var(--bg);
-    border: 1px solid var(--border);
-    border-radius: 10px;
-    padding: .65rem .6rem;
-    text-align: center
-}
-
-.stat-box .stat-val {
-    font-family: var(--font-head);
-    font-size: 1.4rem;
-    font-weight: 800;
-    line-height: 1;
-    margin-bottom: .15rem
-}
-
-.stat-box .stat-lbl {
-    font-size: .65rem;
-    color: var(--text-muted);
-    text-transform: uppercase;
-    letter-spacing: .04em
-}
-
-.stat-box.accent .stat-val {
-    color: var(--accent)
-}
-
-.stat-box.success .stat-val {
-    color: var(--success)
-}
-
-.stat-box.warn .stat-val {
-    color: #fbbf24
-}
-
-.stat-box.purple .stat-val {
-    color: #a78bfa
-}
-
-/* ── Meta info ────────────────────────────────────────────── */
-.meta-list {
-    display: flex;
-    flex-direction: column;
-    gap: 0
-}
-
-.meta-row {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: .45rem 0;
-    border-bottom: 1px solid var(--border);
-    font-size: .78rem;
-    gap: .5rem
-}
-
-.meta-row:last-child {
-    border-bottom: none
-}
-
-.meta-row .meta-key {
-    color: var(--text-muted);
-    flex-shrink: 0
-}
-
-.meta-row .meta-val {
-    color: var(--text);
-    font-weight: 500;
-    text-align: right;
-    word-break: break-all
-}
-
-.meta-row code {
-    font-family: var(--font-mono);
-    font-size: .72rem;
-    background: var(--bg);
-    padding: 2px 6px;
-    border-radius: 4px;
-    color: var(--accent);
-    word-break: break-all
-}
-
-/* ── Sidebar actions ─────────────────────────────────────── */
-.sidebar-actions {
-    display: flex;
-    flex-direction: column;
-    gap: .4rem
-}
-
-.slink {
-    display: flex;
-    align-items: center;
-    gap: .55rem;
-    padding: .5rem .8rem;
-    background: var(--bg);
-    border: 1px solid var(--border);
-    border-radius: 8px;
-    color: var(--text-dim);
-    text-decoration: none;
-    font-size: .8rem;
-    transition: all .2s;
-    cursor: pointer
-}
-
-.slink:hover {
-    background: var(--accent-glow);
-    border-color: var(--border-acc);
-    color: var(--accent)
-}
-
-.slink i {
-    width: 14px;
-    text-align: center;
-    color: var(--accent)
-}
-
-/* ── Tabs ────────────────────────────────────────────────── */
-.tab-bar {
-    display: flex;
-    gap: 0;
-    background: var(--bg);
-    border: 1px solid var(--border);
-    border-radius: 10px;
-    padding: 4px;
-    margin-bottom: 1.5rem;
-    overflow-x: auto
-}
-
-.tab-btn {
-    display: flex;
-    align-items: center;
-    gap: .4rem;
-    padding: .45rem 1rem;
-    border-radius: 7px;
-    font-size: .8rem;
-    font-weight: 600;
-    color: var(--text-dim);
-    background: none;
-    border: none;
-    cursor: pointer;
-    transition: all .2s;
-    white-space: nowrap;
-    flex-shrink: 0
-}
-
-.tab-btn:hover {
-    color: var(--text);
-    background: var(--bg-hover)
-}
-
-.tab-btn.active {
-    background: var(--bg-card);
-    color: var(--text);
-    border: 1px solid var(--border);
-    box-shadow: 0 1px 4px rgba(0, 0, 0, .2)
-}
-
-.tab-btn .tab-count {
-    background: var(--accent-glow);
-    color: var(--accent);
-    border: 1px solid var(--border-acc);
-    font-size: .62rem;
-    font-weight: 700;
-    padding: 1px 5px;
-    border-radius: 999px;
-    min-width: 18px;
-    text-align: center
-}
-
-.tab-panel {
-    display: none
-}
-
-.tab-panel.active {
-    display: block
-}
-
-/* ── Forms ───────────────────────────────────────────────── */
-.form-grid {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 1.1rem
-}
-
-.form-grid .full {
-    grid-column: 1/-1
-}
-
-@media(max-width:600px) {
-    .form-grid {
-        grid-template-columns: 1fr
-    }
-
-    .form-grid .full {
-        grid-column: 1
-    }
-}
-
-.form-group {
-    display: flex;
-    flex-direction: column;
-    gap: .3rem
-}
-
-.form-label {
-    font-size: .72rem;
-    font-weight: 700;
-    text-transform: uppercase;
-    letter-spacing: .04em;
-    color: var(--text-dim)
-}
-
-.req {
-    color: var(--danger)
-}
-
-.form-control {
-    padding: .6rem .85rem;
-    background: var(--bg);
-    border: 1px solid var(--border);
-    border-radius: 8px;
-    color: var(--text);
-    font-family: var(--font-body);
-    font-size: .85rem;
-    outline: none;
-    transition: border-color .2s, box-shadow .2s;
-    width: 100%
-}
-
-.form-control:focus {
-    border-color: var(--accent);
-    box-shadow: 0 0 0 3px var(--accent-glow)
-}
-
-.form-control::placeholder {
-    color: var(--text-muted)
-}
-
-.form-control.error {
-    border-color: var(--danger)
-}
-
-.form-hint {
-    font-size: .7rem;
-    color: var(--text-muted);
-    margin-top: .15rem
-}
-
-.form-actions {
-    display: flex;
-    gap: .6rem;
-    justify-content: flex-end;
-    margin-top: 1.5rem;
-    padding-top: 1.5rem;
-    border-top: 1px solid var(--border)
-}
-
-/* ── Buttons ─────────────────────────────────────────────── */
-.btn {
-    display: inline-flex;
-    align-items: center;
-    gap: .4rem;
-    padding: .55rem 1.1rem;
-    border-radius: 8px;
-    font-size: .82rem;
-    font-weight: 600;
-    cursor: pointer;
-    transition: all .2s;
-    text-decoration: none;
-    border: 1px solid var(--border);
-    white-space: nowrap;
-    font-family: var(--font-body)
-}
-
-.btn-primary {
-    background: var(--accent);
-    color: #fff;
-    border-color: var(--accent)
-}
-
-.btn-primary:hover {
-    filter: brightness(1.12);
-    transform: translateY(-1px);
-    box-shadow: 0 4px 16px var(--accent-glow)
-}
-
-.btn-secondary {
-    background: transparent;
-    border: 1px solid var(--border);
-    color: var(--text-dim)
-}
-
-.btn-secondary:hover {
-    background: var(--bg-hover);
-    border-color: var(--border-acc);
-    color: var(--text)
-}
-
-.btn-danger {
-    background: rgba(239, 68, 68, .1);
-    border-color: rgba(239, 68, 68, .3);
-    color: #f87171
-}
-
-.btn-danger:hover {
-    background: rgba(239, 68, 68, .2)
-}
-
-.btn-success {
-    background: rgba(16, 185, 129, .1);
-    border-color: rgba(16, 185, 129, .3);
-    color: #34d399
-}
-
-.btn-success:hover {
-    background: rgba(16, 185, 129, .2)
-}
-
-.btn-lg {
-    padding: .65rem 1.4rem;
-    font-size: .88rem
-}
-
-.btn-sm {
-    padding: .35rem .7rem;
-    font-size: .75rem
-}
-
-.btn:disabled {
-    opacity: .55;
-    cursor: not-allowed;
-    pointer-events: none
-}
-
-/* ── Security panel ──────────────────────────────────────── */
-.sec-grid {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 1rem
-}
-
-@media(max-width:660px) {
-    .sec-grid {
-        grid-template-columns: 1fr
-    }
-}
-
-.sec-block {
-    background: var(--bg);
-    border: 1px solid var(--border);
-    border-radius: 10px;
-    padding: 1rem;
-    display: flex;
-    align-items: flex-start;
-    gap: .75rem
-}
-
-.sec-block.danger-border {
-    border-color: rgba(239, 68, 68, .3)
-}
-
-.sec-block.success-border {
-    border-color: rgba(16, 185, 129, .3)
-}
-
-.sec-icon {
-    width: 38px;
-    height: 38px;
-    border-radius: 9px;
-    background: var(--accent-glow);
-    border: 1px solid var(--border-acc);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    color: var(--accent);
-    font-size: .85rem;
-    flex-shrink: 0
-}
-
-.sec-icon.danger {
-    background: rgba(239, 68, 68, .08);
-    border-color: rgba(239, 68, 68, .2);
-    color: #f87171
-}
-
-.sec-icon.success {
-    background: rgba(16, 185, 129, .08);
-    border-color: rgba(16, 185, 129, .2);
-    color: #34d399
-}
-
-.sec-icon.warn {
-    background: rgba(245, 158, 11, .08);
-    border-color: rgba(245, 158, 11, .2);
-    color: #fbbf24
-}
-
-.sec-icon.purple {
-    background: rgba(139, 92, 246, .08);
-    border-color: rgba(139, 92, 246, .2);
-    color: #a78bfa
-}
-
-.sec-body {
-    flex: 1;
-    min-width: 0
-}
-
-.sec-body strong {
-    display: block;
-    font-size: .82rem;
-    font-weight: 700;
-    margin-bottom: .2rem
-}
-
-.sec-body p {
-    font-size: .77rem;
-    color: var(--text-muted);
-    margin: 0 0 .5rem;
-    line-height: 1.4
-}
-
-/* Toggle switch */
-.toggle-row {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: .5rem
-}
-
-.toggle {
-    position: relative;
-    width: 40px;
-    height: 22px;
-    flex-shrink: 0
-}
-
-.toggle input {
-    opacity: 0;
-    width: 0;
-    height: 0
-}
-
-.toggle-track {
-    position: absolute;
-    inset: 0;
-    border-radius: 11px;
-    background: var(--border);
-    transition: background .25s;
-    cursor: pointer
-}
-
-.toggle-track::after {
-    content: '';
-    position: absolute;
-    top: 3px;
-    left: 3px;
-    width: 16px;
-    height: 16px;
-    border-radius: 50%;
-    background: #fff;
-    transition: transform .25s;
-    box-shadow: 0 1px 3px rgba(0, 0, 0, .3)
-}
-
-.toggle input:checked+.toggle-track {
-    background: var(--accent)
-}
-
-.toggle input:checked+.toggle-track::after {
-    transform: translateX(18px)
-}
-
-/* Recovery key field */
-.secret-field {
-    display: flex;
-    align-items: center;
-    gap: .4rem;
-    margin-top: .4rem
-}
-
-.secret-value {
-    font-family: var(--font-mono);
-    font-size: .8rem;
-    background: var(--bg-card);
-    border: 1px solid var(--border);
-    border-radius: 6px;
-    padding: .4rem .6rem;
-    color: var(--accent);
-    letter-spacing: .06em;
-    flex: 1;
-    overflow: hidden;
-    white-space: nowrap;
-    text-overflow: ellipsis
-}
-
-.secret-value.hidden {
-    filter: blur(5px);
-    user-select: none
-}
-
-.icon-btn {
-    width: 30px;
-    height: 30px;
-    border: 1px solid var(--border);
-    border-radius: 6px;
-    background: var(--bg-card);
-    color: var(--text-dim);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    cursor: pointer;
-    font-size: .75rem;
-    transition: all .2s;
-    flex-shrink: 0
-}
-
-.icon-btn:hover {
-    border-color: var(--accent);
-    color: var(--accent);
-    background: var(--accent-glow)
-}
-
-/* Dividers */
-.sec-divider {
-    border: none;
-    border-top: 1px solid var(--border);
-    margin: 1.25rem 0
-}
-
-/* PIN form inline */
-.pin-form {
-    display: flex;
-    gap: .4rem;
-    align-items: center;
-    margin-top: .5rem
-}
-
-.pin-input {
-    width: 80px;
-    padding: .4rem .5rem;
-    background: var(--bg-card);
-    border: 1px solid var(--border);
-    border-radius: 6px;
-    color: var(--text);
-    font-family: var(--font-mono);
-    font-size: .9rem;
-    letter-spacing: .15em;
-    text-align: center;
-    outline: none
-}
-
-.pin-input:focus {
-    border-color: var(--accent);
-    box-shadow: 0 0 0 3px var(--accent-glow)
-}
-
-/* ── Audit log ───────────────────────────────────────────── */
-.audit-wrap {
-    display: flex;
-    flex-direction: column;
-    gap: 0
-}
-
-.audit-item {
-    display: flex;
-    gap: .75rem;
-    padding: .75rem 0;
-    border-bottom: 1px solid var(--border);
-    align-items: flex-start
-}
-
-.audit-item:last-child {
-    border-bottom: none
-}
-
-.audit-icon {
-    width: 32px;
-    height: 32px;
-    border-radius: 8px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: .75rem;
-    flex-shrink: 0;
-    margin-top: .1rem
-}
-
-.audit-icon.c-create {
-    background: rgba(16, 185, 129, .1);
-    color: #34d399;
-    border: 1px solid rgba(16, 185, 129, .2)
-}
-
-.audit-icon.c-delete {
-    background: rgba(239, 68, 68, .1);
-    color: #f87171;
-    border: 1px solid rgba(239, 68, 68, .2)
-}
-
-.audit-icon.c-update {
-    background: rgba(59, 130, 246, .1);
-    color: var(--accent);
-    border: 1px solid rgba(59, 130, 246, .2)
-}
-
-.audit-icon.c-login {
-    background: rgba(139, 92, 246, .1);
-    color: #a78bfa;
-    border: 1px solid rgba(139, 92, 246, .2)
-}
-
-.audit-icon.c-default {
-    background: rgba(148, 163, 184, .1);
-    color: var(--text-muted);
-    border: 1px solid var(--border)
-}
-
-.audit-body {
-    flex: 1;
-    min-width: 0
-}
-
-.audit-action {
-    font-size: .82rem;
-    font-weight: 600;
-    margin-bottom: .1rem
-}
-
-.audit-meta {
-    font-size: .7rem;
-    color: var(--text-muted);
-    display: flex;
-    gap: .6rem;
-    flex-wrap: wrap
-}
-
-.audit-entity {
-    font-size: .68rem;
-    background: var(--bg);
-    border: 1px solid var(--border);
-    border-radius: 4px;
-    padding: 1px 5px;
-    color: var(--text-dim);
-    font-family: var(--font-mono)
-}
-
-/* ── Alert ───────────────────────────────────────────────── */
-.alert {
-    padding: .9rem 1.1rem;
-    border-radius: 10px;
-    margin-bottom: 1.25rem;
-    display: flex;
-    align-items: flex-start;
-    gap: .65rem;
-    font-size: .83rem
-}
-
-.alert-success {
-    background: rgba(16, 185, 129, .08);
-    border: 1px solid rgba(16, 185, 129, .25);
-    color: #34d399
-}
-
-.alert-danger {
-    background: rgba(239, 68, 68, .08);
-    border: 1px solid rgba(239, 68, 68, .25);
-    color: #f87171
-}
-
-.alert-close {
-    margin-left: auto;
-    background: none;
-    border: none;
-    color: inherit;
-    cursor: pointer;
-    opacity: .6;
-    font-size: .85rem;
-    padding: 0
-}
-
-.alert-close:hover {
-    opacity: 1
-}
-
-/* ── Toast ───────────────────────────────────────────────── */
-#toast-container {
-    position: fixed;
-    top: 1rem;
-    right: 1rem;
-    z-index: 9999;
-    display: flex;
-    flex-direction: column;
-    gap: .5rem;
-    pointer-events: none
-}
-
-.toast {
-    display: flex;
-    align-items: center;
-    gap: .55rem;
-    padding: .7rem 1.1rem;
-    border-radius: 9px;
-    font-size: .82rem;
-    font-weight: 500;
-    pointer-events: all;
-    animation: toastIn .25s ease;
-    transition: opacity .3s, transform .3s;
-    max-width: 320px;
-    backdrop-filter: blur(12px)
-}
-
-.toast-success {
-    background: rgba(16, 185, 129, .15);
-    border: 1px solid rgba(16, 185, 129, .35);
-    color: #34d399
-}
-
-.toast-error {
-    background: rgba(239, 68, 68, .15);
-    border: 1px solid rgba(239, 68, 68, .35);
-    color: #f87171
-}
-
-.toast-info {
-    background: rgba(59, 130, 246, .15);
-    border: 1px solid rgba(59, 130, 246, .35);
-    color: #93c5fd
-}
-
-@keyframes toastIn {
-    from {
-        opacity: 0;
-        transform: translateX(20px)
-    }
-
-    to {
-        opacity: 1;
-        transform: translateX(0)
-    }
-}
-
-/* ── Section header ──────────────────────────────────────── */
-.section-hd {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    margin-bottom: 1.2rem;
-    padding-bottom: .9rem;
-    border-bottom: 1px solid var(--border)
-}
-
-.section-hd h3 {
-    font-family: var(--font-head);
-    font-size: .98rem;
-    font-weight: 800;
-    display: flex;
-    align-items: center;
-    gap: .5rem
-}
-
-.section-hd h3 i {
-    color: var(--accent)
-}
-
-/* ── Upload drag zone ────────────────────────────────────── */
-.drag-hint {
-    font-size: .65rem;
-    color: var(--text-muted);
-    text-align: center;
-    margin-top: .35rem
-}
-</style>
-
-<body>
+<body class="profile-page">
     <script>
     // Defina switchTab ANTES de qualquer HTML que a use
     function switchTab(tab) {
@@ -1334,7 +313,6 @@ $memberSince = !empty($admin['creat_employees']) ? date('d/m/Y', strtotime($admi
                                 enctype="multipart/form-data">
                                 <input type="hidden" name="action" value="update_profile">
                                 <input type="hidden" name="csrf_token" value="<?= $_SESSION['admin_csrf_token'] ?>">
-                                <input type="hidden" name="photo_data" id="photoData">
 
                                 <div class="form-grid">
                                     <div class="form-group">
@@ -1439,8 +417,8 @@ $memberSince = !empty($admin['creat_employees']) ? date('d/m/Y', strtotime($admi
                                     <div class="sec-body">
                                         <strong>Tentativas Falhadas</strong>
                                         <p><?= (int)$admin['login_attempts'] ?> tentativa(s) registada(s)</p>
-                                        <?php if ((int)$admin['login_attempts'] > 0): ?>
-                                        <button class="btn btn-danger btn-sm" onclick="resetAttempts()">
+                                        <?php if (($admin['role'] ?? '') === 'super_admin' && (int)$admin['login_attempts'] > 0): ?>
+                                        <button type="button" class="btn btn-danger btn-sm" onclick="resetAttempts()">
                                             <i class="fas fa-eraser"></i> Limpar
                                         </button>
                                         <?php endif; ?>
@@ -1503,10 +481,11 @@ $memberSince = !empty($admin['creat_employees']) ? date('d/m/Y', strtotime($admi
                                     <input type="password" id="newPinInput" class="pin-input" maxlength="6"
                                         minlength="6" inputmode="numeric" placeholder="••••••"
                                         autocomplete="new-password">
-                                    <button class="btn btn-primary btn-sm" onclick="savePin()">
+                                    <button type="button" class="btn btn-primary btn-sm" onclick="savePin()">
                                         <i class="fas fa-floppy-disk"></i> Guardar PIN
                                     </button>
-                                    <button class="icon-btn" onclick="togglePinVis()" title="Mostrar/ocultar PIN">
+                                    <button type="button" class="icon-btn" onclick="togglePinVis()"
+                                        title="Mostrar/ocultar PIN">
                                         <i class="fas fa-eye" id="pinEyeIcon"></i>
                                     </button>
                                 </div>
@@ -1529,10 +508,11 @@ $memberSince = !empty($admin['creat_employees']) ? date('d/m/Y', strtotime($admi
                                         <span class="secret-value hidden" id="recoveryKeyVal">
                                             <?= e($admin['recovery_key'] ?? '—') ?>
                                         </span>
-                                        <button class="icon-btn" onclick="toggleRecovery()" title="Mostrar/ocultar">
+                                        <button type="button" class="icon-btn" onclick="toggleRecovery()"
+                                            title="Mostrar/ocultar">
                                             <i class="fas fa-eye" id="recoveryEyeIcon"></i>
                                         </button>
-                                        <button class="icon-btn" onclick="copyRecovery()" title="Copiar">
+                                        <button type="button" class="icon-btn" onclick="copyRecovery()" title="Copiar">
                                             <i class="fas fa-copy" id="copyIcon"></i>
                                         </button>
                                     </div>
@@ -1655,26 +635,52 @@ $memberSince = !empty($admin['creat_employees']) ? date('d/m/Y', strtotime($admi
     <?php include __DIR__ . '/../../include/modal_logout.php'; ?>
 
     <script>
-    const BASE_URL = '<?= BASE_URL ?>';
-    const CSRF_TOKEN = '<?= $_SESSION['admin_csrf_token'] ?>';
+    const BASE_URL = <?= json_encode(BASE_URL, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?>;
+    const CSRF_TOKEN =
+        <?= json_encode($_SESSION['admin_csrf_token'] ?? '', JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?>;
+    const MAX_PROFILE_PHOTO_BYTES = <?= defined('MAX_UPLOAD_SIZE') ? (int) MAX_UPLOAD_SIZE : 2 * 1024 * 1024 ?>;
 
     // ── Toast ────────────────────────────────────────────────────
     function showToast(msg, type = 'success') {
-        const c = document.getElementById('toast-container');
-        const t = document.createElement('div');
-        t.className = `toast toast-${type}`;
+        const container = document.getElementById('toast-container');
+        const toast = document.createElement('div');
+        toast.className = `toast toast-${type}`;
         const icons = {
             success: 'check-circle',
             error: 'circle-xmark',
             info: 'circle-info'
         };
-        t.innerHTML = `<i class="fas fa-${icons[type] || 'circle-info'}"></i> ${msg}`;
-        c.appendChild(t);
+        const icon = document.createElement('i');
+        icon.className = `fas fa-${icons[type] || 'circle-info'}`;
+        icon.setAttribute('aria-hidden', 'true');
+        toast.appendChild(icon);
+        toast.appendChild(document.createTextNode(' ' + String(msg ?? '')));
+        container.appendChild(toast);
         setTimeout(() => {
-            t.style.opacity = '0';
-            t.style.transform = 'translateX(20px)';
-            setTimeout(() => t.remove(), 350);
+            toast.style.opacity = '0';
+            toast.style.transform = 'translateX(20px)';
+            setTimeout(() => toast.remove(), 350);
         }, 4000);
+    }
+
+    async function parseJsonResponse(response) {
+        const body = await response.text();
+        const contentType = response.headers.get('content-type') || '';
+        if (!contentType.toLowerCase().includes('application/json')) {
+            console.error('[Profile] Resposta não JSON', response.status, body.slice(0, 500));
+            if (response.redirected) {
+                throw new Error(
+                    'A sessão expirou ou foi redireccionada. Actualiza a página e inicia sessão novamente.');
+            }
+            throw new Error(
+                `Resposta inesperada do servidor (HTTP ${response.status}). Verifica a rota e o log PHP.`);
+        }
+        try {
+            return JSON.parse(body);
+        } catch (error) {
+            console.error('[Profile] JSON inválido', response.status, body.slice(0, 500));
+            throw new Error('O servidor devolveu uma resposta inválida. Verifica o log PHP.');
+        }
     }
 
     // ── Avatar: click + drag & drop ──────────────────────────────
@@ -1691,7 +697,7 @@ $memberSince = !empty($admin['creat_employees']) ? date('d/m/Y', strtotime($admi
         e.preventDefault();
         avatarZone.classList.remove('drag-over');
         const file = e.dataTransfer.files[0];
-        if (file && file.type.startsWith('image/')) {
+        if (file) {
             selectedAvatarFile = file;
             previewAvatar(file);
         }
@@ -1705,6 +711,18 @@ $memberSince = !empty($admin['creat_employees']) ? date('d/m/Y', strtotime($admi
     });
 
     function previewAvatar(file) {
+        const allowedTypes = ['image/jpeg', 'image/png', 'image/webp'];
+        if (!allowedTypes.includes(file.type)) {
+            selectedAvatarFile = null;
+            showToast('Formato não suportado. Usa JPEG, PNG ou WebP.', 'error');
+            return;
+        }
+        if (file.size > MAX_PROFILE_PHOTO_BYTES) {
+            selectedAvatarFile = null;
+            showToast(`A foto excede o limite de ${Math.round(MAX_PROFILE_PHOTO_BYTES / 1024 / 1024 * 10) / 10} MB.`,
+                'error');
+            return;
+        }
         const reader = new FileReader();
         reader.onload = function(ev) {
             let el = document.getElementById('avatarImg') || document.getElementById('avatarPlaceholder');
@@ -1716,7 +734,6 @@ $memberSince = !empty($admin['creat_employees']) ? date('d/m/Y', strtotime($admi
                 el = img;
             }
             el.src = ev.target.result;
-            document.getElementById('photoData').value = ev.target.result;
             showToast('Foto seleccionada. Guarda para aplicar.', 'info');
         };
         reader.readAsDataURL(file);
@@ -1733,8 +750,7 @@ $memberSince = !empty($admin['creat_employees']) ? date('d/m/Y', strtotime($admi
 
     // ── Reset form ───────────────────────────────────────────────
     function resetForm() {
-        document.getElementById('profileForm').reset();
-        showToast('Formulário reposto.', 'info');
+        window.location.reload();
     }
 
     // ── Submit perfil ────────────────────────────────────────────
@@ -1770,15 +786,15 @@ $memberSince = !empty($admin['creat_employees']) ? date('d/m/Y', strtotime($admi
                     'X-CSRF-Token': CSRF_TOKEN
                 }
             });
-            const data = await res.json();
+            const data = await parseJsonResponse(res);
             if (data.success) {
                 showToast(data.message || 'Perfil actualizado!', 'success');
                 setTimeout(() => location.reload(), 1200);
             } else {
                 (data.errors || [data.message]).forEach(m => showToast(m || 'Erro desconhecido.', 'error'));
             }
-        } catch {
-            showToast('Erro de rede. Tenta novamente.', 'error');
+        } catch (error) {
+            showToast(error.message || 'Não foi possível contactar o servidor.', 'error');
         } finally {
             submitBtn.disabled = false;
             submitBtn.innerHTML = '<i class="fas fa-floppy-disk"></i> Guardar Alterações';
@@ -1819,16 +835,16 @@ $memberSince = !empty($admin['creat_employees']) ? date('d/m/Y', strtotime($admi
                 el.checked = !enabled; // reverter
                 showToast(data.message || 'Erro ao alterar lockscreen.', 'error');
             }
-        } catch {
+        } catch (error) {
             el.checked = !enabled;
-            showToast('Erro de rede.', 'error');
+            showToast(error.message || 'Não foi possível contactar o servidor.', 'error');
         }
     }
 
     // ── Guardar PIN ──────────────────────────────────────────────
     async function savePin() {
         const pin = document.getElementById('newPinInput').value.trim();
-        if (!/^\d{4,6}$/.test(pin)) {
+        if (!/^\d{6}$/.test(pin)) {
             showToast('O PIN deve ter 6 dígitos numéricos.', 'error');
             return;
         }
@@ -1842,8 +858,8 @@ $memberSince = !empty($admin['creat_employees']) ? date('d/m/Y', strtotime($admi
             } else {
                 showToast(data.message || 'Erro ao guardar PIN.', 'error');
             }
-        } catch {
-            showToast('Erro de rede.', 'error');
+        } catch (error) {
+            showToast(error.message || 'Não foi possível contactar o servidor.', 'error');
         }
     }
 
@@ -1856,8 +872,8 @@ $memberSince = !empty($admin['creat_employees']) ? date('d/m/Y', strtotime($admi
                 showToast('Tentativas limpas.', 'success');
                 setTimeout(() => location.reload(), 900);
             } else showToast(data.message || 'Erro.', 'error');
-        } catch {
-            showToast('Erro de rede.', 'error');
+        } catch (error) {
+            showToast(error.message || 'Não foi possível contactar o servidor.', 'error');
         }
     }
 
@@ -1894,7 +910,8 @@ $memberSince = !empty($admin['creat_employees']) ? date('d/m/Y', strtotime($admi
     }
 
     // ── Input country uppercase ──────────────────────────────────
-    document.querySelector('[name="country_employees"]').addEventListener('input', function() {
+    const countryInput = document.querySelector('[name="country_employees"]');
+    if (countryInput) countryInput.addEventListener('input', function() {
         this.value = this.value.toUpperCase();
     });
     </script>

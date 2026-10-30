@@ -1,0 +1,297 @@
+/* ==========================================================================
+   GESTÃO DE MEDIA DO PROJECTO — estilos isolados
+   ========================================================================== */
+.project-media-page .breadcrumb {
+  display: flex;
+        align-items: center;
+        gap: .5rem;
+        font-size: .78rem;
+        color: var(--text-muted);
+        margin-bottom: .5rem
+}
+.project-media-page .breadcrumb a {
+  color: var(--text-dim);
+        text-decoration: none;
+        transition: color .2s
+}
+.project-media-page .breadcrumb a:hover {
+  color: var(--accent)
+}
+.project-media-page .breadcrumb i {
+  font-size: .6rem
+}
+.project-media-page .page-top {
+  display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        flex-wrap: wrap;
+        gap: 1rem;
+        margin-bottom: 1.5rem
+}
+.project-media-page .page-title {
+  font-family: var(--font-head);
+        font-size: 1.5rem;
+        font-weight: 800;
+        letter-spacing: -.02em;
+        margin-bottom: .2rem
+}
+.project-media-page .page-sub {
+  font-size: .8rem;
+        color: var(--text-muted)
+}
+.project-media-page .form-section {
+  background: var(--bg-card);
+        border: 1px solid var(--border);
+        border-radius: var(--radius-lg);
+        padding: 1.8rem;
+        margin-bottom: 1.2rem
+}
+.project-media-page .section-header {
+  display: flex;
+        align-items: flex-start;
+        gap: 1rem;
+        margin-bottom: 1.5rem;
+        padding-bottom: 1.2rem;
+        border-bottom: 1px solid var(--border)
+}
+.project-media-page .section-icon {
+  width: 40px;
+        height: 40px;
+        border-radius: 10px;
+        background: var(--accent-glow);
+        border: 1px solid var(--border-acc);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: var(--accent);
+        font-size: .95rem;
+        flex-shrink: 0
+}
+.project-media-page .section-header h3 {
+  font-family: var(--font-head);
+        font-size: 1rem;
+        font-weight: 700;
+        margin-bottom: .15rem
+}
+.project-media-page .section-header p {
+  font-size: .78rem;
+        color: var(--text-muted)
+}
+.project-media-page .form-group {
+  display: flex;
+        flex-direction: column;
+        gap: .35rem
+}
+.project-media-page .form-label {
+  font-size: .75rem;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: .04em;
+        color: var(--text-dim)
+}
+.project-media-page .form-control {
+  padding: .65rem .85rem;
+        background: var(--bg);
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        color: var(--text);
+        font-family: var(--font-body);
+        font-size: .88rem;
+        outline: none;
+        transition: border-color .2s, box-shadow .2s
+}
+.project-media-page .form-control:focus {
+  border-color: var(--accent);
+        box-shadow: 0 0 0 3px var(--accent-glow)
+}
+.project-media-page .upload-row {
+  display: flex;
+        gap: 1.2rem;
+        align-items: flex-end
+}
+@media (max-width:768px) {
+  .project-media-page .upload-row {
+    flex-direction: column
+  }
+}
+.project-media-page .upload-area-small {
+  border: 2px dashed var(--border);
+        border-radius: var(--radius);
+        padding: 1.5rem;
+        text-align: center;
+        cursor: pointer;
+        transition: all .25s;
+        min-height: 120px;
+        display: flex;
+        align-items: center;
+        justify-content: center
+}
+.project-media-page .upload-area-small:hover {
+  border-color: var(--accent);
+        background: rgba(37, 99, 235, .03)
+}
+.project-media-page .upload-placeholder {
+  color: var(--text-muted);
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: .5rem
+}
+.project-media-page .upload-placeholder i {
+  font-size: 1.8rem
+}
+.project-media-page .upload-placeholder span {
+  font-size: .82rem
+}
+.project-media-page .upload-preview-small img {
+  max-height: 150px;
+        border-radius: 8px
+}
+.project-media-page .btn {
+  display: inline-flex;
+        align-items: center;
+        gap: .45rem;
+        padding: .55rem 1.1rem;
+        border-radius: 8px;
+        font-family: var(--font-body);
+        font-size: .83rem;
+        font-weight: 500;
+        cursor: pointer;
+        transition: all .2s;
+        text-decoration: none;
+        border: 1px solid var(--border);
+        white-space: nowrap
+}
+.project-media-page .btn-primary {
+  background: var(--accent);
+        color: #fff;
+        border-color: var(--accent)
+}
+.project-media-page .btn-primary:hover {
+  background: #1d4ed8;
+        transform: translateY(-1px);
+        box-shadow: 0 4px 16px var(--accent-glow)
+}
+.project-media-page .btn-secondary {
+  background: transparent;
+        border: 1px solid var(--border);
+        color: var(--text-dim)
+}
+.project-media-page .btn-secondary:hover {
+  background: var(--bg-hover);
+        border-color: var(--border-acc);
+        color: var(--text)
+}
+.project-media-page .media-grid {
+  display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+        gap: 1rem
+}
+.project-media-page .media-card {
+  background: var(--bg);
+        border: 1px solid var(--border);
+        border-radius: var(--radius);
+        overflow: hidden;
+        transition: all .2s
+}
+.project-media-page .media-card:hover {
+  border-color: var(--border-acc);
+        transform: translateY(-2px)
+}
+.project-media-page .media-thumb {
+  position: relative;
+        aspect-ratio: 16/9;
+        overflow: hidden
+}
+.project-media-page .media-thumb img {
+  width: 100%;
+        height: 100%;
+        object-fit: cover
+}
+.project-media-page .media-overlay {
+  position: absolute;
+        inset: 0;
+        background: rgba(0, 0, 0, .6);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        opacity: 0;
+        transition: opacity .2s
+}
+.project-media-page .media-card:hover .media-overlay {
+  opacity: 1
+}
+.project-media-page .btn-icon-danger {
+  background: var(--danger);
+        border-color: var(--danger);
+        color: #fff;
+        width: 34px;
+        height: 34px;
+        border-radius: 8px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+        transition: all .2s
+}
+.project-media-page .btn-icon-danger:hover {
+  background: #dc2626;
+        transform: scale(1.1)
+}
+.project-media-page .media-caption {
+  padding: .5rem .7rem;
+        font-size: .75rem;
+        color: var(--text-dim);
+        text-align: center
+}
+.project-media-page .empty-state {
+  padding: 3rem 2rem;
+        text-align: center;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: .5rem
+}
+.project-media-page .empty-icon {
+  width: 64px;
+        height: 64px;
+        border-radius: 18px;
+        background: var(--bg);
+        border: 1px solid var(--border);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1.5rem;
+        color: var(--text-muted);
+        margin-bottom: .5rem
+}
+.project-media-page .empty-state h3 {
+  font-family: var(--font-head);
+        font-size: 1.1rem;
+        font-weight: 700
+}
+.project-media-page .empty-state p {
+  font-size: .85rem;
+        color: var(--text-muted);
+        max-width: 360px
+}
+
+/* Complementos e acessibilidade da gestão de media */
+.project-media-page .upload-area-small:focus-visible,
+.project-media-page .btn:focus-visible,
+.project-media-page .btn-icon:focus-visible,
+.project-media-page .delete-media:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+}
+.project-media-page .upload-area-small[aria-busy="true"] { opacity: .7; cursor: progress; }
+.project-media-page .upload-preview-small img { display: block; width: 100%; max-width: 100%; object-fit: contain; }
+.project-media-page .media-thumb img { display: block; }
+.project-media-page .media-caption { overflow-wrap: anywhere; }
+.project-media-page .page-sub { display:flex; align-items:center; flex-wrap:wrap; gap:.35rem; }
+.project-media-page .upload-form-status { margin-top:.75rem; }
+@media (max-width: 600px) {
+  .project-media-page .form-section { padding: 1rem; }
+  .project-media-page .media-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap:.65rem; }
+  .project-media-page .upload-area-small { min-height: 130px; padding:1rem; }
+}

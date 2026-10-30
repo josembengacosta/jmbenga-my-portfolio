@@ -11,17 +11,43 @@ require_once __DIR__ . '/../../includes/db.php';
 require_once __DIR__ . '/../../includes/functions.php';
 
 // ── Constantes exclusivas do painel admin ───────────────────
-define('ADMIN_SESSION_NAME',  'jm_panel_sess');
-define('ADMIN_COOKIE_NAME',   'jm_panel_remember');
-define('ADMIN_COOKIE_DAYS',   7);
-define('ADMIN_MAX_ATTEMPTS',  5);
-define('ADMIN_BLOCK_1_MIN',   10);   // 3 tentativas → 10 min
-define('ADMIN_BLOCK_2_MIN',   30);   // 5 tentativas → 30 min
-define('ADMIN_BLOCK_3_MIN',   60);   // 7+ tentativas → 60 min
+if (!defined('ADMIN_SESSION_NAME')) {
+    define('ADMIN_SESSION_NAME', 'jm_panel_sess');
+}
+if (!defined('ADMIN_COOKIE_NAME')) {
+    define('ADMIN_COOKIE_NAME', 'jm_panel_remember');
+}
+if (!defined('ADMIN_COOKIE_DAYS')) {
+    define('ADMIN_COOKIE_DAYS', 7);
+}
+if (!defined('ADMIN_MAX_ATTEMPTS')) {
+    define('ADMIN_MAX_ATTEMPTS', 5);
+}
+if (!defined('ADMIN_BLOCK_1_MIN')) {
+    define('ADMIN_BLOCK_1_MIN', 10); // 3 tentativas → 10 min
+}
+if (!defined('ADMIN_BLOCK_2_MIN')) {
+    define('ADMIN_BLOCK_2_MIN', 30); // 5 tentativas → 30 min
+}
+if (!defined('ADMIN_BLOCK_3_MIN')) {
+    define('ADMIN_BLOCK_3_MIN', 60); // 7+ tentativas → 60 min
+}
+
+/** Indica se os cookies administrativos devem ser marcados como Secure. */
+function adminCookieRequiresSecure(): bool
+{
+    $https = strtolower((string) ($_SERVER['HTTPS'] ?? ''));
+    return (defined('APP_ENV') && APP_ENV === 'production')
+        || ($https !== '' && $https !== 'off' && $https !== '0')
+        || (int) ($_SERVER['SERVER_PORT'] ?? 0) === 443;
+}
 
 function getAdminCookiePath(): string
 {
-    $path = parse_url(ADMIN_PATH, PHP_URL_PATH) ?: '/';
+    $configuredPath = parse_url((string) ADMIN_PATH, PHP_URL_PATH);
+    $path = is_string($configuredPath) && $configuredPath !== '' ? $configuredPath : '/';
+    $path = '/' . ltrim($path, '/');
+    $path = preg_replace('#/+#', '/', $path) ?: '/';
     return rtrim($path, '/') . '/';
 }
 
@@ -34,10 +60,10 @@ function startAdminSession(): void
     if (session_status() === PHP_SESSION_NONE) {
         session_name(ADMIN_SESSION_NAME);
         session_set_cookie_params([
-            'lifetime' => SESSION_LIFETIME,
+            'lifetime' => defined('SESSION_LIFETIME') ? (int) SESSION_LIFETIME : 0,
             'path'     => getAdminCookiePath(),
-            'domain'   => $_SERVER['HTTP_HOST'],
-            'secure'   => (APP_ENV === 'production'),
+            // Cookie host-only: evita domínio inválido por causa de :porta no HTTP_HOST.
+            'secure'   => adminCookieRequiresSecure(),
             'httponly' => true,
             'samesite' => 'Strict',
         ]);
@@ -55,12 +81,18 @@ function startAdminSession(): void
 
 function validateAdminCsrf(string $token): bool
 {
-    return isset($_SESSION['admin_csrf_token'])
+    return $token !== ''
+        && session_status() === PHP_SESSION_ACTIVE
+        && isset($_SESSION['admin_csrf_token'])
+        && is_string($_SESSION['admin_csrf_token'])
         && hash_equals($_SESSION['admin_csrf_token'], $token);
 }
 
 function regenerateAdminCsrf(): void
 {
+    if (session_status() !== PHP_SESSION_ACTIVE) {
+        startAdminSession();
+    }
     $_SESSION['admin_csrf_token'] = bin2hex(random_bytes(32));
 }
 
@@ -69,51 +101,60 @@ function isAdminLoggedIn(): bool
     return !empty($_SESSION['admin_id']);
 }
 
-/**
- * CORREÇÃO: Restaurada lógica de deduplicação do BASE_URL no REQUEST_URI
- * para evitar URLs duplicados quando o projeto está num subdiretório.
- */
+/** Exige sessão autenticada e revalida a conta em cada pedido protegido. */
 function requireAdminLogin(): void
 {
     if (!isAdminLoggedIn()) {
-        $requestUri = $_SERVER['REQUEST_URI'] ?? '';
-        $basePath = parse_url(BASE_URL, PHP_URL_PATH) ?: '';
+        $requestUri = (string) ($_SERVER['REQUEST_URI'] ?? '/');
+        $requestPath = parse_url($requestUri, PHP_URL_PATH);
+        $requestPath = is_string($requestPath) && $requestPath !== '' ? $requestPath : '/';
+        $requestQuery = parse_url($requestUri, PHP_URL_QUERY);
 
-        // Remover ocorrências do basePath do REQUEST_URI para evitar duplicação
-        if ($basePath !== '' && $basePath !== '/') {
-            $tmp = $requestUri;
-            while (str_starts_with($tmp, $basePath)) {
-                $tmp = substr($tmp, strlen($basePath));
-            }
-            $return = $tmp === '' ? '/' : $tmp;
-        } else {
-            $return = $requestUri;
+        $basePath = parse_url((string) BASE_URL, PHP_URL_PATH);
+        $basePath = is_string($basePath) ? rtrim($basePath, '/') : '';
+
+        // Remove o prefixo apenas quando corresponde a um segmento completo.
+        if ($basePath !== '' && ($requestPath === $basePath || str_starts_with($requestPath, $basePath . '/'))) {
+            $requestPath = substr($requestPath, strlen($basePath));
         }
 
-        if ($return === '' || !str_starts_with($return, '/')) {
-            $return = '/' . ltrim($return, '/');
+        $requestPath = '/' . ltrim($requestPath, '/');
+        if (str_starts_with($requestPath, '//') || str_contains($requestPath, "\\")) {
+            $requestPath = '/';
+        }
+
+        $return = $requestPath;
+        if (is_string($requestQuery) && $requestQuery !== '') {
+            $requestQuery = str_replace(["\r", "\n"], '', $requestQuery);
+            $return .= '?' . $requestQuery;
         }
 
         $_SESSION['admin_return_url'] = $return;
         redirect('/jm-panel/entrar');
+        return;
     }
 
-    $session_admin_id = (int) $_SESSION['admin_id'];
+    $sessionAdminId = (int) $_SESSION['admin_id'];
     try {
         $row = $GLOBALS['pdo']->prepare(
             "SELECT status_employees, role FROM _employees WHERE id_employees = ? LIMIT 1"
         );
-        $row->execute([$session_admin_id]);
-        $current = $row->fetch();
+        $row->execute([$sessionAdminId]);
+        $current = $row->fetch(PDO::FETCH_ASSOC);
 
-        if (!$current || $current['status_employees'] !== 'active') {
+        if (!$current || ($current['status_employees'] ?? null) !== 'active') {
             logoutAdmin();
             redirect('/jm-panel/entrar');
+            return;
         }
-    } catch (Exception $e) {
+
+        // Mantém a role da sessão sincronizada caso o nível de acesso seja alterado no ADMIN.
+        $_SESSION['admin_role'] = (string) ($current['role'] ?? '');
+    } catch (Throwable $e) {
         error_log('[ADMIN STATUS CHECK] ' . $e->getMessage());
         logoutAdmin();
         redirect('/jm-panel/entrar');
+        return;
     }
 }
 
@@ -131,15 +172,61 @@ function requireNoLockscreen(): void
 
 function createAdminResetToken(int $id): string
 {
-    $token   = bin2hex(random_bytes(32));
-    $expires = date('Y-m-d H:i:s', time() + 3600);
+    if ($id < 1) {
+        throw new InvalidArgumentException(
+            'Identificador de administrador inválido.'
+        );
+    }
 
-    $GLOBALS['pdo']->prepare("
-        UPDATE _employees_security
-        SET reset_password_token = ?,
-            reset_password_expires = ?
-        WHERE id_employees = ?
-    ")->execute([$token, $expires, $id]);
+    $db = $GLOBALS['pdo'];
+    $token = bin2hex(random_bytes(32));
+
+    $stmt = $db->prepare(
+        'SELECT id_sec_emp
+         FROM _employees_security
+         WHERE id_employees = ?
+         LIMIT 1'
+    );
+    $stmt->execute([$id]);
+    $securityId = $stmt->fetchColumn();
+
+    if ($securityId !== false) {
+        $stmt = $db->prepare(
+            'UPDATE _employees_security
+             SET reset_password_token = ?,
+                 reset_password_expires = DATE_ADD(NOW(), INTERVAL 1 HOUR)
+             WHERE id_sec_emp = ?'
+        );
+        $stmt->execute([$token, (int) $securityId]);
+    } else {
+        // recovery_key é obrigatório e tem 60 caracteres no máximo.
+        $recoveryKey = bin2hex(random_bytes(30));
+
+        $stmt = $db->prepare(
+            'INSERT INTO _employees_security
+                (id_employees, recovery_key,
+                 reset_password_token, reset_password_expires)
+             VALUES (?, ?, ?, DATE_ADD(NOW(), INTERVAL 1 HOUR))'
+        );
+        $stmt->execute([$id, $recoveryKey, $token]);
+    }
+
+    // Confirma que o token existe e ainda está dentro da validade.
+    $stmt = $db->prepare(
+        'SELECT 1
+         FROM _employees_security
+         WHERE id_employees = ?
+           AND reset_password_token = ?
+           AND reset_password_expires > NOW()
+         LIMIT 1'
+    );
+    $stmt->execute([$id, $token]);
+
+    if (!$stmt->fetchColumn()) {
+        throw new RuntimeException(
+            'Não foi possível confirmar o token de recuperação.'
+        );
+    }
 
     return $token;
 }
@@ -182,6 +269,15 @@ function getAdminById(int $id): ?array
 
 function sendAdminResetEmail(string $email, string $name, string $token): bool
 {
+    $email = trim($email);
+    $name = trim($name);
+    $token = trim($token);
+
+    if (!filter_var($email, FILTER_VALIDATE_EMAIL) || !preg_match('/\A[a-f0-9]{64}\z/i', $token)) {
+        error_log('[ADMIN MAILER] Pedido de redefinição com email ou token inválido.');
+        return false;
+    }
+
     $mailer_path = __DIR__ . '/../../includes/JmbengaMailer.php';
 
     if (!file_exists($mailer_path)) {
@@ -196,7 +292,9 @@ function sendAdminResetEmail(string $email, string $name, string $token): bool
         return false;
     }
 
-    $link    = BASE_URL . '/jm-panel/reset-password?token=' . urlencode($token);
+    $link = rtrim((string) BASE_URL, '/') . '/jm-panel/reset-password?token=' . rawurlencode($token);
+    $safeName = htmlspecialchars($name, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
+    $safeLink = htmlspecialchars($link, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
     $subject = 'Redefinir senha — Painel JMbenga';
 
     $bodyHtml = "
@@ -207,10 +305,10 @@ function sendAdminResetEmail(string $email, string $name, string $token): bool
       </div>
       <div style='background:#fff;padding:36px 32px;border:1px solid #eee;border-top:none;border-radius:0 0 10px 10px'>
         <h2 style='color:#111;margin-top:0;font-size:1.3rem;font-family:\"Syne\",sans-serif'>Redefinição de senha</h2>
-        <p>Olá <strong>{$name}</strong>,</p>
+        <p>Olá <strong>{$safeName}</strong>,</p>
         <p>Recebemos um pedido de redefinição de senha para a tua conta de administrador do portfólio <strong>JMbenga</strong>.</p>
         <div style='text-align:center;margin:32px 0'>
-          <a href='{$link}'
+          <a href='{$safeLink}'
              style='background:#2563eb;color:#fff;text-decoration:none;
                     padding:14px 36px;border-radius:8px;font-size:0.95rem;
                     font-weight:700;display:inline-block'>
@@ -219,7 +317,7 @@ function sendAdminResetEmail(string $email, string $name, string $token): bool
         </div>
         <p style='color:#666;font-size:.88rem'>
           Se o botão não funcionar, copia e cola este link:<br>
-          <a href='{$link}' style='color:#2563eb;word-break:break-all;font-size:.82rem'>{$link}</a>
+          <a href='{$safeLink}' style='color:#2563eb;word-break:break-all;font-size:.82rem'>{$safeLink}</a>
         </p>
         <div style='background:#f8faff;border-left:3px solid #2563eb;padding:12px 16px;border-radius:0 6px 6px 0;margin:20px 0'>
           <p style='margin:0;font-size:.85rem;color:#555'>
@@ -239,7 +337,7 @@ function sendAdminResetEmail(string $email, string $name, string $token): bool
         $mailer->secure   = MAIL_SECURE;
         $mailer->username = MAIL_USER;
         $mailer->password = MAIL_PASS;
-        $mailer->debug    = (APP_ENV === 'production') ? 1 : 0;
+        $mailer->debug    = (APP_ENV === 'production') ? 0 : 1;
 
         $mailer->setFrom(MAIL_FROM, MAIL_FROM_NAME)
             ->addAddress($email, $name)
@@ -248,8 +346,8 @@ function sendAdminResetEmail(string $email, string $name, string $token): bool
             ->send();
 
         return true;
-    } catch (\Jmbenga\MailerException $e) {
-        error_log('[ADMIN MAILER] Falha ao enviar reset email para ' . $email . ': ' . $e->getMessage());
+    } catch (Throwable $e) {
+        error_log('[ADMIN MAILER] Falha no envio de email de redefinição: ' . $e->getMessage());
         return false;
     }
 }
@@ -303,17 +401,24 @@ function updateAdminPassword(int $id, string $newPassword): void
 function isAdminBlocked(array $admin): array
 {
     if (!empty($admin['block_until'])) {
-        if (strtotime($admin['block_until']) > time()) {
+        $blockedUntil = strtotime((string) $admin['block_until']);
+        if ($blockedUntil !== false && $blockedUntil > time()) {
             return [
                 'blocked' => true,
                 'until'   => $admin['block_until'],
                 'reason'  => 'attempts',
             ];
         }
-        resetAdminLoginAttempts((int)$admin['id_employees']);
+
+        // Expira apenas o bloqueio actual. Mantemos tentativas/nível para que
+        // os bloqueios progressivos de 10, 30 e 60 minutos possam evoluir.
+        $GLOBALS['pdo']->prepare(
+            "UPDATE _employees_security SET block_until = NULL WHERE id_employees = ? AND block_until <= NOW()"
+        )->execute([(int) ($admin['id_employees'] ?? 0)]);
+        $admin['block_until'] = null;
     }
 
-    if ($admin['status_employees'] !== 'active') {
+    if (($admin['status_employees'] ?? null) !== 'active') {
         return [
             'blocked' => true,
             'until'   => null,
@@ -371,32 +476,51 @@ function recordAdminLoginSuccess(int $id): void
 
 function setAdminRememberCookie(int $id): void
 {
+    if (headers_sent()) {
+        error_log('[ADMIN REMEMBER] Não foi possível emitir o cookie porque os headers já foram enviados.');
+        return;
+    }
+
     $token   = bin2hex(random_bytes(32));
     $expires = time() + (ADMIN_COOKIE_DAYS * 24 * 3600);
+
+    // Guardar o token antes de expor o cookie ao navegador.
+    $GLOBALS['pdo']->prepare("UPDATE _employees_security SET remember_token = ? WHERE id_employees = ?")
+        ->execute([$token, $id]);
 
     setcookie(ADMIN_COOKIE_NAME, $token, [
         'expires'  => $expires,
         'path'     => getAdminCookiePath(),
-        'secure'   => (APP_ENV === 'production'),
+        'secure'   => adminCookieRequiresSecure(),
         'httponly' => true,
         'samesite' => 'Strict',
     ]);
-
-    $GLOBALS['pdo']->prepare("UPDATE _employees_security SET remember_token = ? WHERE id_employees = ?")
-        ->execute([$token, $id]);
 }
 
 function clearAdminRememberCookie(int $id): void
 {
-    setcookie(ADMIN_COOKIE_NAME, '', [
-        'expires'  => 1,
-        'path'     => getAdminCookiePath(),
-        'secure'   => (APP_ENV === 'production'),
-        'httponly' => true,
-        'samesite' => 'Strict',
-    ]);
-    $GLOBALS['pdo']->prepare("UPDATE _employees_security SET remember_token = NULL WHERE id_employees = ?")
-        ->execute([$id]);
+    if (!headers_sent()) {
+        setcookie(ADMIN_COOKIE_NAME, '', [
+            'expires'  => time() - 3600,
+            'path'     => getAdminCookiePath(),
+            'secure'   => adminCookieRequiresSecure(),
+            'httponly' => true,
+            'samesite' => 'Strict',
+        ]);
+    }
+
+    // ID 0 é usado quando o cookie recebido não corresponde a nenhuma conta.
+    if ($id <= 0) {
+        return;
+    }
+
+    try {
+        $GLOBALS['pdo']->prepare("UPDATE _employees_security SET remember_token = NULL WHERE id_employees = ?")
+            ->execute([$id]);
+    } catch (Throwable $e) {
+        // Falha de BD não deve impedir a limpeza da sessão no logout.
+        error_log('[ADMIN REMEMBER] Não foi possível invalidar o token persistido: ' . $e->getMessage());
+    }
 }
 
 function checkAdminRememberMe(): void
@@ -404,7 +528,10 @@ function checkAdminRememberMe(): void
     if (isAdminLoggedIn()) return;
 
     $token = $_COOKIE[ADMIN_COOKIE_NAME] ?? null;
-    if (!$token || !preg_match('/^[a-f0-9]{64}$/', $token)) {
+    if (!is_string($token) || !preg_match('/\A[a-f0-9]{64}\z/i', $token)) {
+        if (isset($_COOKIE[ADMIN_COOKIE_NAME])) {
+            clearAdminRememberCookie(0);
+        }
         return;
     }
 
@@ -453,11 +580,16 @@ function activateLockscreen(int $id): void
 {
     $db = $GLOBALS['pdo'];
 
-    $existing = $db->prepare("SELECT access_code FROM _employees_security WHERE id_employees = ?");
+    $existing = $db->prepare("SELECT access_code FROM _employees_security WHERE id_employees = ? LIMIT 1");
     $existing->execute([$id]);
     $code = $existing->fetchColumn();
 
-    if (empty($code) || !preg_match('/^\d{6}$/', (string)$code)) {
+    if ($code === false) {
+        error_log('[ADMIN LOCKSCREEN] Não existe registo de segurança para o administrador ' . $id . '.');
+        return;
+    }
+
+    if (empty($code) || !preg_match('/\A\d{6}\z/', (string)$code)) {
         $code = str_pad((string) random_int(0, 999999), 6, '0', STR_PAD_LEFT);
         $db->prepare("UPDATE _employees_security SET access_code = ? WHERE id_employees = ?")
             ->execute([$code, $id]);
@@ -479,7 +611,11 @@ function validateAndUnlock(int $id, string $code): bool
     $stmt->execute([$id]);
     $row = $stmt->fetch();
 
-    if (!$row || !hash_equals((string) $row['access_code'], trim($code))) {
+    $storedCode = is_array($row) ? (string) ($row['access_code'] ?? '') : '';
+    $providedCode = trim($code);
+    if (!preg_match('/\A\d{6}\z/', $providedCode)
+        || !preg_match('/\A\d{6}\z/', $storedCode)
+        || !hash_equals($storedCode, $providedCode)) {
         return false;
     }
 
@@ -497,24 +633,36 @@ function validateAndUnlock(int $id, string $code): bool
 
 function logoutAdmin(): void
 {
-    $id = $_SESSION['admin_id'] ?? null;
-    if ($id) {
-        logAudit((int)$id, null, 'auth.logout', 'employees', (int)$id);
-        clearAdminRememberCookie((int)$id);
+    $id = (int) ($_SESSION['admin_id'] ?? 0);
+
+    if ($id > 0) {
+        logAudit($id, null, 'auth.logout', 'employees', $id);
     }
+
+    // Invalida o remember-me sem permitir que uma falha de BD impeça o logout local.
+    clearAdminRememberCookie($id);
+
     $_SESSION = [];
-    if (ini_get('session.use_cookies')) {
-        $p = session_get_cookie_params();
-        setcookie(session_name(), '', [
-            'expires'  => time() - 42000,
-            'path'     => $p['path'],
-            'domain'   => $p['domain'],
-            'secure'   => $p['secure'],
-            'httponly' => true,
-            'samesite' => 'Strict',
-        ]);
+    if (session_status() === PHP_SESSION_ACTIVE && ini_get('session.use_cookies')) {
+        $params = session_get_cookie_params();
+        if (!headers_sent()) {
+            $sessionCookieOptions = [
+                'expires'  => time() - 3600,
+                'path'     => $params['path'] ?? '/',
+                'secure'   => (bool) ($params['secure'] ?? false),
+                'httponly' => true,
+                'samesite' => 'Strict',
+            ];
+            if (!empty($params['domain'])) {
+                $sessionCookieOptions['domain'] = $params['domain'];
+            }
+            setcookie(session_name(), '', $sessionCookieOptions);
+        }
     }
-    session_destroy();
+
+    if (session_status() === PHP_SESSION_ACTIVE) {
+        session_destroy();
+    }
 }
 
 // ══════════════════════════════════════════════════════════════
@@ -541,34 +689,39 @@ function logAudit(
             $action,
             $entity,
             $entity_id,
-            $old !== null ? json_encode($old, JSON_UNESCAPED_UNICODE) : null,
-            $new !== null ? json_encode($new, JSON_UNESCAPED_UNICODE) : null,
+            $old !== null ? json_encode($old, JSON_UNESCAPED_UNICODE | JSON_INVALID_UTF8_SUBSTITUTE) : null,
+            $new !== null ? json_encode($new, JSON_UNESCAPED_UNICODE | JSON_INVALID_UTF8_SUBSTITUTE) : null,
             $ip,
             $ua,
         ]);
-    } catch (PDOException $e) {
+    } catch (Throwable $e) {
         error_log('[AUDIT LOG] ' . $e->getMessage());
     }
 }
 
+/**
+ * Obtém o endereço remoto sem confiar cegamente em X-Forwarded-For/X-Real-IP.
+ * Esses cabeçalhos só devem ser usados após configurar explicitamente um proxy confiável.
+ */
 function getRealClientIp(): string
 {
-    $headers = ['HTTP_X_FORWARDED_FOR', 'HTTP_X_REAL_IP', 'REMOTE_ADDR'];
-    foreach ($headers as $h) {
-        if (!empty($_SERVER[$h])) {
-            $ip = $_SERVER[$h];
-            if ($h === 'HTTP_X_FORWARDED_FOR') {
-                $ips = explode(',', $ip);
-                $ip = trim($ips[0]);
-            }
-            if (filter_var($ip, FILTER_VALIDATE_IP, FILTER_FLAG_NO_PRIV_RANGE | FILTER_FLAG_NO_RES_RANGE)) {
-                return $ip;
-            }
-            if (filter_var($ip, FILTER_VALIDATE_IP)) {
-                return $ip;
-            }
+    $remoteAddress = trim((string) ($_SERVER['REMOTE_ADDR'] ?? ''));
+    if ($remoteAddress !== '' && filter_var($remoteAddress, FILTER_VALIDATE_IP)) {
+        return $remoteAddress;
+    }
+
+    // Fallback apenas para ambientes que não fornecem REMOTE_ADDR válido.
+    // Não é usado quando existe um endereço remoto válido, evitando spoofing comum.
+    foreach (['HTTP_X_REAL_IP', 'HTTP_X_FORWARDED_FOR'] as $header) {
+        $candidate = trim((string) ($_SERVER[$header] ?? ''));
+        if ($header === 'HTTP_X_FORWARDED_FOR') {
+            $candidate = trim(explode(',', $candidate)[0] ?? '');
+        }
+        if ($candidate !== '' && filter_var($candidate, FILTER_VALIDATE_IP)) {
+            return $candidate;
         }
     }
+
     return '—';
 }
 
@@ -603,7 +756,7 @@ function parseBrowserFromUA(string $ua): string
 {
     $raw = $ua;
     $browsers = [
-        'Edge'    => '/edg?\//i',
+        'Edge'    => '/edg(?:e|a|ios)?\//i',
         'Opera'   => '/opr\//i',
         'Brave'   => '/brave/i',
         'Chrome'  => '/chrome\/([\d.]+)/i',
@@ -625,10 +778,10 @@ function parseOSFromUA(string $ua): string
 {
     $raw = $ua;
     $patterns = [
-        'Windows 11'  => '/windows nt 10\.0.*win64/i',
-        'Windows 10'  => '/windows nt 10\.0/i',
-        'Windows 7'   => '/windows nt 6\.1/i',
-        'Windows'     => '/windows/i',
+        // Windows 10 e 11 usam frequentemente o mesmo token NT 10.0; não inferir um deles.
+        'Windows 10/11' => '/windows nt 10\.0/i',
+        'Windows 7'     => '/windows nt 6\.1/i',
+        'Windows'       => '/windows/i',
         'macOS'       => '/mac os x ([\d_]+)/i',
         'Android'     => '/android ([\d.]+)/i',
         'iOS'         => '/iphone|ipad/i',
@@ -655,6 +808,8 @@ function parseOSFromUA(string $ua): string
 
 function getVisitorChartData(int $days = 7): array
 {
+    // Limita o intervalo para impedir consultas acidentalmente enormes.
+    $days = max(1, min(90, $days));
     $db = $GLOBALS['pdo'];
 
     $rawRows = $db->prepare("
@@ -686,34 +841,125 @@ function getVisitorChartData(int $days = 7): array
     return ['labels' => $labels, 'data' => $data, 'total' => array_sum($data)];
 }
 
-function getStatTrend(string $table, string $dateCol, int $days = 7, string $where = ''): float
+/**
+ * Converte filtros simples em condições SQL estritamente permitidas.
+ * Aceita apenas comparações por igualdade unidas por AND. Nunca insere SQL livre.
+ */
+function buildAdminTrendCondition(string $table, string $where): string
 {
-    static $allowedTables = ['_visitor', '_contact_message', '_projects', '_skills', '_testimonials'];
-    static $allowedCols  = ['creat_visitor', 'creat_msg', 'creat_project', 'creat_skill', 'creat_testimonial', 'updated_at'];
-
-    if (!in_array($table, $allowedTables, true) || !in_array($dateCol, $allowedCols, true)) {
-        throw new InvalidArgumentException('Tabela ou coluna não permitida.');
+    $where = trim($where);
+    if ($where === '') {
+        return '';
     }
 
-    $db = $GLOBALS['pdo'];
-    $cond = $where ? "AND ({$where})" : '';
+    $allowed = [
+        '_visitor' => [
+            'is_bot' => ['0', '1'],
+            'is_online' => ['0', '1'],
+            'status_visitor' => ["'active'", "'blocked'", "'suspicious'"],
+            'device_type' => ["'desktop'", "'mobile'", "'tablet'", "'bot'", "'unknown'"],
+        ],
+        '_contact_message' => [
+            'status_msg' => ["'new'", "'read'", "'replied'", "'archived'"],
+            'is_starred' => ['0', '1'],
+        ],
+        '_projects' => [
+            'status_project' => ["'published'", "'draft'", "'archived'"],
+            'category_project' => ["'web'", "'mobile'", "'api'", "'desktop'", "'design'", "'other'"],
+            'is_featured' => ['0', '1'],
+        ],
+        '_skills' => [
+            'is_visible' => ['0', '1'],
+            'category_skill' => ["'frontend'", "'backend'", "'devops'", "'design'", "'other'"],
+        ],
+        '_testimonials' => [
+            'status_testimonial' => ["'visible'", "'hidden'"],
+        ],
+    ];
 
-    $thisQ = $db->prepare("
-        SELECT COUNT(*) FROM {$table}
-        WHERE {$dateCol} >= DATE_SUB(NOW(), INTERVAL {$days} DAY) {$cond}
-    ");
+    if (!isset($allowed[$table])) {
+        throw new InvalidArgumentException('Tabela não permitida para filtros de tendência.');
+    }
+
+    $parts = preg_split('/\s+AND\s+/i', $where) ?: [];
+    if (!$parts) {
+        throw new InvalidArgumentException('Filtro de tendência inválido.');
+    }
+
+    $sqlParts = [];
+    foreach ($parts as $part) {
+        if (!preg_match("/\\A([a-zA-Z_][a-zA-Z0-9_]*)\\s*=\\s*(?:'([a-zA-Z0-9_-]+)'|([0-9]+))\\z/", trim($part), $matches)) {
+            throw new InvalidArgumentException('Filtro inválido: use apenas comparações permitidas ligadas por AND.');
+        }
+
+        $column = $matches[1];
+        $value = isset($matches[2]) && $matches[2] !== ''
+            ? "'" . $matches[2] . "'"
+            : ($matches[3] ?? '');
+
+        if (!isset($allowed[$table][$column]) || !in_array($value, $allowed[$table][$column], true)) {
+            throw new InvalidArgumentException('Coluna ou valor não permitido no filtro de tendência.');
+        }
+
+        $sqlParts[] = '`' . $column . '` = ' . $value;
+    }
+
+    return 'AND (' . implode(' AND ', $sqlParts) . ')';
+}
+
+function getStatTrend(string $table, string $dateCol, int $days = 7, string $where = ''): float
+{
+    // _skills não tem uma coluna temporal no esquema actual, por isso não é
+    // possível calcular uma tendência temporal real sem alterar a base de dados.
+    if ($table === '_skills') {
+        static $skillsTrendWarningLogged = false;
+        if (!$skillsTrendWarningLogged) {
+            error_log('[ADMIN TREND] _skills não tem coluna temporal; tendência devolvida como 0.');
+            $skillsTrendWarningLogged = true;
+        }
+        return 0.0;
+    }
+
+    $dateColumns = [
+        '_visitor' => ['creat_visitor'],
+        // Alias legado creat_msg é normalizado para a coluna real da tabela.
+        '_contact_message' => ['created_at', 'creat_msg'],
+        '_projects' => ['creat_project'],
+        '_testimonials' => ['creat_testimonial'],
+    ];
+
+    if (!isset($dateColumns[$table]) || !in_array($dateCol, $dateColumns[$table], true)) {
+        throw new InvalidArgumentException('Tabela ou coluna temporal não permitida para tendência.');
+    }
+
+    if ($table === '_contact_message') {
+        $dateCol = 'created_at';
+    }
+
+    $days = max(1, min(365, $days));
+    $condition = buildAdminTrendCondition($table, $where);
+    $db = $GLOBALS['pdo'];
+
+    $thisQ = $db->prepare(
+        "SELECT COUNT(*) FROM {$table}
+         WHERE {$dateCol} >= DATE_SUB(NOW(), INTERVAL {$days} DAY) {$condition}"
+    );
     $thisQ->execute();
     $thisCount = (int) $thisQ->fetchColumn();
 
-    $prevQ = $db->prepare("
-        SELECT COUNT(*) FROM {$table}
-        WHERE {$dateCol} BETWEEN DATE_SUB(NOW(), INTERVAL ? DAY)
-              AND DATE_SUB(NOW(), INTERVAL {$days} DAY) {$cond}
-    ");
-    $prevQ->execute([$days * 2]);
+    $previousDays = $days * 2;
+    $prevQ = $db->prepare(
+        "SELECT COUNT(*) FROM {$table}
+         WHERE {$dateCol} BETWEEN DATE_SUB(NOW(), INTERVAL {$previousDays} DAY)
+               AND DATE_SUB(NOW(), INTERVAL {$days} DAY) {$condition}"
+    );
+    $prevQ->execute();
     $prevCount = (int) $prevQ->fetchColumn();
 
-    if ($prevCount === 0) return $thisCount > 0 ? 100.0 : 0.0;
+    if ($prevCount === 0) {
+        return $thisCount > 0 ? 100.0 : 0.0;
+    }
+
     return round((($thisCount - $prevCount) / $prevCount) * 100, 1);
 }
 
@@ -737,6 +983,7 @@ function getMessageBreakdown(): array
 
 function getTopPages(int $limit = 5): array
 {
+    $limit = max(1, min(100, $limit));
     $stmt = $GLOBALS['pdo']->prepare("
         SELECT page_url, page_title, COUNT(*) AS views
         FROM _visitor_pageview
@@ -744,8 +991,9 @@ function getTopPages(int $limit = 5): array
         ORDER BY views DESC
         LIMIT ?
     ");
-    $stmt->execute([$limit]);
-    return $stmt->fetchAll();
+    $stmt->bindValue(1, $limit, PDO::PARAM_INT);
+    $stmt->execute();
+    return $stmt->fetchAll(PDO::FETCH_ASSOC);
 }
 
 function getDeviceBreakdown(): array
@@ -767,6 +1015,7 @@ function getDeviceBreakdown(): array
 
 function getTopCountries(int $limit = 5): array
 {
+    $limit = max(1, min(100, $limit));
     $stmt = $GLOBALS['pdo']->prepare("
         SELECT country_name, country_code, COUNT(*) AS total
         FROM _visitor
@@ -775,8 +1024,9 @@ function getTopCountries(int $limit = 5): array
         ORDER BY total DESC
         LIMIT ?
     ");
-    $stmt->execute([$limit]);
-    return $stmt->fetchAll();
+    $stmt->bindValue(1, $limit, PDO::PARAM_INT);
+    $stmt->execute();
+    return $stmt->fetchAll(PDO::FETCH_ASSOC);
 }
 
 function getPortfolioHealthScore(): int

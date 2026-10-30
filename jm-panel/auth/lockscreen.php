@@ -1,62 +1,89 @@
 <?php
 // ══════════════════════════════════════════════════════════════
-// JMbenga Portfolio — Lockscreen (Refactored)
+// JMbenga Portfolio — Lockscreen
 // ══════════════════════════════════════════════════════════════
 declare(strict_types=1);
 
 require_once __DIR__ . '/../include/functions_admin.php';
 
 startAdminSession();
+checkAdminRememberMe();
 
-if (empty($_SESSION['admin_id'])) {
+$adminId = (int) ($_SESSION['admin_id'] ?? 0);
+if ($adminId <= 0) {
     redirect('/jm-panel/entrar');
 }
 
-if (empty($_SESSION['admin_lockscreen'])) {
-    redirect('/jm-panel/home');
+$db = $GLOBALS['pdo'];
+try {
+    $stmt = $db->prepare(
+        "SELECT e.first_name, e.second_name, e.email_employees, e.photo_employees, e.status_employees,
+                s.id_employees AS security_admin_id, s.access_code, s.lockscreen
+         FROM _employees e
+         LEFT JOIN _employees_security s ON s.id_employees = e.id_employees
+         WHERE e.id_employees = ?
+         LIMIT 1"
+    );
+    $stmt->execute([$adminId]);
+    $admin = $stmt->fetch(PDO::FETCH_ASSOC) ?: null;
+} catch (Throwable $e) {
+    error_log('[ADMIN LOCKSCREEN PAGE] Falha ao carregar a conta: ' . $e->getMessage());
+    http_response_code(500);
+    exit('Não foi possível carregar o ecrã de bloqueio. Tenta novamente mais tarde.');
 }
 
-$db = $GLOBALS['pdo'];
-$adminId = (int) $_SESSION['admin_id'];
-
-$stmt = $db->prepare("
-    SELECT e.first_name, e.second_name, e.email_employees, e.photo_employees, e.status_employees,
-           s.access_code, s.lockscreen
-    FROM _employees e
-    LEFT JOIN _employees_security s ON s.id_employees = e.id_employees
-    WHERE e.id_employees = ?
-    LIMIT 1
-");
-$stmt->execute([$adminId]);
-$admin = $stmt->fetch();
-
-if (!$admin || $admin['status_employees'] !== 'active') {
+if (!$admin || ($admin['status_employees'] ?? null) !== 'active') {
     logoutAdmin();
     redirect('/jm-panel/entrar');
 }
 
-$adminName    = trim(($admin['first_name'] ?? '') . ' ' . ($admin['second_name'] ?? ''));
-$adminEmail   = $admin['email_employees'] ?? '';
-$adminPhoto   = null;
-$adminInitial = strtoupper(mb_substr((string)($admin['first_name'] ?? ''), 0, 1));
+if (empty($admin['security_admin_id'])) {
+    error_log('[ADMIN LOCKSCREEN PAGE] Falta o registo de segurança para o administrador ' . $adminId . '.');
+    logoutAdmin();
+    redirect('/jm-panel/entrar?msg=error&error=' . urlencode('Não foi possível validar a segurança da conta. Inicia sessão novamente.'));
+}
 
-// Segurança: validar nome do arquivo antes de usar em path
-if (!empty($admin['photo_employees']) && preg_match('/^[a-zA-Z0-9_\-\.]+$/', $admin['photo_employees'])) {
-    $photoPath = ROOT_PATH . '/assets/img/profile/' . $admin['photo_employees'];
+// A base de dados é a fonte de verdade para o estado do bloqueio.
+if (empty($admin['lockscreen'])) {
+    $_SESSION['admin_lockscreen'] = false;
+    unset($_SESSION['admin_lockscreen_attempts'], $_SESSION['admin_lockscreen_block_until']);
+    redirect('/jm-panel/home');
+}
+$_SESSION['admin_lockscreen'] = true;
+
+$firstName = (string) ($admin['first_name'] ?? '');
+$adminName = trim($firstName . ' ' . (string) ($admin['second_name'] ?? ''));
+$adminEmail = (string) ($admin['email_employees'] ?? '');
+$adminPhoto = null;
+$adminInitial = strtoupper(function_exists('mb_substr') ? mb_substr($firstName, 0, 1, 'UTF-8') : substr($firstName, 0, 1));
+if ($adminInitial === '') {
+    $adminInitial = 'A';
+}
+
+// Apenas ficheiros de imagem com nome simples são aceites.
+$photoFile = is_string($admin['photo_employees'] ?? null) ? $admin['photo_employees'] : '';
+if ($photoFile !== '' && preg_match('/\A[a-zA-Z0-9_-][a-zA-Z0-9_.-]*\.(?:png|jpe?g|webp|gif)\z/i', $photoFile)) {
+    $photoPath = ROOT_PATH . '/assets/img/profile/' . $photoFile;
     if (is_file($photoPath) && is_readable($photoPath)) {
-        $adminPhoto = $admin['photo_employees'];
+        $adminPhoto = $photoFile;
     }
 }
 
-$error = $_GET['error'] ?? '';
+$errorValue = $_GET['error'] ?? '';
+$error = is_string($errorValue) ? trim($errorValue) : '';
+$error = function_exists('mb_substr') ? mb_substr($error, 0, 300, 'UTF-8') : substr($error, 0, 300);
 $clientIp = getRealClientIp();
-$osInfo = parseOSFromUA($_SERVER['HTTP_USER_AGENT'] ?? '');
-$loginTime = $_SESSION['admin_login_time'] ?? time();
+$userAgent = is_string($_SERVER['HTTP_USER_AGENT'] ?? null) ? $_SERVER['HTTP_USER_AGENT'] : '';
+$osInfo = parseOSFromUA($userAgent);
+$loginTime = max(0, (int) ($_SESSION['admin_login_time'] ?? time()));
 $sessionMins = max(0, (int) floor((time() - $loginTime) / 60));
 
-// Base URL seguro para JS
-$baseUrlJson = json_encode(BASE_URL, JSON_UNESCAPED_SLASHES | JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP);
-$csrfToken = $_SESSION['admin_csrf_token'] ?? '';
+// Codificação segura para utilizar BASE_URL em JavaScript.
+$baseUrlJson = json_encode((string) BASE_URL, JSON_UNESCAPED_SLASHES | JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP);
+if (!is_string($baseUrlJson)) {
+    $baseUrlJson = '""';
+}
+$csrfToken = is_string($_SESSION['admin_csrf_token'] ?? null) ? $_SESSION['admin_csrf_token'] : '';
 ?>
 <!DOCTYPE html>
 <html lang="pt" data-theme="dark">
@@ -638,15 +665,15 @@ $csrfToken = $_SESSION['admin_csrf_token'] ?? '';
                 // Enter no último campo → submit
                 if (e.key === 'Enter' && index === pinInputs.length - 1) {
                     e.preventDefault();
-                    form.dispatchEvent(new Event('submit'));
+                    form.requestSubmit();
                 }
             });
 
             // Colar código completo
             input.addEventListener('paste', function(e) {
                 e.preventDefault();
-                const paste = (e.clipboardData.getData('text') || '').replace(/[^0-9]/g, '').slice(
-                    0, 6);
+                const clipboardText = e.clipboardData ? e.clipboardData.getData('text') : '';
+                const paste = (clipboardText || '').replace(/[^0-9]/g, '').slice(0, 6);
                 if (!paste) return;
 
                 pinInputs.forEach((inp, i) => {
@@ -709,8 +736,16 @@ $csrfToken = $_SESSION['admin_csrf_token'] ?? '';
 
                 const data = await res.json();
 
+                if (data.force_logout && typeof data.return_url === 'string') {
+                    window.location.replace(data.return_url);
+                    return;
+                }
+
                 if (data.success) {
-                    window.location.href = data.return_url || (BASE_URL + '/jm-panel/home');
+                    const destination = typeof data.return_url === 'string' ?
+                        data.return_url :
+                        (BASE_URL + '/jm-panel/home');
+                    window.location.replace(destination);
                     return;
                 }
 
@@ -727,7 +762,13 @@ $csrfToken = $_SESSION['admin_csrf_token'] ?? '';
                 }
 
                 shakeInputs();
-                showToast(data.message || 'Código incorrecto.', 'error');
+                pinInputs.forEach((input) => {
+                    input.value = '';
+                });
+                pinInputs[0].focus();
+                updateSubmitState();
+                showToast(typeof data.message === 'string' ? data.message : 'Código incorrecto.',
+                    'error');
 
             } catch (err) {
                 showToast('Erro de rede. Tenta novamente.', 'error');

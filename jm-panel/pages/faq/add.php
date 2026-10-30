@@ -44,9 +44,10 @@ unset($_SESSION['form_data'], $_SESSION['form_errors']);
 <!DOCTYPE html>
 <html lang="pt" data-theme="dark" data-base-url="<?= BASE_URL ?>">
 <?php include __DIR__ . '/../../include/head.php'; ?>
+<link rel="stylesheet" href="<?= BASE_URL ?>/assets/css/jmbenga-faq.css?v=1.0.0">
 </head>
 
-<body>
+<body class="faq-form-page">
 
     <?php include __DIR__ . '/../../include/sidebar.php'; ?>
 
@@ -96,9 +97,12 @@ unset($_SESSION['form_data'], $_SESSION['form_errors']);
             <?php endif; ?>
 
             <!-- ═══ FORMULÁRIO ════════════════════════════════════════════ -->
-            <form id="faqForm" novalidate data-api="<?= BASE_URL ?>/jm-panel/faq/add-process">
+            <form id="faqForm" novalidate data-api="<?= BASE_URL ?>/jm-panel/faq/add-process"
+                data-action-label="Guardar FAQ" data-busy-label="A guardar…"
+                data-success-url="<?= BASE_URL ?>/jm-panel/faq?msg=created">
 
-                <input type="hidden" name="csrf_token" id="csrf_token" value="<?= $_SESSION['admin_csrf_token'] ?>">
+                <input type="hidden" name="csrf_token" id="csrf_token"
+                    value="<?= e($_SESSION['admin_csrf_token'] ?? '') ?>">
 
                 <!-- ═══ SECÇÃO 1 — PERGUNTA E RESPOSTA ══════════════════════ -->
                 <div class="form-section">
@@ -128,7 +132,7 @@ unset($_SESSION['form_data'], $_SESSION['form_errors']);
                                 Resposta <span class="required">*</span>
                             </label>
                             <textarea id="answer" name="answer" class="form-control textarea-lg" rows="6"
-                                placeholder="Escreve a resposta completa…"
+                                placeholder="Escreve a resposta completa…" maxlength="5000"
                                 required><?= e($formData['answer'] ?? '') ?></textarea>
                             <span class="form-hint" id="answerCount">0/5000 caracteres</span>
                         </div>
@@ -214,464 +218,168 @@ unset($_SESSION['form_data'], $_SESSION['form_errors']);
 
     <?php include __DIR__ . '/../../include/modal_logout.php'; ?>
 
-    <style>
-    .breadcrumb {
-        display: flex;
-        align-items: center;
-        gap: .5rem;
-        font-size: .78rem;
-        color: var(--text-muted);
-        margin-bottom: .5rem
-    }
-
-    .breadcrumb a {
-        color: var(--text-dim);
-        text-decoration: none;
-        transition: color .2s
-    }
-
-    .breadcrumb a:hover {
-        color: var(--accent)
-    }
-
-    .breadcrumb i {
-        font-size: .6rem
-    }
-
-    .page-top {
-        display: flex;
-        justify-content: space-between;
-        align-items: flex-start;
-        flex-wrap: wrap;
-        gap: 1rem;
-        margin-bottom: 1.5rem
-    }
-
-    .page-title {
-        font-family: var(--font-head);
-        font-size: 1.5rem;
-        font-weight: 800;
-        letter-spacing: -.02em;
-        margin-bottom: .2rem
-    }
-
-    .page-sub {
-        font-size: .8rem;
-        color: var(--text-muted)
-    }
-
-    .alert {
-        padding: 1rem 1.2rem;
-        border-radius: var(--radius);
-        margin-bottom: 1.5rem;
-        display: flex;
-        align-items: flex-start;
-        gap: .75rem;
-        font-size: .85rem
-    }
-
-    .alert-danger {
-        background: rgba(239, 68, 68, .1);
-        border: 1px solid rgba(239, 68, 68, .3);
-        color: #f87171
-    }
-
-    .alert-close {
-        margin-left: auto;
-        background: none;
-        border: none;
-        color: inherit;
-        cursor: pointer;
-        opacity: .6;
-        font-size: .9rem
-    }
-
-    .alert-close:hover {
-        opacity: 1
-    }
-
-    .form-section {
-        background: var(--bg-card);
-        border: 1px solid var(--border);
-        border-radius: var(--radius-lg);
-        padding: 1.8rem;
-        margin-bottom: 1.2rem;
-        transition: border-color .25s
-    }
-
-    .form-section:focus-within {
-        border-color: var(--border-acc)
-    }
-
-    .section-header {
-        display: flex;
-        align-items: flex-start;
-        gap: 1rem;
-        margin-bottom: 1.5rem;
-        padding-bottom: 1.2rem;
-        border-bottom: 1px solid var(--border)
-    }
-
-    .section-icon {
-        width: 40px;
-        height: 40px;
-        border-radius: 10px;
-        background: var(--accent-glow);
-        border: 1px solid var(--border-acc);
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        color: var(--accent);
-        font-size: .95rem;
-        flex-shrink: 0
-    }
-
-    .section-header h3 {
-        font-family: var(--font-head);
-        font-size: 1rem;
-        font-weight: 700;
-        margin-bottom: .15rem
-    }
-
-    .section-header p {
-        font-size: .78rem;
-        color: var(--text-muted)
-    }
-
-    .form-grid {
-        display: grid;
-        grid-template-columns: 1fr 1fr;
-        gap: 1.2rem
-    }
-
-    .form-group.full-width {
-        grid-column: 1/-1
-    }
-
-    @media(max-width:768px) {
-        .form-grid {
-            grid-template-columns: 1fr
-        }
-    }
-
-    .form-group {
-        display: flex;
-        flex-direction: column;
-        gap: .35rem
-    }
-
-    .form-label {
-        font-size: .75rem;
-        font-weight: 600;
-        text-transform: uppercase;
-        letter-spacing: .04em;
-        color: var(--text-dim)
-    }
-
-    .required {
-        color: var(--danger)
-    }
-
-    .form-control {
-        padding: .65rem .85rem;
-        background: var(--bg);
-        border: 1px solid var(--border);
-        border-radius: 8px;
-        color: var(--text);
-        font-family: var(--font-body);
-        font-size: .88rem;
-        outline: none;
-        transition: border-color .2s, box-shadow .2s
-    }
-
-    .form-control:focus {
-        border-color: var(--accent);
-        box-shadow: 0 0 0 3px var(--accent-glow)
-    }
-
-    .form-control::placeholder {
-        color: var(--text-muted)
-    }
-
-    .form-hint {
-        font-size: .7rem;
-        color: var(--text-muted);
-        margin-top: .15rem
-    }
-
-    .textarea-lg {
-        resize: vertical;
-        min-height: 140px;
-        line-height: 1.7
-    }
-
-    .switch {
-        display: flex;
-        align-items: center;
-        gap: .75rem;
-        cursor: pointer
-    }
-
-    .switch input {
-        display: none
-    }
-
-    .switch-slider {
-        width: 42px;
-        height: 24px;
-        border-radius: 12px;
-        background: var(--border);
-        transition: background .25s;
-        position: relative;
-        flex-shrink: 0
-    }
-
-    .switch-slider::after {
-        content: '';
-        position: absolute;
-        top: 3px;
-        left: 3px;
-        width: 18px;
-        height: 18px;
-        border-radius: 50%;
-        background: #fff;
-        transition: transform .25s
-    }
-
-    .switch input:checked+.switch-slider {
-        background: var(--accent)
-    }
-
-    .switch input:checked+.switch-slider::after {
-        transform: translateX(18px)
-    }
-
-    .switch-label {
-        font-size: .82rem;
-        font-weight: 500
-    }
-
-    .number-input {
-        display: flex;
-        align-items: center;
-        gap: .3rem
-    }
-
-    .num-btn {
-        width: 32px;
-        height: 32px;
-        border-radius: 6px;
-        background: var(--bg);
-        border: 1px solid var(--border);
-        color: var(--text-dim);
-        cursor: pointer;
-        font-size: .9rem;
-        transition: all .15s;
-        display: flex;
-        align-items: center;
-        justify-content: center
-    }
-
-    .num-btn:hover {
-        border-color: var(--accent);
-        color: var(--accent)
-    }
-
-    .num-field {
-        width: 70px;
-        text-align: center;
-        -moz-appearance: textfield
-    }
-
-    .num-field::-webkit-outer-spin-button,
-    .num-field::-webkit-inner-spin-button {
-        -webkit-appearance: none;
-        margin: 0
-    }
-
-    .btn {
-        display: inline-flex;
-        align-items: center;
-        gap: .45rem;
-        padding: .55rem 1.1rem;
-        border-radius: 8px;
-        font-family: var(--font-body);
-        font-size: .83rem;
-        font-weight: 500;
-        cursor: pointer;
-        transition: all .2s;
-        text-decoration: none;
-        border: 1px solid var(--border);
-        white-space: nowrap
-    }
-
-    .btn-primary {
-        background: var(--accent);
-        color: #fff;
-        border-color: var(--accent)
-    }
-
-    .btn-primary:hover {
-        background: #1d4ed8;
-        transform: translateY(-1px);
-        box-shadow: 0 4px 16px var(--accent-glow)
-    }
-
-    .btn-secondary {
-        background: transparent;
-        border: 1px solid var(--border);
-        color: var(--text-dim)
-    }
-
-    .btn-secondary:hover {
-        background: var(--bg-hover);
-        border-color: var(--border-acc);
-        color: var(--text)
-    }
-
-    .btn-lg {
-        padding: .7rem 1.5rem;
-        font-size: .9rem
-    }
-
-    .form-actions {
-        display: flex;
-        gap: .75rem;
-        justify-content: flex-end;
-        margin-top: 1.5rem;
-        padding-top: 1.5rem;
-        border-top: 1px solid var(--border)
-    }
-    </style>
-
     <script>
-    const BASE_URL = '<?= BASE_URL ?>';
-    const form = document.getElementById('faqForm');
-    const submitBtns = document.querySelectorAll('#submitBtn, #submitBtn2');
+    (() => {
+        'use strict';
 
-    function showToast(message, type = 'success') {
-        const container = document.getElementById('toast-container') || createToastContainer();
-        const toast = document.createElement('div');
-        toast.className = `toast toast-${type}`;
-        toast.innerHTML =
-            `<i class="fas fa-${type === 'success' ? 'check-circle' : type === 'error' ? 'times-circle' : 'info-circle'}"></i> ${message}`;
-        container.appendChild(toast);
-        setTimeout(() => {
-            toast.style.opacity = '0';
-            toast.style.transform = 'translateX(20px)';
-            setTimeout(() => toast.remove(), 300);
-        }, 4000);
-    }
+        const form = document.getElementById('faqForm');
+        if (!form) return;
 
-    function createToastContainer() {
-        const container = document.createElement('div');
-        container.id = 'toast-container';
-        container.style.cssText =
-            'position:fixed;top:1rem;right:1rem;z-index:9999;display:flex;flex-direction:column;gap:.5rem';
-        document.body.appendChild(container);
-        return container;
-    }
+        const submitButtons = Array.from(document.querySelectorAll('#submitBtn, #submitBtn2'));
+        const actionLabel = form.dataset.actionLabel || 'Guardar FAQ';
+        const busyLabel = form.dataset.busyLabel || 'A guardar…';
+        const successUrl = form.dataset.successUrl;
+        let submissionSucceeded = false;
 
-    // ── Contadores de caracteres ──────────────────────────────────
-    const questionInput = document.getElementById('question');
-    const questionCount = document.getElementById('questionCount');
-    if (questionInput && questionCount) {
-        questionInput.addEventListener('input', function() {
-            const len = this.value.length;
-            questionCount.textContent = len + '/500 caracteres';
-            questionCount.style.color = len > 480 ? 'var(--danger)' : 'var(--text-muted)';
-        });
-    }
-
-    const answerInput = document.getElementById('answer');
-    const answerCount = document.getElementById('answerCount');
-    if (answerInput && answerCount) {
-        answerInput.addEventListener('input', function() {
-            const len = this.value.length;
-            answerCount.textContent = len + '/5000 caracteres';
-            answerCount.style.color = len > 4800 ? 'var(--danger)' : 'var(--text-muted)';
-        });
-    }
-
-    // ── Ordem +/− ──────────────────────────────────────────────
-    function changeOrder(delta) {
-        const field = document.getElementById('display_order');
-        let val = parseInt(field.value) || 0;
-        val = Math.max(0, val + delta);
-        field.value = val;
-    }
-
-    // ── Switch label ─────────────────────────────────────────────
-    const statusCheckbox = document.querySelector('input[name="status_faq"]');
-    const switchLabel = document.querySelector('.switch-label');
-    if (statusCheckbox && switchLabel) {
-        statusCheckbox.addEventListener('change', function() {
-            switchLabel.textContent = this.checked ? 'Visível' : 'Oculta';
-        });
-    }
-
-    // ── Submissão AJAX ───────────────────────────────────────────
-    form.addEventListener('submit', async function(e) {
-        e.preventDefault();
-
-        let clientValid = true;
-        form.querySelectorAll('[required]').forEach(field => {
-            if (!field.value.trim()) {
-                field.classList.add('error');
-                clientValid = false;
-            } else {
-                field.classList.remove('error');
-            }
-        });
-        if (!clientValid) {
-            showToast('Preenche todos os campos obrigatórios.', 'error');
-            return;
+        function showToast(message, type = 'success') {
+            const container = document.getElementById('toast-container') || createToastContainer();
+            const toast = document.createElement('div');
+            toast.className = `toast toast-${type}`;
+            const icon = document.createElement('i');
+            icon.className =
+                `fas fa-${type === 'success' ? 'check-circle' : type === 'error' ? 'times-circle' : 'info-circle'}`;
+            const text = document.createElement('span');
+            text.textContent = String(message ?? 'Ocorreu um erro.');
+            toast.append(icon, text);
+            container.appendChild(toast);
+            window.setTimeout(() => {
+                toast.style.opacity = '0';
+                toast.style.transform = 'translateX(20px)';
+                window.setTimeout(() => toast.remove(), 300);
+            }, 4000);
         }
 
-        submitBtns.forEach(btn => {
-            btn.disabled = true;
-            btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> A guardar…';
+        function createToastContainer() {
+            const container = document.createElement('div');
+            container.id = 'toast-container';
+            container.style.cssText =
+                'position:fixed;top:1rem;right:1rem;z-index:9999;display:flex;flex-direction:column;gap:.5rem';
+            document.body.appendChild(container);
+            return container;
+        }
+
+        async function readJsonResponse(response) {
+            const raw = await response.text();
+            try {
+                return JSON.parse(raw);
+            } catch (_) {
+                throw new Error(`Resposta inválida do servidor (HTTP ${response.status}).`);
+            }
+        }
+
+        function setBusy(isBusy) {
+            submitButtons.forEach(button => {
+                button.disabled = isBusy;
+                button.innerHTML = isBusy ?
+                    `<i class="fas fa-spinner fa-spin"></i> ${busyLabel}` :
+                    `<i class="fas fa-save"></i> ${actionLabel}`;
+            });
+        }
+
+        const questionInput = document.getElementById('question');
+        const answerInput = document.getElementById('answer');
+
+        function updateCounter(input, counter, max, threshold) {
+            if (!input || !counter) return;
+            const length = input.value.length;
+            counter.textContent = `${length}/${max} caracteres`;
+            counter.style.color = length > threshold ? 'var(--danger)' : 'var(--text-muted)';
+        }
+
+        if (questionInput) {
+            const counter = document.getElementById('questionCount');
+            questionInput.addEventListener('input', () => updateCounter(questionInput, counter, 500, 480));
+            updateCounter(questionInput, counter, 500, 480);
+        }
+        if (answerInput) {
+            const counter = document.getElementById('answerCount');
+            answerInput.addEventListener('input', () => updateCounter(answerInput, counter, 5000, 4800));
+            updateCounter(answerInput, counter, 5000, 4800);
+        }
+
+        window.changeOrder = function(delta) {
+            const field = document.getElementById('display_order');
+            if (!field) return;
+            const current = Number.parseInt(field.value, 10);
+            field.value = Math.max(0, (Number.isFinite(current) ? current : 0) + delta);
+        };
+
+        const statusCheckbox = form.querySelector('input[name="status_faq"]');
+        const switchLabel = form.querySelector('.switch-label');
+        if (statusCheckbox && switchLabel) {
+            statusCheckbox.addEventListener('change', () => {
+                switchLabel.textContent = statusCheckbox.checked ? 'Visível' : 'Oculta';
+            });
+        }
+
+        form.querySelectorAll('[required]').forEach(field => {
+            field.addEventListener('input', () => field.classList.remove('error'));
+            field.addEventListener('change', () => field.classList.remove('error'));
         });
 
-        try {
-            const formData = new FormData(form);
-            const res = await fetch(form.dataset.api, {
-                method: 'POST',
-                body: formData,
-                headers: {
-                    'X-Requested-With': 'XMLHttpRequest',
-                    'X-CSRF-Token': document.getElementById('csrf_token').value
-                }
+        form.addEventListener('submit', async event => {
+            event.preventDefault();
+            if (form.dataset.submitting === '1') return;
+
+            let valid = true;
+            form.querySelectorAll('[required]').forEach(field => {
+                const isEmpty = !String(field.value ?? '').trim();
+                field.classList.toggle('error', isEmpty);
+                if (isEmpty) valid = false;
             });
 
-            const data = await res.json();
+            const orderField = document.getElementById('display_order');
+            if (orderField && (!Number.isInteger(Number(orderField.value)) || Number(orderField.value) <
+                    0)) {
+                orderField.classList.add('error');
+                valid = false;
+            }
 
-            if (!res.ok || !data.success) {
-                if (data.errors) {
-                    data.errors.forEach(err => showToast(err, 'error'));
-                } else {
-                    showToast(data.message || 'Erro ao criar FAQ.', 'error');
-                }
-                submitBtns.forEach(btn => {
-                    btn.disabled = false;
-                    btn.innerHTML = '<i class="fas fa-save"></i> Guardar FAQ';
-                });
+            if (!valid) {
+                showToast('Verifica os campos obrigatórios e a ordem de exibição.', 'error');
                 return;
             }
 
-            showToast('FAQ criada com sucesso!', 'success');
-            setTimeout(() => {
-                window.location.href = BASE_URL + '/jm-panel/faq?msg=created';
-            }, 800);
+            form.dataset.submitting = '1';
+            setBusy(true);
 
-        } catch (err) {
-            showToast('Erro de rede. Tenta novamente.', 'error');
-            submitBtns.forEach(btn => {
-                btn.disabled = false;
-                btn.innerHTML = '<i class="fas fa-save"></i> Guardar FAQ';
-            });
-        }
-    });
+            try {
+                const csrfField = document.getElementById('csrf_token');
+                const response = await fetch(form.dataset.api, {
+                    method: 'POST',
+                    body: new window.FormData(form),
+                    headers: {
+                        'X-Requested-With': 'XMLHttpRequest',
+                        'X-CSRF-Token': csrfField ? csrfField.value : ''
+                    },
+                    credentials: 'same-origin'
+                });
+                const data = await readJsonResponse(response);
+
+                if (!response.ok || !data.success) {
+                    const errors = Array.isArray(data.errors) ? data.errors : [data.message ||
+                        'Não foi possível guardar a FAQ.'
+                    ];
+                    errors.forEach(message => showToast(message, 'error'));
+                    return;
+                }
+
+                submissionSucceeded = true;
+                showToast(data.message || 'FAQ guardada com sucesso.', 'success');
+                window.setTimeout(() => {
+                    if (successUrl) window.location.href = successUrl;
+                }, 700);
+            } catch (error) {
+                showToast(error.message || 'Erro de rede. Tenta novamente.', 'error');
+            } finally {
+                // A navegação após sucesso ocorre pouco depois; em falha, os botões ficam disponíveis.
+                if (!submissionSucceeded) {
+                    setBusy(false);
+                    delete form.dataset.submitting;
+                }
+            }
+        });
+    })();
     </script>
 </body>
 

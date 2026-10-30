@@ -1,273 +1,157 @@
+/**
+ * JMbenga Portfolio — home.js
+ * Efeitos exclusivos da página inicial: texto rotativo e partículas.
+ * É seguro carregar este ficheiro globalmente: cada efeito só arranca se o seu elemento existir.
+ */
 "use strict";
 
-/* ── Loading screen ────────────────────────────────────────── */
-window.addEventListener("load", () => {
-  setTimeout(() => {
-    const l = document.getElementById("loading");
-    if (l) l.classList.add("hidden");
-  }, 900);
-});
+(function initTypingAnimation() {
+  const element = document.getElementById("typing-word");
+  if (!element) return;
 
-/* ── Scroll progress bar ───────────────────────────────────── */
-const scrollBar = document.getElementById("scroll-progress");
-const header = document.getElementById("header");
-const backTop = document.getElementById("back-top");
-
-window.addEventListener(
-  "scroll",
-  () => {
-    const scrolled = window.scrollY;
-    const total = document.body.scrollHeight - window.innerHeight;
-    if (scrollBar) scrollBar.style.width = (scrolled / total) * 100 + "%";
-    if (header) header.classList.toggle("scrolled", scrolled > 50);
-    if (backTop) backTop.classList.toggle("visible", scrolled > 400);
-  },
-  {
-    passive: true,
+  const words = ["React.js", "Vue.js", "Node.js", "PHP 8", "UI/UX Design", "APIs REST", "MySQL", "TypeScript"];
+  const reduceMotion = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches ?? false;
+  if (reduceMotion) {
+    element.textContent = words[0];
+    return;
   }
-);
 
-/* ── Offcanvas ──────────────────────────────────────────────── */
-const offcanvas = document.getElementById("offcanvas");
-const backdrop = document.getElementById("backdrop");
-const toggle = document.getElementById("menuToggle");
-
-function openMenu() {
-  offcanvas.classList.add("open");
-  backdrop.classList.add("open");
-  toggle.classList.add("open");
-  document.body.style.overflow = "hidden";
-}
-
-function closeMenu() {
-  offcanvas.classList.remove("open");
-  backdrop.classList.remove("open");
-  toggle.classList.remove("open");
-  document.body.style.overflow = "";
-}
-
-/* ── Back to top ────────────────────────────────────────────── */
-if (backTop)
-  backTop.addEventListener("click", () =>
-    window.scrollTo({
-      top: 0,
-      behavior: "smooth",
-    })
-  );
-
-/* ── Active nav link ────────────────────────────────────────── */
-const sections = document.querySelectorAll("section[id]");
-const navLinks = document.querySelectorAll(".nav-link");
-
-const secObs = new IntersectionObserver(
-  (entries) => {
-    entries.forEach((e) => {
-      if (e.isIntersecting) {
-        navLinks.forEach((l) =>
-          l.classList.toggle(
-            "active",
-            l.getAttribute("href") === "#" + e.target.id
-          )
-        );
-      }
-    });
-  },
-  {
-    threshold: 0.35,
-  }
-);
-sections.forEach((s) => secObs.observe(s));
-
-/* ── Reveal ─────────────────────────────────────────────────── */
-const revObs = new IntersectionObserver(
-  (entries) => {
-    entries.forEach((e) => {
-      if (e.isIntersecting) e.target.classList.add("visible");
-    });
-  },
-  {
-    threshold: 0.08,
-    rootMargin: "0px 0px -40px 0px",
-  }
-);
-document.querySelectorAll(".reveal").forEach((el) => revObs.observe(el));
-
-/* ── Timeline ───────────────────────────────────────────────── */
-const tlObs = new IntersectionObserver(
-  (entries) => {
-    entries.forEach((e) => {
-      if (e.isIntersecting) e.target.classList.add("visible");
-    });
-  },
-  {
-    threshold: 0.2,
-  }
-);
-document.querySelectorAll(".timeline-item").forEach((el, i) => {
-  el.style.transitionDelay = i * 0.12 + "s";
-  tlObs.observe(el);
-});
-
-/* ── Contadores ─────────────────────────────────────────────── */
-const cntObs = new IntersectionObserver(
-  (entries) => {
-    entries.forEach((e) => {
-      if (!e.isIntersecting) return;
-      const el = e.target,
-        end = parseInt(el.dataset.target);
-      let cur = 0;
-      const step = Math.max(1, Math.ceil(end / 60));
-      const t = setInterval(() => {
-        cur = Math.min(cur + step, end);
-        el.textContent = cur;
-        if (cur >= end) clearInterval(t);
-      }, 22);
-      cntObs.unobserve(el);
-    });
-  },
-  {
-    threshold: 0.5,
-  }
-);
-document.querySelectorAll(".counter").forEach((el) => cntObs.observe(el));
-
-/* ── Skill bars ─────────────────────────────────────────────── */
-const barObs = new IntersectionObserver(
-  (entries) => {
-    entries.forEach((e) => {
-      if (e.isIntersecting) {
-        e.target.style.width = e.target.dataset.width + "%";
-        barObs.unobserve(e.target);
-      }
-    });
-  },
-  {
-    threshold: 0.3,
-  }
-);
-document.querySelectorAll(".skill-bar-fill").forEach((b) => barObs.observe(b));
-
-/* ── Skill tabs ─────────────────────────────────────────────── */
-function switchTab(cat) {
-  document
-    .querySelectorAll(".skill-tab")
-    .forEach((t) => t.classList.toggle("active", t.dataset.tab === cat));
-  document
-    .querySelectorAll(".skills-panel")
-    .forEach((p) => p.classList.toggle("active", p.id === "tab-" + cat));
-  setTimeout(() => {
-    document
-      .querySelectorAll("#tab-" + cat + " .skill-bar-fill")
-      .forEach((b) => (b.style.width = b.dataset.width + "%"));
-  }, 50);
-}
-
-/* ── Typing animation ───────────────────────────────────────── */
-(function () {
-  const words = [
-    "React.js",
-    "Vue.js",
-    "Node.js",
-    "PHP 8",
-    "UI/UX Design",
-    "APIs REST",
-    "MySQL",
-    "TypeScript",
-  ];
-  const el = document.getElementById("typing-word");
-  if (!el) return;
-  let wi = 0,
-    ci = 0,
-    del = false;
+  let wordIndex = 0;
+  let charIndex = 0;
+  let deleting = false;
+  let timer = 0;
 
   function tick() {
-    const w = words[wi];
-    el.textContent = del ? w.slice(0, ci--) : w.slice(0, ci++);
-    if (!del && ci > w.length) {
-      del = true;
-      setTimeout(tick, 1400);
+    timer = 0;
+    const word = words[wordIndex];
+    charIndex += deleting ? -1 : 1;
+    element.textContent = word.slice(0, Math.max(0, charIndex));
+
+    if (!deleting && charIndex >= word.length) {
+      deleting = true;
+      timer = window.setTimeout(tick, 1400);
       return;
     }
-    if (del && ci < 0) {
-      del = false;
-      wi = (wi + 1) % words.length;
-      ci = 0;
+    if (deleting && charIndex <= 0) {
+      deleting = false;
+      wordIndex = (wordIndex + 1) % words.length;
     }
-    setTimeout(tick, del ? 55 : 90);
+    timer = window.setTimeout(tick, deleting ? 55 : 90);
   }
+
   tick();
+  document.addEventListener("visibilitychange", () => {
+    if (document.hidden) {
+      window.clearTimeout(timer);
+      timer = 0;
+    } else if (!timer) {
+      tick();
+    }
+  });
 })();
 
-/* ── Particles canvas ───────────────────────────────────────── */
-(function () {
+(function initParticles() {
   const canvas = document.getElementById("particles-canvas");
-  if (!canvas) return;
-  const ctx = canvas.getContext("2d");
-  let W,
-    H,
-    particles = [];
-  const N = 55,
-    accent =
-      getComputedStyle(document.documentElement)
-        .getPropertyValue("--accent")
-        .trim() || "#2563eb";
+  if (!canvas || typeof canvas.getContext !== "function") return;
+  const context = canvas.getContext("2d");
+  if (!context) return;
+
+  const reduceMotion = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches ?? false;
+  const cssAccent = getComputedStyle(document.documentElement).getPropertyValue("--accent").trim() || "#2563eb";
+
+  function toRgb(value) {
+    const hex = value.match(/^#([0-9a-f]{3}|[0-9a-f]{6})$/i);
+    if (hex) {
+      let digits = hex[1];
+      if (digits.length === 3) digits = digits.split("").map((char) => char + char).join("");
+      const number = Number.parseInt(digits, 16);
+      return `${(number >> 16) & 255}, ${(number >> 8) & 255}, ${number & 255}`;
+    }
+    const rgb = value.match(/^rgba?\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)/i);
+    if (rgb) return `${rgb[1]}, ${rgb[2]}, ${rgb[3]}`;
+    return "37, 99, 235";
+  }
+  const accentRgb = toRgb(cssAccent);
+
+  let width = 0;
+  let height = 0;
+  let animationId = 0;
+  let particles = [];
+  const particleCount = 55;
 
   function resize() {
-    W = canvas.width = canvas.offsetWidth;
-    H = canvas.height = canvas.offsetHeight;
-  }
-  window.addEventListener("resize", resize);
-  resize();
+    const rect = canvas.getBoundingClientRect();
+    const oldWidth = width || rect.width || 1;
+    const oldHeight = height || rect.height || 1;
+    width = Math.max(1, Math.round(rect.width));
+    height = Math.max(1, Math.round(rect.height));
+    const dpr = Math.min(window.devicePixelRatio || 1, 2);
+    canvas.width = Math.round(width * dpr);
+    canvas.height = Math.round(height * dpr);
+    context.setTransform(dpr, 0, 0, dpr, 0, 0);
 
-  for (let i = 0; i < N; i++) {
-    particles.push({
-      x: Math.random() * 1200,
-      y: Math.random() * 900,
-      r: Math.random() * 1.5 + 0.5,
-      vx: (Math.random() - 0.5) * 0.35,
-      vy: (Math.random() - 0.5) * 0.35,
-      a: Math.random() * 0.5 + 0.1,
-    });
+    if (particles.length) {
+      particles.forEach((particle) => {
+        particle.x = (particle.x / oldWidth) * width;
+        particle.y = (particle.y / oldHeight) * height;
+      });
+    } else {
+      particles = Array.from({ length: particleCount }, () => ({
+        x: Math.random() * width,
+        y: Math.random() * height,
+        radius: Math.random() * 1.5 + 0.5,
+        vx: (Math.random() - 0.5) * 0.35,
+        vy: (Math.random() - 0.5) * 0.35,
+        alpha: Math.random() * 0.5 + 0.1,
+      }));
+    }
   }
 
   function draw() {
-    ctx.clearRect(0, 0, W, H);
-    particles.forEach((p, i) => {
-      p.x += p.vx;
-      p.y += p.vy;
-      if (p.x < 0) p.x = W;
-      if (p.x > W) p.x = 0;
-      if (p.y < 0) p.y = H;
-      if (p.y > H) p.y = 0;
+    if (document.hidden) {
+      animationId = 0;
+      return;
+    }
+    context.clearRect(0, 0, width, height);
+    particles.forEach((particle, index) => {
+      particle.x += particle.vx;
+      particle.y += particle.vy;
+      if (particle.x < 0) particle.x = width;
+      if (particle.x > width) particle.x = 0;
+      if (particle.y < 0) particle.y = height;
+      if (particle.y > height) particle.y = 0;
 
-      ctx.beginPath();
-      ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
-      ctx.fillStyle =
-        accent +
-        Math.floor(p.a * 255)
-          .toString(16)
-          .padStart(2, "0");
-      ctx.fill();
+      context.beginPath();
+      context.arc(particle.x, particle.y, particle.radius, 0, Math.PI * 2);
+      context.fillStyle = `rgba(${accentRgb}, ${particle.alpha})`;
+      context.fill();
 
-      // Linhas de ligação
-      for (let j = i + 1; j < N; j++) {
-        const q = particles[j];
-        const d = Math.hypot(p.x - q.x, p.y - q.y);
-        if (d < 130) {
-          ctx.beginPath();
-          ctx.moveTo(p.x, p.y);
-          ctx.lineTo(q.x, q.y);
-          ctx.strokeStyle =
-            accent +
-            Math.floor((1 - d / 130) * 60)
-              .toString(16)
-              .padStart(2, "0");
-          ctx.lineWidth = 0.5;
-          ctx.stroke();
+      for (let next = index + 1; next < particles.length; next++) {
+        const other = particles[next];
+        const distance = Math.hypot(particle.x - other.x, particle.y - other.y);
+        if (distance < 130) {
+          context.beginPath();
+          context.moveTo(particle.x, particle.y);
+          context.lineTo(other.x, other.y);
+          context.strokeStyle = `rgba(${accentRgb}, ${(1 - distance / 130) * 0.24})`;
+          context.lineWidth = 0.5;
+          context.stroke();
         }
       }
     });
-    requestAnimationFrame(draw);
+    animationId = window.requestAnimationFrame(draw);
   }
-  draw();
+
+  resize();
+  window.addEventListener("resize", resize, { passive: true });
+  if (!reduceMotion) animationId = window.requestAnimationFrame(draw);
+
+  document.addEventListener("visibilitychange", () => {
+    if (document.hidden) {
+      if (animationId) window.cancelAnimationFrame(animationId);
+      animationId = 0;
+    } else if (!reduceMotion && !animationId) {
+      animationId = window.requestAnimationFrame(draw);
+    }
+  });
 })();

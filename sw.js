@@ -2,7 +2,7 @@
 // SERVICE WORKER - PORTFÓLIO JOSÉ MBENDA (OTIMIZADO)
 // ============================================
 
-const APP_VERSION = "2.0";
+const APP_VERSION = "2.1";
 const CACHE_NAME = `jmbenga-pwa-v${APP_VERSION.replace(/\./g, "-")}`;
 
 // ========== CACHE STRATEGIES ==========
@@ -10,48 +10,48 @@ const CACHE_NAME = `jmbenga-pwa-v${APP_VERSION.replace(/\./g, "-")}`;
 // 1. CACHE IMMEDIATELY - Recursos essenciais
 const IMMEDIATE_CACHE = [
   // HTML Core
-  "https://jmbenga.freedev.app/index.html",
-  "https://jmbenga.freedev.app/offline.html",
+  "index.html",
+  "offline.html",
 
   // Manifest & Icons
-  "https://jmbenga.freedev.app/manifest.json",
-  "https://jmbenga.freedev.app/assets/img/icons/icon-192x192.png",
-  "https://jmbenga.freedev.app/assets/img/icons/icon-512x512.png",
-  "https://jmbenga.freedev.app/assets/img/svg/favicon_jm.ico",
+  "manifest.php",
+  "assets/img/icons/icon-192x192.png",
+  "assets/img/icons/icon-512x512.png",
+  "assets/img/svg/favicon_jm.ico",
 
   // Core CSS
-  "https://jmbenga.freedev.app/assets/css/main.css",
-  "https://jmbenga.freedev.app/assets/css/improvements.css",
-  "https://jmbenga.freedev.app/assets/css/particles.css",
+  "assets/css/main.css",
+  "assets/css/improvements.css",
+  "assets/css/particles.css",
 
   // Core JS
-  "https://jmbenga.freedev.app/assets/js/main.js",
-  "https://jmbenga.freedev.app/assets/js/improvements.js",
+  "assets/js/main.js",
+  "assets/js/improvements.js",
 
   // Fonts (Font Awesome)
-  "https://jmbenga.freedev.app/assets/fontawesome-free/webfonts/fa-solid-900.woff2",
-  "https://jmbenga.freedev.app/assets/fontawesome-free/webfonts/fa-brands-400.woff2",
+  "assets/fontawesome-free/webfonts/fa-solid-900.woff2",
+  "assets/fontawesome-free/webfonts/fa-brands-400.woff2",
 ];
 
 // 2. CACHE LAZY - Recursos importantes (cache após instalação)
 const LAZY_CACHE = [
   // Other HTML pages
-  "https://jmbenga.freedev.app/pages/all-projects.html",
-  "https://jmbenga.freedev.app/pages/project-demo.html",
+  "pages/all-projects.html",
+  "pages/project-demo.html",
 
   // Additional CSS
-  "https://jmbenga.freedev.app/assets/css/particles.css",
-  "https://jmbenga.freedev.app/assets/css/all-projects.css",
-  "https://jmbenga.freedev.app/assets/css/project-demo.css",
+  "assets/css/particles.css",
+  "assets/css/all-projects.css",
+  "assets/css/project-demo.css",
 
   // Additional JS
-  "https://jmbenga.freedev.app/assets/js/pwa-install.js",
-  "https://jmbenga.freedev.app/assets/js/pwa-native.js",
-  "https://jmbenga.freedev.app/assets/js/project-demo.js",
-  "https://jmbenga.freedev.app/assets/js/all-projects.js",
+  "assets/js/pwa-install.js",
+  "assets/js/pwa-native.js",
+  "assets/js/project-demo.js",
+  "assets/js/all-projects.js",
 
   // Important images
-  "https://jmbenga.freedev.app/assets/img/photo/josembengadacosta.png",
+  "assets/img/photo/josembengadacosta.png",
 ];
 
 // 3. EXTERNAL RESOURCES
@@ -64,10 +64,10 @@ const EXTERNAL_RESOURCES = [
 
 // 4. NETWORK ONLY - Nunca cache
 const NETWORK_ONLY = [
-  // Form submissions, APIs, etc
+  // Endpoints/API GET que não devem ser guardados em cache.
+  // NÃO incluir contact-form.js: é um asset estático e deve funcionar offline.
   /\/submit/i,
   /\/api\//i,
-  /contact-form/i,
 ];
 
 // 5. PATTERNS FOR DYNAMIC CACHING
@@ -80,39 +80,40 @@ const PATTERNS = {
   pdf: /\.pdf$/i,
 };
 
-// ========== INSTALL - Cache Immediate Resources ==========
+// ========== INSTALL - Cache Essential Resources ==========
 
 self.addEventListener("install", (event) => {
-  console.log(`⚙️ SW v${APP_VERSION} instalando...`);
+  console.log(`SW v${APP_VERSION} a instalar...`);
 
-  event.waitUntil(
-    caches
-      .open(CACHE_NAME)
-      .then((cache) => {
-        console.log(" Cacheando recursos essenciais...");
-        return cache
-          .addAll(
-            IMMEDIATE_CACHE.map((url) => {
-              // Handle both local and GitHub Pages paths
-              if (
-                self.location.hostname === "localhost" ||
-                self.location.hostname === "127.0.0.1"
-              ) {
-                return url.replace("https://jmbenga.freedev.app/", "./");
-              }
-              return url;
-            })
-          )
-          .catch((err) => {
-            console.warn(" Alguns recursos não puderam ser cacheados:", err);
-            // Continue mesmo com erros
-          });
-      })
-      .then(() => {
-        console.log(" Instalação completa!");
-        return self.skipWaiting();
-      })
-  );
+  event.waitUntil((async () => {
+    const cache = await caches.open(CACHE_NAME);
+
+    // A página offline é guardada separadamente. A falha de outro asset não
+    // deve impedir o armazenamento deste fallback essencial.
+    await cacheOfflinePage(cache);
+
+    const immediateResources = IMMEDIATE_CACHE.filter(
+      (path) => path !== "offline.html"
+    );
+
+    const criticalScripts = [
+      "assets/js/contact-form.js",
+      "assets/js/visitor-tracker.js",
+    ];
+
+    const resources = [...immediateResources, ...criticalScripts];
+    await Promise.allSettled(resources.map(async (path) => {
+      const url = appUrl(path);
+      try {
+        await cache.add(url);
+      } catch (error) {
+        console.warn(`Recurso não cacheado: ${url}`, error);
+      }
+    }));
+
+    console.log("Instalação do Service Worker concluída.");
+    await self.skipWaiting();
+  })());
 });
 
 // ========== ACTIVATE - Cleanup & Claim ==========
@@ -173,7 +174,7 @@ self.addEventListener("fetch", (event) => {
       break;
 
     case "stale-while-revalidate":
-      event.respondWith(staleWhileRevalidate(request));
+      event.respondWith(staleWhileRevalidate(request, event));
       break;
 
     case "network-first":
@@ -194,7 +195,7 @@ function getStrategy(url, request) {
   }
 
   // External resources
-  if (url.hostname !== self.location.hostname) {
+  if (url.origin !== self.location.origin) {
     return "stale-while-revalidate";
   }
 
@@ -232,7 +233,26 @@ function getStrategy(url, request) {
 
 // 1. NETWORK ONLY
 async function networkOnly(request) {
-  return fetch(request);
+  try {
+    return await fetch(request);
+  } catch (error) {
+    // Evita que a promessa de respondWith() seja rejeitada quando estiver offline.
+    // APIs GET permanecem sem cache; a resposta apenas torna a falha explícita.
+    return new Response(
+      JSON.stringify({
+        success: false,
+        error: "offline",
+        message: "Sem ligação à rede. Tenta novamente quando a ligação regressar.",
+      }),
+      {
+        status: 503,
+        headers: {
+          "Content-Type": "application/json; charset=utf-8",
+          "Cache-Control": "no-store",
+        },
+      }
+    );
+  }
 }
 
 // 2. NETWORK FIRST (with offline fallback)
@@ -241,11 +261,11 @@ async function networkFirst(request) {
     // Try network first
     const networkResponse = await fetch(request);
 
-    // Cache successful responses
-    if (networkResponse.ok) {
+    // Guarda apenas respostas bem-sucedidas que não proíbem cache.
+    if (shouldCacheResponse(networkResponse)) {
       const cache = await caches.open(CACHE_NAME);
       cache.put(request, networkResponse.clone()).catch((err) => {
-        console.warn(" Não pude cachear resposta:", err);
+        console.warn("Não foi possível guardar a resposta em cache:", err);
       });
     }
 
@@ -265,9 +285,12 @@ async function networkFirst(request) {
     }
 
     // For other requests, return error
-    return new Response("Offline", {
-      status: 408,
-      headers: { "Content-Type": "text/plain" },
+    return new Response("Sem ligação à rede.", {
+      status: 503,
+      headers: {
+        "Content-Type": "text/plain; charset=utf-8",
+        "Cache-Control": "no-store",
+      },
     });
   }
 }
@@ -286,10 +309,10 @@ async function cacheFirst(request) {
   try {
     const networkResponse = await fetch(request);
 
-    if (networkResponse.ok) {
+    if (shouldCacheResponse(networkResponse)) {
       const cache = await caches.open(CACHE_NAME);
       cache.put(request, networkResponse.clone()).catch((err) => {
-        console.warn(" Não pude cachear asset:", err);
+        console.warn("Não foi possível guardar o asset em cache:", err);
       });
     }
 
@@ -313,213 +336,231 @@ async function cacheFirst(request) {
   }
 }
 
-// 4. STALE WHILE REVALIDATE (for CSS, external resources)
-async function staleWhileRevalidate(request) {
-  const cache = await caches.open(CACHE_NAME);
+// 4. STALE WHILE REVALIDATE (CSS e recursos externos)
+async function staleWhileRevalidate(request, event) {
+  const cachePromise = caches.open(CACHE_NAME);
+
+  // Inicia a atualização antes do primeiro await e prolonga a vida do evento.
+  const updatePromise = cachePromise.then(async (cache) => {
+    const response = await fetch(request);
+    if (shouldCacheResponse(response)) {
+      cache.put(request, response.clone()).catch((error) => {
+        console.warn("Não foi possível atualizar o cache:", error);
+      });
+    }
+    return response;
+  });
+
+  if (event && typeof event.waitUntil === "function") {
+    event.waitUntil(updatePromise.then(() => undefined).catch(() => undefined));
+  }
+
+  const cache = await cachePromise;
   const cachedResponse = await cache.match(request);
+  if (cachedResponse) return cachedResponse;
 
-  // Return cached response immediately
-  const fetchPromise = fetch(request)
-    .then((networkResponse) => {
-      if (networkResponse.ok) {
-        cache.put(request, networkResponse.clone());
-      }
-      return networkResponse;
-    })
-    .catch(() => {
-      // Ignore fetch errors
+  try {
+    return await updatePromise;
+  } catch (error) {
+    return new Response("Recurso indisponível sem ligação à rede.", {
+      status: 503,
+      headers: {
+        "Content-Type": "text/plain; charset=utf-8",
+        "Cache-Control": "no-store",
+      },
     });
-
-  return cachedResponse || fetchPromise || fetch(request);
+  }
 }
 
 // ========== HELPER FUNCTIONS ==========
 
-async function cacheLazyResources() {
-  try {
-    const cache = await caches.open(CACHE_NAME);
-    const alreadyCached = await cache.keys();
-    const cachedUrls = alreadyCached.map((req) => req.url);
-
-    const resourcesToCache = LAZY_CACHE.map((url) => {
-      if (
-        self.location.hostname === "localhost" ||
-        self.location.hostname === "127.0.0.1"
-      ) {
-        return url.replace("https://jmbenga.freedev.app/", "./");
-      }
-      return url;
-    });
-
-    const batchSize = 5;
-    for (let i = 0; i < resourcesToCache.length; i += batchSize) {
-      const batch = resourcesToCache.slice(i, i + batchSize);
-      await Promise.allSettled(
-        batch.map((url) =>
-          cache.add(url).catch((err) => {
-            console.log(` Não cacheado: ${url}`, err.message);
-          })
-        )
-      );
-    }
-
-    console.log(" Cache lazy completo!");
-  } catch (error) {
-    console.error(" Erro no cache lazy:", error);
-  }
+/** Resolve o caminho dentro do âmbito real do Service Worker.
+ * Funciona tanto na raiz do domínio como em /portfolio-jmbenga/ no XAMPP.
+ */
+function appUrl(path) {
+  const relativePath = String(path).replace(/^\/+/, "");
+  return new URL(relativePath, self.registration.scope).href;
 }
 
-async function updateCacheInBackground(request) {
-  // Don't wait for this to complete
-  fetch(request)
-    .then((response) => {
-      if (response.ok) {
-        caches
-          .open(CACHE_NAME)
-          .then((cache) => cache.put(request, response))
-          .catch(() => {});
-      }
-    })
-    .catch(() => {});
+function shouldCacheResponse(response) {
+  if (!response || !response.ok || response.type === "opaqueredirect") return false;
+  const cacheControl = response.headers.get("Cache-Control") || "";
+  return !/\bno-store\b/i.test(cacheControl);
 }
 
-async function getOfflinePage() {
-  const cache = await caches.open(CACHE_NAME);
-  const offlinePage = await cache.match(
-    self.location.hostname === "localhost"
-      ? "./offline.html"
-      : "https://jmbenga.freedev.app/offline.html"
-  );
-
-  if (offlinePage) {
-    return offlinePage;
-  }
-
-  // Create a simple offline page
+function offlineFallbackResponse() {
   return new Response(
-    `<!DOCTYPE html>
-    <html lang="pt-BR">
-    <head>
-      <meta charset="UTF-8">
-      <meta name="viewport" content="width=device-width, initial-scale=1.0">
-      <title>Offline | JMbenga Portfolio</title>
-      <style>
-        body {
-          font-family: 'Inter', sans-serif;
-          background: #0f172a;
-          color: #f8fafc;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          min-height: 100vh;
-          margin: 0;
-          padding: 20px;
-          text-align: center;
-        }
-        .container {
-          max-width: 500px;
-        }
-        h1 {
-          color: #2563eb;
-          margin-bottom: 20px;
-        }
-        p {
-          margin-bottom: 30px;
-          line-height: 1.6;
-        }
-        .icon {
-          font-size: 4rem;
-          margin-bottom: 20px;
-          color: #64748b;
-        }
-      </style>
-    </head>
-    <body>
-      <div class="container">
-        <div class="icon">📡</div>
-        <h1>Você está offline</h1>
-        <p>Conecte-se à internet para acessar o conteúdo completo do portfólio.</p>
-        <p>Algumas funcionalidades podem não estar disponíveis.</p>
-      </div>
-    </body>
-    </html>`,
+    `<!doctype html>
+<html lang="pt-AO">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#0a0d14">
+  <title>Offline | JMbenga</title>
+  <style>
+    *{box-sizing:border-box}body{margin:0;padding:24px;min-height:100vh;display:grid;place-items:center;background:#0a0d14;color:#e8edf5;font:16px/1.65 system-ui,sans-serif;text-align:center}
+    main{width:min(100%,520px)}.icon{font-size:3rem;color:#60a5fa}h1{font-size:clamp(1.7rem,5vw,2.3rem);color:#60a5fa;margin:.5rem 0}p{color:#a7b4ca}.btn{display:inline-block;margin-top:12px;padding:12px 20px;border-radius:10px;background:#2563eb;color:white;text-decoration:none;border:0;font:inherit;cursor:pointer}.btn:focus-visible{outline:3px solid #93c5fd;outline-offset:3px}
+  </style>
+</head>
+<body><main><div class="icon" aria-hidden="true">⌁</div><h1>Estás offline</h1><p>Não foi possível estabelecer ligação ao servidor. Verifica a tua ligação à Internet e tenta novamente.</p><button class="btn" type="button" onclick="location.reload()">Tentar novamente</button></main></body>
+</html>`,
     {
       status: 200,
       headers: {
         "Content-Type": "text/html; charset=utf-8",
+        "Cache-Control": "no-store",
         "X-Offline-Mode": "true",
       },
     }
   );
 }
 
+async function cacheOfflinePage(cache) {
+  const offlineUrl = appUrl("offline.html");
+
+  try {
+    const response = await fetch(offlineUrl, { cache: "reload" });
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status} ao obter offline.html`);
+    }
+    await cache.put(offlineUrl, response.clone());
+    console.log("Página offline personalizada guardada:", offlineUrl);
+  } catch (error) {
+    const existing = await cache.match(offlineUrl);
+    if (existing) {
+      console.warn("Não foi possível atualizar offline.html; a versão em cache será mantida.", error);
+      return;
+    }
+
+    await cache.put(offlineUrl, offlineFallbackResponse());
+    console.warn("Foi guardada a página offline de reserva porque offline.html não pôde ser obtida.", error);
+  }
+}
+
+async function cacheLazyResources() {
+  try {
+    const cache = await caches.open(CACHE_NAME);
+    const resourcesToCache = LAZY_CACHE.map(appUrl);
+    const batchSize = 5;
+
+    for (let i = 0; i < resourcesToCache.length; i += batchSize) {
+      const batch = resourcesToCache.slice(i, i + batchSize);
+      await Promise.allSettled(
+        batch.map(async (url) => {
+          try {
+            await cache.add(url);
+          } catch (error) {
+            console.log(`Recurso secundário não cacheado: ${url}`, error);
+          }
+        })
+      );
+    }
+
+    console.log("Cache secundário concluído.");
+  } catch (error) {
+    console.error("Erro ao guardar recursos secundários em cache:", error);
+  }
+}
+
+async function updateCacheInBackground(request) {
+  try {
+    const response = await fetch(request);
+    if (!shouldCacheResponse(response)) return;
+    const cache = await caches.open(CACHE_NAME);
+    await cache.put(request, response.clone());
+  } catch (error) {
+    // A cópia em cache continua disponível mesmo se a atualização falhar.
+  }
+}
+
+async function getOfflinePage() {
+  const cache = await caches.open(CACHE_NAME);
+  const offlineUrl = appUrl("offline.html");
+  const offlinePage = await cache.match(offlineUrl);
+
+  if (offlinePage) return offlinePage;
+
+  // Última salvaguarda: cria e guarda uma página autónoma, sem recursos externos.
+  const fallback = offlineFallbackResponse();
+  await cache.put(offlineUrl, fallback.clone()).catch((error) => {
+    console.warn("Não foi possível guardar a página offline de reserva:", error);
+  });
+  return fallback;
+}
+
 // ========== MESSAGE HANDLING ==========
 
 self.addEventListener("message", (event) => {
-  const { type, data } = event.data || {};
+  const { type } = event.data || {};
+  const reply = (message) => {
+    if (event.source && typeof event.source.postMessage === "function") {
+      event.source.postMessage(message);
+    }
+  };
 
   switch (type) {
     case "GET_VERSION":
-      event.source.postMessage({
-        type: "VERSION_INFO",
-        version: APP_VERSION,
-        cacheName: CACHE_NAME,
-      });
+      reply({ type: "VERSION_INFO", version: APP_VERSION, cacheName: CACHE_NAME });
       break;
 
     case "CLEAR_CACHE":
-      caches
-        .delete(CACHE_NAME)
-        .then(() => {
-          event.source.postMessage({
-            type: "CACHE_CLEARED",
-            success: true,
-          });
-        })
-        .catch((error) => {
-          event.source.postMessage({
+      event.waitUntil(
+        caches.delete(CACHE_NAME)
+          .then(() => reply({ type: "CACHE_CLEARED", success: true }))
+          .catch((error) => reply({
             type: "CACHE_CLEARED",
             success: false,
             error: error.message,
-          });
-        });
+          }))
+      );
       break;
 
     case "UPDATE_SW":
-      self.skipWaiting();
-      event.source.postMessage({
-        type: "SW_UPDATED",
-        success: true,
-      });
+      event.waitUntil(
+        self.skipWaiting().then(() => {
+          reply({ type: "SW_UPDATED", success: true });
+        }).catch((error) => {
+          reply({ type: "SW_UPDATED", success: false, error: error.message });
+        })
+      );
       break;
   }
 });
 
 // ========== PUSH NOTIFICATIONS (Optional) ==========
 
-self.addEventListener("push", (event) => {
-  if (!event.data) return;
+function safeNotificationUrl(candidate) {
+  try {
+    const target = new URL(candidate || appUrl(""), self.location.origin);
+    if (target.origin !== self.location.origin) return appUrl("");
+    return target.href;
+  } catch (error) {
+    return appUrl("");
+  }
+}
 
-  const data = event.data.json();
+self.addEventListener("push", (event) => {
+  let data = {};
+  if (event.data) {
+    try {
+      data = event.data.json() || {};
+    } catch (error) {
+      data = { body: event.data.text() };
+    }
+  }
 
   const options = {
-    body: data.body || "Novo conteúdo disponível no meu portfólio!",
-    icon: "https://jmbenga.freedev.app/assets/img/icons/icon-192x192.png",
-    badge: "https://jmbenga.freedev.app/assets/img/icons/icon-72x72.png",
+    body: data.body || "Novo conteúdo disponível no meu portefólio!",
+    icon: appUrl("assets/img/icons/icon-192x192.png"),
+    badge: appUrl("assets/img/icons/icon-72x72.png"),
     vibrate: [200, 100, 200],
     data: {
-      url: data.url || "https://jmbenga.freedev.app/",
+      url: safeNotificationUrl(data.url),
       date: new Date().toISOString(),
     },
     actions: [
-      {
-        action: "open",
-        title: "Abrir",
-      },
-      {
-        action: "close",
-        title: "Fechar",
-      },
+      { action: "open", title: "Abrir" },
+      { action: "close", title: "Fechar" },
     ],
   };
 
@@ -530,10 +571,29 @@ self.addEventListener("push", (event) => {
 
 self.addEventListener("notificationclick", (event) => {
   event.notification.close();
+  if (event.action === "close") return;
 
-  if (event.action === "open") {
-    event.waitUntil(clients.openWindow(event.notification.data.url));
-  }
+  const targetUrl = safeNotificationUrl(
+    event.notification.data && event.notification.data.url
+  );
+
+  event.waitUntil((async () => {
+    const windows = await self.clients.matchAll({
+      type: "window",
+      includeUncontrolled: true,
+    });
+
+    for (const client of windows) {
+      if (new URL(client.url).origin === self.location.origin && "focus" in client) {
+        if (client.url !== targetUrl && "navigate" in client) {
+          await client.navigate(targetUrl);
+        }
+        return client.focus();
+      }
+    }
+
+    return self.clients.openWindow(targetUrl);
+  })());
 });
 
 // ========== CONSOLE LOG ==========

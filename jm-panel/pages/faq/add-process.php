@@ -1,98 +1,85 @@
 <?php
-// ══════════════════════════════════════════════════════════════
-// JMbenga Portfolio — Processador Adicionar FAQ (AJAX)
-// ══════════════════════════════════════════════════════════════
+// JMbenga Portfolio — Adicionar FAQ (AJAX)
 require_once __DIR__ . '/../../include/functions_admin.php';
 
 startAdminSession();
+checkAdminRememberMe();
 requireAdminLogin();
 requireNoLockscreen();
 
 header('Content-Type: application/json; charset=utf-8');
+header('Cache-Control: no-store, max-age=0');
+header('X-Content-Type-Options: nosniff');
 
 $db = $GLOBALS['pdo'];
 
-// ── Apenas POST ───────────────────────────────────────────────
-if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
-    http_response_code(405);
-    echo json_encode(['success' => false, 'message' => 'Método não permitido.']);
-    exit;
-}
-
-// ── CSRF ──────────────────────────────────────────────────────
-$token = $_POST['csrf_token'] ?? $_SERVER['HTTP_X_CSRF_TOKEN'] ?? '';
-if (!validateAdminCsrf($token)) {
-    http_response_code(403);
-    echo json_encode(['success' => false, 'message' => 'Token de segurança inválido.']);
-    exit;
-}
-
-// ── Função auxiliar para retornar erros ───────────────────────
-$jsonError = function (array $errors, int $status = 422) {
+function faqJsonResponse(array $payload, int $status = 200): void {
     http_response_code($status);
-    echo json_encode(['success' => false, 'errors' => $errors]);
+    echo json_encode($payload, JSON_UNESCAPED_UNICODE | JSON_INVALID_UTF8_SUBSTITUTE);
     exit;
-};
+}
 
-// ── Capturar e sanitizar campos ───────────────────────────────
-$question     = trim($_POST['question']      ?? '');
-$answer       = trim($_POST['answer']        ?? '');
-$category     = trim($_POST['category_faq']  ?? 'Geral');
-$displayOrder = (int)($_POST['display_order'] ?? 0);
-$status       = ($_POST['status_faq'] ?? 'visible') === 'visible' ? 'visible' : 'hidden';
+function faqPostString(string $key, string $default = ''): string {
+    $value = $_POST[$key] ?? $default;
+    return is_string($value) ? trim($value) : '';
+}
 
-// ── Validações ─────────────────────────────────────────────────
+function faqAuditSafely(...$args): void {
+    try {
+        logAudit(...$args);
+    } catch (Throwable $auditError) {
+        error_log('[FAQ AUDIT] ' . $auditError->getMessage());
+    }
+}
+
+if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+    faqJsonResponse(['success' => false, 'message' => 'Método não permitido.'], 405);
+}
+
+$csrfToken = $_SERVER['HTTP_X_CSRF_TOKEN'] ?? $_POST['csrf_token'] ?? '';
+if (!is_string($csrfToken) || !validateAdminCsrf($csrfToken)) {
+    faqJsonResponse(['success' => false, 'message' => 'Token de segurança inválido.'], 403);
+}
+
+$question = faqPostString('question');
+$answer = faqPostString('answer');
+$category = faqPostString('category_faq', 'Geral');
+$orderRaw = $_POST['display_order'] ?? '0';
+$orderValue = is_string($orderRaw) || is_int($orderRaw) ? filter_var((string)$orderRaw, FILTER_VALIDATE_INT, ['options' => ['min_range' => 0, 'max_range' => 2147483647]]) : false;
+$statusRaw = $_POST['status_faq'] ?? null;
+$status = $statusRaw === 'visible' ? 'visible' : 'hidden';
+
 $errors = [];
+if (mb_strlen($question) < 5) $errors[] = 'A pergunta deve ter pelo menos 5 caracteres.';
+if (mb_strlen($question) > 500) $errors[] = 'A pergunta não pode ter mais de 500 caracteres.';
+if (mb_strlen($answer) < 10) $errors[] = 'A resposta deve ter pelo menos 10 caracteres.';
+if (mb_strlen($answer) > 5000) $errors[] = 'A resposta não pode ter mais de 5000 caracteres.';
+if (mb_strlen($category) < 2 || mb_strlen($category) > 100) $errors[] = 'A categoria deve ter entre 2 e 100 caracteres.';
+if ($orderValue === false) $errors[] = 'A ordem de exibição deve ser um número inteiro igual ou superior a zero.';
+if ($statusRaw !== null && $statusRaw !== 'visible') $errors[] = 'Estado da FAQ inválido.';
+if ($errors) faqJsonResponse(['success' => false, 'errors' => $errors], 422);
+$displayOrder = (int)$orderValue;
 
-if (mb_strlen($question) < 5) {
-    $errors[] = 'A pergunta deve ter pelo menos 5 caracteres.';
-}
-if (mb_strlen($question) > 500) {
-    $errors[] = 'A pergunta não pode ter mais de 500 caracteres.';
-}
-if (mb_strlen($answer) < 10) {
-    $errors[] = 'A resposta deve ter pelo menos 10 caracteres.';
-}
-if (mb_strlen($category) < 2) {
-    $errors[] = 'A categoria deve ter pelo menos 2 caracteres.';
-}
-
-// ── Verificar duplicados (mesma pergunta) ─────────────────────
-$stmt = $db->prepare("SELECT COUNT(*) FROM _faq WHERE question = ?");
-$stmt->execute([$question]);
-if ((int)$stmt->fetchColumn() > 0) {
-    $errors[] = 'Já existe uma FAQ com esta pergunta. Escolhe uma pergunta diferente.';
-}
-
-if (!empty($errors)) {
-    $jsonError($errors);
-}
-
-// ── Inserir na base de dados ───────────────────────────────────
 try {
-    $stmt = $db->prepare("
-        INSERT INTO _faq (question, answer, category_faq, display_order, status_faq)
-        VALUES (?, ?, ?, ?, ?)
-    ");
+    $stmt = $db->prepare('SELECT COUNT(*) FROM _faq WHERE question = ?');
+    $stmt->execute([$question]);
+    if ((int)$stmt->fetchColumn() > 0) {
+        faqJsonResponse(['success' => false, 'errors' => ['Já existe uma FAQ com esta pergunta. Escolhe uma pergunta diferente.']], 422);
+    }
+
+    $stmt = $db->prepare('INSERT INTO _faq (question, answer, category_faq, display_order, status_faq) VALUES (?, ?, ?, ?, ?)');
     $stmt->execute([$question, $answer, $category, $displayOrder, $status]);
+    $newId = (int)$db->lastInsertId();
 
-    $newId = $db->lastInsertId();
+    faqAuditSafely((int)$_SESSION['admin_id'], null, 'faq.create', '_faq', $newId, null, [
+        'question' => $question,
+        'category' => $category,
+        'display_order' => $displayOrder,
+        'status' => $status
+    ]);
 
-    // Auditoria
-    logAudit(
-        (int)$_SESSION['admin_id'],
-        null,
-        'faq.create',
-        '_faq',
-        (int)$newId,
-        null,
-        ['question' => $question, 'category' => $category, 'status' => $status]
-    );
-
-    echo json_encode(['success' => true, 'message' => 'FAQ criada com sucesso.']);
-    exit;
-
+    faqJsonResponse(['success' => true, 'message' => 'FAQ criada com sucesso.', 'id_faq' => $newId]);
 } catch (PDOException $e) {
     error_log('[ADD FAQ] ' . $e->getMessage());
-    $jsonError(['Erro interno ao guardar a FAQ. Tenta novamente.'], 500);
+    faqJsonResponse(['success' => false, 'message' => 'Erro interno ao guardar a FAQ. Tenta novamente.'], 500);
 }

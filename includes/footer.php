@@ -43,6 +43,25 @@ foreach ($socialKeys as $key) {
     }
 }
 
+$iconMap = [
+    'github_url' => 'fab fa-github',
+    'linkedin_url' => 'fab fa-linkedin-in',
+    'whatsapp_url' => 'fab fa-whatsapp',
+    'twitter_url' => 'fab fa-x-twitter',
+    'instagram_url' => 'fab fa-instagram',
+    'youtube_url' => 'fab fa-youtube',
+    'behance_url' => 'fab fa-behance',
+    'dribbble_url' => 'fab fa-dribbble',
+    'medium_url' => 'fab fa-medium-m',
+    'devto_url' => 'fab fa-dev',
+    'facebook_url' => 'fab fa-facebook-f',
+    'telegram_url' => 'fab fa-telegram-plane',
+    'tiktok_url' => 'fab fa-tiktok',
+    'discord_url' => 'fab fa-discord',
+    'stackoverflow_url' => 'fab fa-stack-overflow',
+    'codepen_url' => 'fab fa-codepen',
+];
+
 $email = $cfg('email_contact');
 $whatsapp = $cfg('whatsapp_url');
 $wa = $whatsapp;
@@ -60,37 +79,19 @@ $wa = $whatsapp;
                 <!-- Redes sociais dinâmicas -->
                 <div class="socials" style="margin-top:16px">
                     <?php foreach ($allSocials as $key => $url): ?>
-                    <?php
-                        // Mapear chave para ícone Font Awesome
-                        $iconMap = [
-                            'github_url' => 'fab fa-github',
-                            'linkedin_url' => 'fab fa-linkedin-in',
-                            'whatsapp_url' => 'fab fa-whatsapp',
-                            'twitter_url' => 'fab fa-x-twitter',
-                            'instagram_url' => 'fab fa-instagram',
-                            'youtube_url' => 'fab fa-youtube',
-                            'behance_url' => 'fab fa-behance',
-                            'dribbble_url' => 'fab fa-dribbble',
-                            'medium_url' => 'fab fa-medium-m',
-                            'devto_url' => 'fab fa-dev',
-                            'facebook_url' => 'fab fa-facebook-f',
-                            'telegram_url' => 'fab fa-telegram-plane',
-                            'tiktok_url' => 'fab fa-tiktok',
-                            'discord_url' => 'fab fa-discord',
-                            'stackoverflow_url' => 'fab fa-stack-overflow',
-                            'codepen_url' => 'fab fa-codepen',
-                        ];
+                        <?php
+                        // O mapa partilhado também é usado na coluna "Conecte-se".
                         $icon = $iconMap[$key] ?? 'fas fa-link';
                         ?>
-                    <a href="<?= e($url) ?>" target="_blank" class="social-link"
-                        title="<?= e(ucfirst(str_replace('_url', '', $key))) ?>">
-                        <i class="<?= $icon ?>"></i>
-                    </a>
+                        <a href="<?= e($url) ?>" target="_blank" rel="noopener noreferrer" class="social-link"
+                            title="<?= e(ucfirst(str_replace('_url', '', $key))) ?>">
+                            <i class="<?= $icon ?>"></i>
+                        </a>
                     <?php endforeach; ?>
                     <?php if (!empty($email)): ?>
-                    <a href="mailto:<?= e($email) ?>" class="social-link" title="Email">
-                        <i class="fas fa-envelope"></i>
-                    </a>
+                        <a href="mailto:<?= e($email) ?>" class="social-link" title="Email">
+                            <i class="fas fa-envelope"></i>
+                        </a>
                     <?php endif; ?>
                 </div>
             </div>
@@ -102,6 +103,7 @@ $wa = $whatsapp;
                     <li><a href="<?= BASE_URL ?>/about" class="footer-link">Sobre</a></li>
                     <li><a href="<?= BASE_URL ?>/skills" class="footer-link">Skills</a></li>
                     <li><a href="<?= BASE_URL ?>/projects" class="footer-link">Projectos</a></li>
+                    <li><a href="<?= BASE_URL ?>/servicos" class="footer-link">Todos os serviços</a></li>
                     <li><a href="<?= BASE_URL ?>/contact" class="footer-link">Contacto</a></li>
                 </ul>
             </div>
@@ -109,6 +111,8 @@ $wa = $whatsapp;
             <div>
                 <h4 class="footer-title">Serviços</h4>
                 <ul class="footer-links">
+                    <li><a href="<?= BASE_URL ?>/servicos" class="footer-link"><strong>Ver todos os
+                                serviços</strong></a></li>
                     <li><a href="<?= BASE_URL ?>/services/web-development" class="footer-link">Desenvolvimento Web</a>
                     </li>
                     <li><a href="<?= BASE_URL ?>/services/mobile-apps" class="footer-link">Apps Mobile</a></li>
@@ -122,7 +126,7 @@ $wa = $whatsapp;
                 <h4 class="footer-title">Conecte-se</h4>
                 <ul class="footer-links">
                     <?php foreach ($allSocials as $key => $url): ?>
-                    <?php
+                        <?php
                         $labelMap = [
                             'github_url' => 'GitHub',
                             'linkedin_url' => 'LinkedIn',
@@ -144,12 +148,12 @@ $wa = $whatsapp;
                         $label = $labelMap[$key] ?? ucfirst(str_replace('_url', '', $key));
                         $icon = $iconMap[$key] ?? 'fas fa-link';
                         ?>
-                    <li><a href="<?= e($url) ?>" target="_blank" class="footer-link"><i class="<?= $icon ?>"
-                                style="width:16px"></i> <?= e($label) ?></a></li>
+                        <li><a href="<?= e($url) ?>" target="_blank" rel="noopener noreferrer" class="footer-link"><i
+                                    class="<?= $icon ?>" style="width:16px"></i> <?= e($label) ?></a></li>
                     <?php endforeach; ?>
                     <?php if (!empty($email)): ?>
-                    <li><a href="mailto:<?= e($email) ?>" class="footer-link"><i class="fas fa-envelope"
-                                style="width:16px"></i> Email</a></li>
+                        <li><a href="mailto:<?= e($email) ?>" class="footer-link"><i class="fas fa-envelope"
+                                    style="width:16px"></i> Email</a></li>
                     <?php endif; ?>
                 </ul>
             </div>
@@ -179,10 +183,15 @@ $wa = $whatsapp;
             <div class="jm-chatbot-avatar" aria-hidden="true">
                 <i class="fas fa-robot"></i>
             </div>
-            <div>
-                <h3 id="jm-chatbot-title">Assistente JMbenga</h3>
+            <div style="flex:1;min-width:0;">
+                <h3 id="jm-chatbot-title">JMbenga AI</h3>
                 <p><span></span> Online agora</p>
             </div>
+            <button type="button" class="jm-chatbot-clear" id="jm-chatbot-clear" aria-label="Limpar conversa"
+                title="Limpar conversa"
+                style="background:transparent;color:inherit;border:0;cursor:pointer;padding:8px;border-radius:8px;display:inline-flex;align-items:center;justify-content:center;flex-shrink:0;">
+                <i class="fas fa-trash-can" aria-hidden="true"></i>
+            </button>
             <button type="button" class="jm-chatbot-close" id="jm-chatbot-close" aria-label="Fechar chat">
                 <i class="fas fa-xmark"></i>
             </button>

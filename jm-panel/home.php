@@ -3,12 +3,19 @@
 // JMbenga Portfolio — Dashboard Principal (Versão Melhorada)
 // ══════════════════════════════════════════════════════════════
 
-// DEBUG (temporário para diagnosticar 500 no InfinityFree)
-ini_set('display_errors', '1');
-ini_set('display_startup_errors', '1');
+// Não expor erros e detalhes internos do painel na resposta HTML.
+// Os erros continuam disponíveis no log do PHP; em desenvolvimento,
+// a configuração local pode mostrar erros depois de carregar a configuração.
+ini_set('display_errors', '0');
+ini_set('display_startup_errors', '0');
 error_reporting(E_ALL);
 
 require_once __DIR__ . '/include/functions_admin.php';
+
+if (defined('APP_ENV') && APP_ENV === 'development') {
+    ini_set('display_errors', '1');
+    ini_set('display_startup_errors', '1');
+}
 
 startAdminSession();
 checkAdminRememberMe();
@@ -21,7 +28,11 @@ $db = $GLOBALS['pdo'];
 $adminName    = $_SESSION['admin_full_name'] ?? $_SESSION['admin_name'] ?? 'Admin';
 $adminEmail   = $_SESSION['admin_email'] ?? '';
 $adminRole    = $_SESSION['admin_role'] ?? 'super_admin';
-$adminInitial = strtoupper(mb_substr($adminName, 0, 1));
+$adminInitial = strtoupper(
+    function_exists('mb_substr')
+        ? mb_substr($adminName, 0, 1, 'UTF-8')
+        : substr($adminName, 0, 1)
+);
 $adminPhoto   = $_SESSION['admin_photo'] ?? null;
 
 // ── Tempo de sessão & info do cliente ──────────────────────
@@ -58,21 +69,41 @@ $projTrend     = $projLastMonth > 0 ? round((($projThisMonth - $projLastMonth) /
 
 // ── Dados do gráfico de visitas (últimos 7 dias, reais) ────
 $rawVisits = $db->query("
-    SELECT DATE(creat_visitor) as day, COUNT(*) as total
+    SELECT DATE(creat_visitor) AS day, COUNT(*) AS total
     FROM _visitor
-    WHERE creat_visitor >= DATE_SUB(CURDATE(), INTERVAL 6 DAY) AND is_bot = 0
+    WHERE creat_visitor >= DATE_SUB(CURDATE(), INTERVAL 6 DAY)
+      AND is_bot = 0
     GROUP BY DATE(creat_visitor)
     ORDER BY day ASC
 ")->fetchAll(PDO::FETCH_KEY_PAIR);
 
 $chartDays = $chartVisits = [];
 $weekdays  = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
+
 for ($i = 6; $i >= 0; $i--) {
     $date = date('Y-m-d', strtotime("-$i days"));
     $wd   = (int) date('w', strtotime($date));
     $chartDays[]   = $weekdays[$wd];
     $chartVisits[] = (int) ($rawVisits[$date] ?? 0);
 }
+
+// Série real de visitas para os últimos 30 dias (sem dados aleatórios).
+$rawVisits30 = $db->query("
+    SELECT DATE(creat_visitor) AS day, COUNT(*) AS total
+    FROM _visitor
+    WHERE creat_visitor >= DATE_SUB(CURDATE(), INTERVAL 29 DAY)
+      AND is_bot = 0
+    GROUP BY DATE(creat_visitor)
+    ORDER BY day ASC
+")->fetchAll(PDO::FETCH_KEY_PAIR);
+
+$chartDays30 = $chartVisits30 = [];
+for ($i = 29; $i >= 0; $i--) {
+    $date = date('Y-m-d', strtotime("-$i days"));
+    $chartDays30[]   = date('d/m', strtotime($date));
+    $chartVisits30[] = (int) ($rawVisits30[$date] ?? 0);
+}
+
 $maxVisits = max(max($chartVisits), 1);
 
 // ── Distribuição de mensagens por estado ───────────────────
@@ -139,10 +170,17 @@ $categoryData = $db->query("
 // ── Estado do sistema ───────────────────────────────────────
 $phpVersion   = phpversion();
 $mysqlVersion = $db->query("SELECT VERSION()")->fetchColumn();
-$diskFreeBytes = disk_free_space(__DIR__);
-$diskFreeGB   = round($diskFreeBytes / 1024 / 1024 / 1024, 1);
-$diskTotalGB  = function_exists('disk_total_space') ? round(disk_total_space(__DIR__) / 1024 / 1024 / 1024, 1) : 0;
-$diskUsedPct  = $diskTotalGB > 0 ? round((($diskTotalGB - $diskFreeGB) / $diskTotalGB) * 100) : 0;
+$diskFreeBytes  = @disk_free_space(__DIR__);
+$diskTotalBytes = function_exists('disk_total_space') ? @disk_total_space(__DIR__) : false;
+$diskFreeGB     = is_numeric($diskFreeBytes)
+    ? round((float) $diskFreeBytes / 1024 / 1024 / 1024, 1)
+    : 0.0;
+$diskTotalGB    = is_numeric($diskTotalBytes)
+    ? round((float) $diskTotalBytes / 1024 / 1024 / 1024, 1)
+    : 0.0;
+$diskUsedPct    = ($diskTotalGB > 0 && is_numeric($diskFreeBytes))
+    ? (int) max(0, min(100, round((($diskTotalGB - $diskFreeGB) / $diskTotalGB) * 100)))
+    : 0;
 $serverSoft   = $_SERVER['SERVER_SOFTWARE'] ?? 'Apache';
 
 // ── Saudação baseada na hora ────────────────────────────────
@@ -170,9 +208,11 @@ function activityIcon(string $action): string
 }
 ?>
 <!DOCTYPE html>
-<html lang="pt" data-theme="dark" data-base-url="<?= BASE_URL ?>">
-<?php include __DIR__ . '/include/head.php'; ?>
-<title>Dashboard — Painel JMbenga</title>
+<html lang="pt" data-theme="dark" data-base-url="<?= e(BASE_URL) ?>">
+<?php
+$pageTitle = 'Dashboard';
+include __DIR__ . '/include/head.php';
+?>
 </head>
 
 <body>
@@ -350,7 +390,7 @@ function activityIcon(string $action): string
                         </div>
                     </div>
                     <div class="chart-container">
-                        <canvas id="visitsChart" style«></canvas>
+                        <canvas id="visitsChart"></canvas>
                     </div>
                 </div>
 
@@ -670,6 +710,7 @@ function activityIcon(string $action): string
     <?php include __DIR__ . '/include/modal_logout.php'; ?>
 
     <script>
+    /* global Chart */
     // ── DataTables ─────────────────────────────────────────────────
     $(document).ready(function() {
         const dtOpts = {
@@ -692,8 +733,12 @@ function activityIcon(string $action): string
     });
 
     // ── Chart.js: visitas ──────────────────────────────────────────
-    const CHART_DAYS_7 = <?= json_encode($chartDays) ?>;
-    const CHART_VISITS_7 = <?= json_encode($chartVisits) ?>;
+    const CHART_DAYS_7 = <?= json_encode($chartDays, JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_AMP | JSON_HEX_QUOT) ?>;
+    const CHART_VISITS_7 =
+        <?= json_encode($chartVisits, JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_AMP | JSON_HEX_QUOT) ?>;
+    const CHART_DAYS_30 = <?= json_encode($chartDays30, JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_AMP | JSON_HEX_QUOT) ?>;
+    const CHART_VISITS_30 =
+        <?= json_encode($chartVisits30, JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_AMP | JSON_HEX_QUOT) ?>;
 
     const accentColor = getComputedStyle(document.documentElement).getPropertyValue('--accent').trim() || '#2563eb';
 
@@ -787,20 +832,18 @@ function activityIcon(string $action): string
             visitsChart.data.labels = CHART_DAYS_7;
             visitsChart.data.datasets[0].data = CHART_VISITS_7;
         } else {
-            // Para 30 dias, gerar labels de dias atrás
-            visitsChart.data.labels = Array.from({
-                length: 30
-            }, (_, i) => 'D' + (i + 1));
-            visitsChart.data.datasets[0].data = Array.from({
-                length: 30
-            }, () => Math.floor(Math.random() * 600) + 50);
+            visitsChart.data.labels = CHART_DAYS_30;
+            visitsChart.data.datasets[0].data = CHART_VISITS_30;
         }
         visitsChart.update('active');
     });
 
     // ── Chart.js: donut categorias ─────────────────────────────────
-    const categoryData = <?= json_encode($categoryData) ?>;
-    const catLabels = categoryData.map(c => c.category_project.charAt(0).toUpperCase() + c.category_project.slice(1));
+    const categoryData = <?= json_encode($categoryData, JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_AMP | JSON_HEX_QUOT) ?>;
+    const catLabels = categoryData.map(c => {
+        const value = String(c.category_project || 'Outra');
+        return value.charAt(0).toUpperCase() + value.slice(1);
+    });
     const catValues = categoryData.map(c => parseInt(c.total));
     const catColors = ['#2563eb', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#14b8a6', '#ec4899', '#f97316'];
 

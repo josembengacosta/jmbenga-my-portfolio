@@ -14,37 +14,84 @@ $cfg = function (string $key, string $default = ''): string {
     return get_config($pdo, $key, $default);
 };
 
-$accent = $cfg('accent_color', '#2563eb');
-$whatsapp = $cfg('whatsapp_url');
-$email = $cfg('email_contact');
+// Valida a cor antes de a inserir no CSS e converte #RGB para #RRGGBB.
+$accent = trim($cfg('accent_color', '#2563eb'));
+if (!preg_match('/^#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/', $accent)) {
+    $accent = '#2563eb';
+}
+if (strlen($accent) === 4) {
+    $accent = '#' . $accent[1] . $accent[1] . $accent[2] . $accent[2] . $accent[3] . $accent[3];
+}
+$accent = strtolower($accent);
+$accentChannels = [
+    hexdec(substr($accent, 1, 2)),
+    hexdec(substr($accent, 3, 2)),
+    hexdec(substr($accent, 5, 2)),
+];
+$accentRgb = implode(', ', $accentChannels);
+$accentDim = '#' . implode('', array_map(
+    static fn (int $channel): string => str_pad(dechex((int)round($channel * 0.78)), 2, '0', STR_PAD_LEFT),
+    $accentChannels
+));
+
+// Só aceita URLs HTTP(S) absolutas para ligações externas provenientes da configuração.
+$isSafeExternalUrl = static function (?string $url): bool {
+    if ($url === null || trim($url) === '') {
+        return false;
+    }
+    $url = trim($url);
+    $parts = parse_url($url);
+    return $parts !== false
+        && isset($parts['scheme'], $parts['host'])
+        && in_array(strtolower($parts['scheme']), ['http', 'https'], true)
+        && filter_var($url, FILTER_VALIDATE_URL) !== false
+        && !isset($parts['user'])
+        && !isset($parts['pass']);
+};
+
+$whatsappRaw = trim($cfg('whatsapp_url'));
+$whatsapp = $isSafeExternalUrl($whatsappRaw) ? $whatsappRaw : '';
+$whatsappContactUrl = '';
+if ($whatsapp !== '') {
+    $parts = parse_url($whatsapp);
+    $query = [];
+    if (!empty($parts['query'])) {
+        parse_str($parts['query'], $query);
+    }
+    $query['text'] = 'Olá José, vim do seu portfólio';
+    $whatsappContactUrl = $parts['scheme'] . '://' . $parts['host']
+        . (isset($parts['port']) ? ':' . $parts['port'] : '')
+        . ($parts['path'] ?? '')
+        . '?' . http_build_query($query, '', '&', PHP_QUERY_RFC3986)
+        . (isset($parts['fragment']) ? '#' . $parts['fragment'] : '');
+}
 
 $page_title = 'Serviços de Desenvolvimento Web — José Mbenga | Full Stack Developer';
-$page_desc  = 'Criação de websites e sistemas web profissionais, performáticos e personalizados. De landing pages a plataformas complexas.';
+$page_desc = 'Criação de websites e sistemas web profissionais, responsivos e personalizados, desde páginas institucionais a aplicações web.';
+// Compatibilidade com cabeçalhos que usam $meta_desc em vez de $page_desc.
+$meta_desc = $page_desc;
 $page_section = 'services';
 
-?>
-<?php
-include '../includes/header.php';
-
+include __DIR__ . '/../includes/header.php';
 ?>
 <link rel="stylesheet" href="<?= BASE_URL ?>/assets/css/services.css">
 
 <style>
 /* ════════════════════════════════════════════════════════════
-   TOKENS — Dark (padrão) e Light 
+   TOKENS — Dark (padrão) e Light
 ════════════════════════════════════════════════════════════ */
 :root {
     --accent: <?=e($accent) ?>;
-    --accent-dim: #1d4ed8;
+    --accent-dim: <?=e($accentDim) ?>;
     --accent-glow: <?=e($accent) ?>26;
-    --accent-rgb: 37, 99, 235;
+    --accent-rgb: <?=$accentRgb ?>;
 
     --bg: #0a0d14;
     --bg-2: #0f1623;
     --bg-card: #131b2e;
     --bg-glass: rgba(13, 22, 35, .8);
     --border: rgba(255, 255, 255, .06);
-    --border-acc: rgba(37, 99, 235, .35);
+    --border-acc: rgba(<?=$accentRgb ?>, .35);
     --text: #e8edf5;
     --text-dim: #8899b4;
     --text-muted: #4a5878;
@@ -85,9 +132,18 @@ include '../includes/header.php';
     width: 700px;
     height: 700px;
     border-radius: 50%;
-    background: radial-gradient(circle, <?=e($accent) ?>22 0%, transparent 65%);
+    background: radial-gradient(circle, rgba(<?=$accentRgb ?>, .14) 0%, transparent 65%);
     animation: blob 14s ease-in-out infinite alternate;
     pointer-events: none;
+}
+
+@media (max-width: 768px) {
+    .service-hero-text h1 {
+        font-size: 1.6rem !important;
+        line-height: 1.3 !important;
+        letter-spacing: normal !important;
+        margin-bottom: 12px !important;
+    }
 }
 </style>
 
@@ -96,9 +152,9 @@ include '../includes/header.php';
 <body>
 
     <!-- WhatsApp Float -->
-    <?php if ($wa = $cfg('whatsapp_url')): ?>
+    <?php if ($whatsapp !== ''): ?>
     <div class=" whatsapp-float" id="whatsappFloat">
-        <a href="<?= e($wa) ?>?text=Olá%20José,%20vim%20do%20seu%20portfólio" target="_blank" rel="noopener">
+        <a href="<?= e($whatsappContactUrl) ?>" target="_blank" rel="noopener noreferrer">
             <i class="fab fa-whatsapp"></i> <span>Vamos conversar?</span>
         </a>
         <button class="close-whatsapp" onclick="this.parentElement.style.display='none'" aria-label="Fechar">
@@ -106,7 +162,7 @@ include '../includes/header.php';
         </button>
     </div>
     <?php endif; ?>
-    <?php include  '../includes/navbar.php'; ?>
+    <?php include __DIR__ . '/../includes/navbar.php'; ?>
 
     <!-- Hero -->
     <section id="service-hero">
@@ -122,8 +178,8 @@ include '../includes/header.php';
                         <a href="<?= BASE_URL ?>/contact?service=Desenvolvimento+Web" class="btn btn-primary"><i
                                 class="fas fa-paper-plane"></i>Solicitar Orçamento</a>
                         <?php if ($whatsapp): ?>
-                        <a href="<?= e($whatsapp) ?>" target="_blank" class="btn btn-outline"><i
-                                class="fab fa-whatsapp"></i>WhatsApp</a>
+                        <a href="<?= e($whatsapp) ?>" target="_blank" rel="noopener noreferrer"
+                            class="btn btn-outline"><i class="fab fa-whatsapp"></i>WhatsApp</a>
                         <?php endif; ?>
                     </div>
                 </div>
@@ -155,9 +211,9 @@ include '../includes/header.php';
                 ];
                 foreach ($services as $svc): ?>
                 <div class="service-card reveal">
-                    <div class="icon-circle"><i class="fas <?= $svc['icon'] ?>"></i></div>
-                    <h3><?= $svc['title'] ?></h3>
-                    <p><?= $svc['desc'] ?></p>
+                    <div class="icon-circle"><i class="fas <?= e($svc['icon']) ?>"></i></div>
+                    <h3><?= e($svc['title']) ?></h3>
+                    <p><?= e($svc['desc']) ?></p>
                 </div>
                 <?php endforeach; ?>
             </div>
@@ -185,9 +241,9 @@ include '../includes/header.php';
                 ];
                 foreach ($steps as $step): ?>
                 <div class="process-step">
-                    <div class="step-number"><?= $step['num'] ?></div>
-                    <h4><?= $step['title'] ?></h4>
-                    <p><?= $step['desc'] ?></p>
+                    <div class="step-number"><?= (int)$step['num'] ?></div>
+                    <h4><?= e($step['title']) ?></h4>
+                    <p><?= e($step['desc']) ?></p>
                 </div>
                 <?php endforeach; ?>
             </div>
@@ -207,7 +263,7 @@ include '../includes/header.php';
                 <?php
                 $techs = [
                     ['icon' => 'fab fa-html5', 'name' => 'HTML5 Semântico'],
-                    ['icon' => 'fab fa-css3-alt', 'name' => 'CSS3 / Tailwind'],
+                    ['icon' => 'fab fa-css3-alt', 'name' => 'CSS3 / Tailwind / Bootstrap'],
                     ['icon' => 'fab fa-js', 'name' => 'JavaScript ES6+'],
                     ['icon' => 'fab fa-react', 'name' => 'React.js'],
                     ['icon' => 'fab fa-vuejs', 'name' => 'Vue.js'],
@@ -219,78 +275,94 @@ include '../includes/header.php';
                 ];
                 foreach ($techs as $tech): ?>
                 <div class="tech-card reveal">
-                    <i class="<?= $tech['icon'] ?>"></i>
-                    <h4><?= $tech['name'] ?></h4>
+                    <i class="<?= e($tech['icon']) ?>"></i>
+                    <h4><?= e($tech['name']) ?></h4>
                 </div>
                 <?php endforeach; ?>
             </div>
         </div>
     </section>
 
-    <!-- Preços -->
+    <!-- Pacotes e preços de referência JMbenga -->
     <section class="section section-dark">
         <div class="container">
             <div class="section-head reveal">
                 <span class="tag">Investimento</span>
-                <h2 class="section-title">Planos <span class="text-gradient">Transparentes</span></h2>
-                <p class="section-sub">Sem surpresas. Escolha o plano ideal para o seu projecto ou solicite um orçamento
-                    personalizado.</p>
+                <h2 class="section-title">Pacotes <span class="text-gradient">JMbenga</span></h2>
+                <p class="section-sub">
+                    Valores de referência para projectos com o âmbito descrito. O orçamento final é confirmado
+                    depois de alinharmos os requisitos, os conteúdos e as funcionalidades.
+                </p>
             </div>
+
             <div class="pricing-grid reveal">
-                <!-- Básico -->
                 <div class="pricing-card">
-                    <h3 style="font-family:var(--font-head)">Site Básico</h3>
-                    <div class="price">$1,500<span>/projecto</span></div>
+                    <h3 style="font-family:var(--font-head)">JMbenga Start</h3>
+                    <div class="price">75.000–100.000 <span>Kz</span></div>
+                    <p>Para profissionais individuais e pequenos negócios que precisam de uma presença digital inicial.
+                    </p>
                     <ul>
-                        <li><i class="fas fa-check"></i>Até 5 páginas</li>
-                        <li><i class="fas fa-check"></i>Design responsivo</li>
-                        <li><i class="fas fa-check"></i>SEO básico</li>
-                        <li><i class="fas fa-check"></i>Formulário de contacto</li>
-                        <li><i class="fas fa-check"></i>Hospedagem gratuita (1º ano)</li>
-                        <li><i class="fas fa-check"></i>Suporte por 30 dias</li>
+                        <li><i class="fas fa-check"></i>Uma página com secções organizadas</li>
+                        <li><i class="fas fa-check"></i>Design adaptado a telemóveis</li>
+                        <li><i class="fas fa-check"></i>Contactos, redes sociais e WhatsApp</li>
+                        <li><i class="fas fa-check"></i>SEO técnico básico</li>
+                        <li><i class="fas fa-check"></i>Publicação e testes</li>
                     </ul>
-                    <a href="<?= BASE_URL ?>/contact" class="btn btn-outline" style="width:100%">Começar</a>
+                    <a href="<?= BASE_URL ?>/contact?service=Desenvolvimento+Web&amp;package=JMbenga+Start"
+                        class="btn btn-outline" style="width:100%">Pedir este pacote</a>
                 </div>
-                <!-- Profissional -->
+
                 <div class="pricing-card featured">
                     <div
                         style="position:absolute;top:-12px;left:50%;transform:translateX(-50%);background:var(--accent);color:#fff;padding:4px 16px;border-radius:999px;font-size:.72rem;font-weight:600">
-                        MAIS POPULAR</div>
-                    <h3 style="font-family:var(--font-head)">Profissional</h3>
-                    <div class="price">$3,500<span>/projecto</span></div>
+                        RECOMENDADO</div>
+                    <h3 style="font-family:var(--font-head)">JMbenga Business</h3>
+                    <div class="price">180.000–280.000 <span>Kz</span></div>
+                    <p>Para pequenas empresas que precisam de apresentar os seus serviços profissionalmente.</p>
                     <ul>
-                        <li><i class="fas fa-check"></i>Até 10 páginas</li>
-                        <li><i class="fas fa-check"></i>Design premium personalizado</li>
-                        <li><i class="fas fa-check"></i>SEO avançado</li>
-                        <li><i class="fas fa-check"></i>Sistema de blog / notícias</li>
-                        <li><i class="fas fa-check"></i>Painel de administração</li>
-                        <li><i class="fas fa-check"></i>Integração com redes sociais</li>
-                        <li><i class="fas fa-check"></i>Otimização de performance</li>
-                        <li><i class="fas fa-check"></i>Suporte por 60 dias</li>
+                        <li><i class="fas fa-check"></i>Até cinco páginas</li>
+                        <li><i class="fas fa-check"></i>Design personalizado e responsivo</li>
+                        <li><i class="fas fa-check"></i>Formulário de contacto e WhatsApp</li>
+                        <li><i class="fas fa-check"></i>Galeria ou portfólio</li>
+                        <li><i class="fas fa-check"></i>SEO inicial, publicação e testes</li>
+                        <li><i class="fas fa-check"></i>Duas rondas de revisões</li>
                     </ul>
-                    <a href="<?= BASE_URL ?>/contact" class="btn btn-primary" style="width:100%">Começar</a>
+                    <a href="<?= BASE_URL ?>/contact?service=Desenvolvimento+Web&amp;package=JMbenga+Business"
+                        class="btn btn-primary" style="width:100%">Pedir este pacote</a>
                 </div>
-                <!-- E-commerce -->
+
                 <div class="pricing-card">
-                    <h3 style="font-family:var(--font-head)">E‑commerce</h3>
-                    <div class="price">$5,000<span>/projecto</span></div>
+                    <h3 style="font-family:var(--font-head)">JMbenga Custom</h3>
+                    <div class="price">A partir de 300.000 <span>Kz</span></div>
+                    <p>Para projectos que exigem funcionalidades próprias, gestão de dados ou automação.</p>
                     <ul>
-                        <li><i class="fas fa-check"></i>Loja online completa</li>
-                        <li><i class="fas fa-check"></i>Carrinho & checkout</li>
-                        <li><i class="fas fa-check"></i>Gestão de produtos</li>
-                        <li><i class="fas fa-check"></i>Pagamentos online (multicaixa, referência, etc.)</li>
-                        <li><i class="fas fa-check"></i>Painel do cliente</li>
-                        <li><i class="fas fa-check"></i>Relatórios de vendas</li>
-                        <li><i class="fas fa-check"></i>Integração com redes sociais</li>
-                        <li><i class="fas fa-check"></i>Suporte prioritário</li>
+                        <li><i class="fas fa-check"></i>Análise de requisitos</li>
+                        <li><i class="fas fa-check"></i>Interface adaptada ao negócio</li>
+                        <li><i class="fas fa-check"></i>Base de dados, quando necessária</li>
+                        <li><i class="fas fa-check"></i>Autenticação e permissões, se contratadas</li>
+                        <li><i class="fas fa-check"></i>Testes e documentação básica</li>
+                        <li><i class="fas fa-check"></i>Entrega por etapas, conforme o projecto</li>
                     </ul>
-                    <a href="<?= BASE_URL ?>/contact" class="btn btn-outline" style="width:100%">Começar</a>
+                    <a href="<?= BASE_URL ?>/contact?service=Desenvolvimento+Web&amp;package=JMbenga+Custom"
+                        class="btn btn-outline" style="width:100%">Pedir orçamento</a>
                 </div>
             </div>
-            <p style="text-align:center;margin-top:24px;color:var(--text-muted);font-size:.85rem">
-                Os preços podem variar conforme a complexidade do projecto. <a href="<?= BASE_URL ?>/contact"
-                    style="color:var(--accent)">Entre em contacto</a> para um orçamento personalizado.
-            </p>
+
+            <div style="max-width:850px;margin:28px auto 0;color:var(--text-dim);font-size:.9rem;line-height:1.7">
+                <p><strong>Referência para loja virtual:</strong> 300.000–650.000 Kz, dependendo do catálogo,
+                    pagamentos,
+                    gestão de encomendas e integrações necessárias.</p>
+                <p><strong>Condições comerciais:</strong> os pacotes Start e Business não incluem automaticamente
+                    domínio,
+                    alojamento ou serviços pagos externos. Estes custos serão discriminados no orçamento. Como
+                    regra-base,
+                    o pagamento é de 50% para iniciar e 50% antes da entrega final ou publicação; projectos maiores
+                    podem
+                    ter pagamentos por etapas.</p>
+                <p>O prazo começa após a recepção do sinal, dos conteúdos e dos acessos necessários. O pacote Business
+                    inclui duas rondas de revisões dentro do âmbito aprovado; funcionalidades novas ou alterações
+                    estruturais podem exigir orçamento adicional.</p>
+            </div>
         </div>
     </section>
 
@@ -304,18 +376,18 @@ include '../includes/header.php';
             <div class="faq-list reveal">
                 <?php
                 $faqs = [
-                    ['q' => 'Quanto tempo leva para desenvolver um site?', 'a' => 'O tempo varia conforme a complexidade. Um site básico leva de 2 a 3 semanas, sites profissionais de 4 a 6 semanas e e‑commerces de 8 a 12 semanas.'],
+                    ['q' => 'Quanto tempo leva para desenvolver um site?', 'a' => 'O prazo depende do âmbito, dos conteúdos e das integrações. Depois de levantar os requisitos, apresento uma estimativa e as etapas previstas.'],
                     ['q' => 'Fornece manutenção após o lançamento?', 'a' => 'Sim! Ofereço planos de manutenção mensal que incluem atualizações de segurança, backups regulares, monitorização e suporte técnico contínuo.'],
-                    ['q' => 'Posso gerir o conteúdo do site sozinho?', 'a' => 'Sim. Todos os sites incluem um CMS (Sistema de Gestão de Conteúdo) intuitivo para que possa atualizar textos, imagens, produtos e outras informações sem conhecimentos técnicos.'],
+                    ['q' => 'Posso gerir o conteúdo do site sozinho?', 'a' => 'Quando a gestão autónoma de conteúdo faz parte dos requisitos, pode ser incluído um CMS ou painel de administração. Essa funcionalidade fica especificada no orçamento.'],
                     ['q' => 'O site será responsivo (mobile‑friendly)?', 'a' => 'Absolutamente. Todos os projectos são desenvolvidos com design responsivo, garantindo uma experiência perfeita em qualquer dispositivo.'],
-                    ['q' => 'Faz integração com meios de pagamento em Angola?', 'a' => 'Sim. Tenho experiência com integrações de pagamentos locais como Multicaixa Express, Referência Multicaixa, e também gateways internacionais como Stripe e PayPal.'],
+                    ['q' => 'Faz integração com meios de pagamento em Angola?', 'a' => 'As integrações são avaliadas caso a caso, de acordo com o provedor, a documentação técnica, a disponibilidade no país e os requisitos da conta comercial.'],
                 ];
                 foreach ($faqs as $faq): ?>
                 <div class="faq-item">
                     <h4><i class="fas fa-question-circle"
-                            style="color:var(--accent);margin-right:8px"></i><?= $faq['q'] ?>
+                            style="color:var(--accent);margin-right:8px"></i><?= e($faq['q']) ?>
                     </h4>
-                    <p><?= $faq['a'] ?></p>
+                    <p><?= e($faq['a']) ?></p>
                 </div>
                 <?php endforeach; ?>
             </div>
@@ -331,15 +403,15 @@ include '../includes/header.php';
                 Vamos Criar Algo <span class="text-gradient">Incrível</span>
             </h2>
             <p class="cta-sub" style="font-size:1rem;color:var(--text-dim);margin-bottom:32px;line-height:1.7">
-                Pronto para transformar a sua ideia em realidade? Preencha o formulário e entrarei em contacto em até 24
-                horas.
+                Pronto para transformar a sua ideia em realidade? Envie os detalhes do projecto para avaliarmos os
+                requisitos e os próximos passos.
             </p>
             <div class="cta-actions" style="display:flex;gap:14px;justify-content:center;flex-wrap:wrap">
                 <a href="<?= BASE_URL ?>/contact?service=Desenvolvimento+Web" class="btn btn-primary"><i
                         class="fas fa-paper-plane"></i>Solicitar
                     Orçamento</a>
                 <?php if ($whatsapp): ?>
-                <a href="<?= e($whatsapp) ?>" target="_blank" class="btn btn-secondary"><i
+                <a href="<?= e($whatsapp) ?>" target="_blank" rel="noopener noreferrer" class="btn btn-secondary"><i
                         class="fab fa-whatsapp"></i>Conversar no WhatsApp</a>
                 <?php endif; ?>
             </div>
@@ -349,8 +421,8 @@ include '../includes/header.php';
     <?php
     $inline_js = '';
     $page_scripts = [];
-    include '../includes/footer.php';
-    include '../includes/bottom-nav.php';
+    include __DIR__ . '/../includes/footer.php';
+    include __DIR__ . '/../includes/bottom-nav.php';
     ?>
 
 </body>

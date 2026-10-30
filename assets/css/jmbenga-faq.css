@@ -1,0 +1,745 @@
+/* JMbenga Portfolio — FAQ module styles. Scoped to FAQ pages. */
+
+
+    
+body.faq-form-page .breadcrumb {display: flex;
+        align-items: center;
+        gap: .5rem;
+        font-size: .78rem;
+        color: var(--text-muted);
+        margin-bottom: .5rem}
+
+
+    
+body.faq-form-page .breadcrumb a {color: var(--text-dim);
+        text-decoration: none;
+        transition: color .2s}
+
+
+    
+body.faq-form-page .breadcrumb a:hover {color: var(--accent)}
+
+
+    
+body.faq-form-page .breadcrumb i {font-size: .6rem}
+
+
+    
+body.faq-form-page .page-top {display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        flex-wrap: wrap;
+        gap: 1rem;
+        margin-bottom: 1.5rem}
+
+
+    
+body.faq-form-page .page-title {font-family: var(--font-head);
+        font-size: 1.5rem;
+        font-weight: 800;
+        letter-spacing: -.02em;
+        margin-bottom: .2rem}
+
+
+    
+body.faq-form-page .page-sub {font-size: .8rem;
+        color: var(--text-muted)}
+
+
+    
+body.faq-form-page .alert {padding: 1rem 1.2rem;
+        border-radius: var(--radius);
+        margin-bottom: 1.5rem;
+        display: flex;
+        align-items: flex-start;
+        gap: .75rem;
+        font-size: .85rem}
+
+
+    
+body.faq-form-page .alert-danger {background: rgba(239, 68, 68, .1);
+        border: 1px solid rgba(239, 68, 68, .3);
+        color: #f87171}
+
+
+    
+body.faq-form-page .alert-close {margin-left: auto;
+        background: none;
+        border: none;
+        color: inherit;
+        cursor: pointer;
+        opacity: .6;
+        font-size: .9rem}
+
+
+    
+body.faq-form-page .alert-close:hover {opacity: 1}
+
+
+    
+body.faq-form-page .form-section {background: var(--bg-card);
+        border: 1px solid var(--border);
+        border-radius: var(--radius-lg);
+        padding: 1.8rem;
+        margin-bottom: 1.2rem;
+        transition: border-color .25s}
+
+
+    
+body.faq-form-page .form-section:focus-within {border-color: var(--border-acc)}
+
+
+    
+body.faq-form-page .section-header {display: flex;
+        align-items: flex-start;
+        gap: 1rem;
+        margin-bottom: 1.5rem;
+        padding-bottom: 1.2rem;
+        border-bottom: 1px solid var(--border)}
+
+
+    
+body.faq-form-page .section-icon {width: 40px;
+        height: 40px;
+        border-radius: 10px;
+        background: var(--accent-glow);
+        border: 1px solid var(--border-acc);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: var(--accent);
+        font-size: .95rem;
+        flex-shrink: 0}
+
+
+    
+body.faq-form-page .section-header h3 {font-family: var(--font-head);
+        font-size: 1rem;
+        font-weight: 700;
+        margin-bottom: .15rem}
+
+
+    
+body.faq-form-page .section-header p {font-size: .78rem;
+        color: var(--text-muted)}
+
+
+    
+body.faq-form-page .form-grid {display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 1.2rem}
+
+
+    
+body.faq-form-page .form-group.full-width {grid-column: 1/-1}
+
+
+    
+@media (max-width:768px) {
+        
+body.faq-form-page .form-grid {grid-template-columns: 1fr}
+
+    }
+
+
+    
+body.faq-form-page .form-group {display: flex;
+        flex-direction: column;
+        gap: .35rem}
+
+
+    
+body.faq-form-page .form-label {font-size: .75rem;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: .04em;
+        color: var(--text-dim)}
+
+
+    
+body.faq-form-page .required {color: var(--danger)}
+
+
+    
+body.faq-form-page .form-control {padding: .65rem .85rem;
+        background: var(--bg);
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        color: var(--text);
+        font-family: var(--font-body);
+        font-size: .88rem;
+        outline: none;
+        transition: border-color .2s, box-shadow .2s}
+
+
+    
+body.faq-form-page .form-control:focus {border-color: var(--accent);
+        box-shadow: 0 0 0 3px var(--accent-glow)}
+
+
+    
+body.faq-form-page .form-control::placeholder {color: var(--text-muted)}
+
+
+    
+body.faq-form-page .form-hint {font-size: .7rem;
+        color: var(--text-muted);
+        margin-top: .15rem}
+
+
+    
+body.faq-form-page .textarea-lg {resize: vertical;
+        min-height: 140px;
+        line-height: 1.7}
+
+
+    
+body.faq-form-page .switch {display: flex;
+        align-items: center;
+        gap: .75rem;
+        cursor: pointer}
+
+
+    
+body.faq-form-page .switch input {display: none}
+
+
+    
+body.faq-form-page .switch-slider {width: 42px;
+        height: 24px;
+        border-radius: 12px;
+        background: var(--border);
+        transition: background .25s;
+        position: relative;
+        flex-shrink: 0}
+
+
+    
+body.faq-form-page .switch-slider::after {content: "";
+        position: absolute;
+        top: 3px;
+        left: 3px;
+        width: 18px;
+        height: 18px;
+        border-radius: 50%;
+        background: #fff;
+        transition: transform .25s}
+
+
+    
+body.faq-form-page .switch input:checked+.switch-slider {background: var(--accent)}
+
+
+    
+body.faq-form-page .switch input:checked+.switch-slider::after {transform: translateX(18px)}
+
+
+    
+body.faq-form-page .switch-label {font-size: .82rem;
+        font-weight: 500}
+
+
+    
+body.faq-form-page .number-input {display: flex;
+        align-items: center;
+        gap: .3rem}
+
+
+    
+body.faq-form-page .num-btn {width: 32px;
+        height: 32px;
+        border-radius: 6px;
+        background: var(--bg);
+        border: 1px solid var(--border);
+        color: var(--text-dim);
+        cursor: pointer;
+        font-size: .9rem;
+        transition: all .15s;
+        display: flex;
+        align-items: center;
+        justify-content: center}
+
+
+    
+body.faq-form-page .num-btn:hover {border-color: var(--accent);
+        color: var(--accent)}
+
+
+    
+body.faq-form-page .num-field {width: 70px;
+        text-align: center;
+        -moz-appearance: textfield}
+
+
+    
+body.faq-form-page .num-field::-webkit-outer-spin-button,
+body.faq-form-page .num-field::-webkit-inner-spin-button {-webkit-appearance: none;
+        margin: 0}
+
+
+    
+body.faq-form-page .btn {display: inline-flex;
+        align-items: center;
+        gap: .45rem;
+        padding: .55rem 1.1rem;
+        border-radius: 8px;
+        font-family: var(--font-body);
+        font-size: .83rem;
+        font-weight: 500;
+        cursor: pointer;
+        transition: all .2s;
+        text-decoration: none;
+        border: 1px solid var(--border);
+        white-space: nowrap}
+
+
+    
+body.faq-form-page .btn-primary {background: var(--accent);
+        color: #fff;
+        border-color: var(--accent)}
+
+
+    
+body.faq-form-page .btn-primary:hover {background: #1d4ed8;
+        transform: translateY(-1px);
+        box-shadow: 0 4px 16px var(--accent-glow)}
+
+
+    
+body.faq-form-page .btn-secondary {background: transparent;
+        border: 1px solid var(--border);
+        color: var(--text-dim)}
+
+
+    
+body.faq-form-page .btn-secondary:hover {background: var(--bg-hover);
+        border-color: var(--border-acc);
+        color: var(--text)}
+
+
+    
+body.faq-form-page .btn-lg {padding: .7rem 1.5rem;
+        font-size: .9rem}
+
+
+    
+body.faq-form-page .form-actions {display: flex;
+        gap: .75rem;
+        justify-content: flex-end;
+        margin-top: 1.5rem;
+        padding-top: 1.5rem;
+        border-top: 1px solid var(--border)}
+
+    
+
+/* FAQ listing */
+
+
+    
+body.faq-list-page .page-top {display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        flex-wrap: wrap;
+        gap: 1rem;
+        margin-bottom: 1.5rem}
+
+
+    
+body.faq-list-page .breadcrumb {display: flex;
+        align-items: center;
+        gap: .5rem;
+        font-size: .78rem;
+        color: var(--text-muted);
+        margin-bottom: .5rem}
+
+
+    
+body.faq-list-page .breadcrumb a {color: var(--text-dim);
+        text-decoration: none;
+        transition: color .2s}
+
+
+    
+body.faq-list-page .breadcrumb a:hover {color: var(--accent)}
+
+
+    
+body.faq-list-page .breadcrumb i {font-size: .6rem}
+
+
+    
+body.faq-list-page .page-title {font-family: var(--font-head);
+        font-size: 1.5rem;
+        font-weight: 800;
+        letter-spacing: -.02em;
+        margin-bottom: .2rem}
+
+
+    
+body.faq-list-page .page-sub {font-size: .8rem;
+        color: var(--text-muted)}
+
+
+    
+body.faq-list-page .kpi-row {display: flex;
+        gap: .75rem;
+        flex-wrap: wrap;
+        margin-bottom: 1.25rem}
+
+
+    
+body.faq-list-page .kpi-card {flex: 1;
+        min-width: 120px;
+        background: var(--bg-card);
+        border: 1px solid var(--border);
+        border-radius: var(--radius);
+        padding: .85rem 1rem;
+        display: flex;
+        align-items: center;
+        gap: .75rem;
+        text-decoration: none;
+        color: var(--text);
+        transition: all .22s var(--ease);
+        position: relative;
+        overflow: hidden}
+
+
+    
+body.faq-list-page .kpi-card:hover {transform: translateY(-2px);
+        border-color: var(--border-acc);
+        box-shadow: 0 6px 24px rgba(0, 0, 0, .25)}
+
+
+    
+body.faq-list-page .kpi-card.kpi-active {border-color: var(--accent);
+        background: var(--accent-soft)}
+
+
+    
+body.faq-list-page .kpi-card.kpi-active::after {content: "";
+        position: absolute;
+        bottom: 0;
+        left: 0;
+        right: 0;
+        height: 2px;
+        background: var(--accent)}
+
+
+    
+body.faq-list-page .kpi-icon {width: 36px;
+        height: 36px;
+        border-radius: 9px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: .9rem;
+        flex-shrink: 0}
+
+
+    
+body.faq-list-page .kpi-val {font-family: var(--font-head);
+        font-size: 1.35rem;
+        font-weight: 800;
+        letter-spacing: -.02em;
+        line-height: 1}
+
+
+    
+body.faq-list-page .kpi-lbl {font-size: .68rem;
+        color: var(--text-muted);
+        margin-top: 2px;
+        white-space: nowrap}
+
+
+    
+body.faq-list-page .filter-bar {display: flex;
+        align-items: center;
+        gap: .6rem;
+        flex-wrap: wrap;
+        margin-bottom: 1.25rem;
+        background: var(--bg-card);
+        border: 1px solid var(--border);
+        border-radius: var(--radius);
+        padding: .85rem 1rem}
+
+
+    
+body.faq-list-page .filter-search {display: flex;
+        align-items: center;
+        gap: .5rem;
+        background: var(--bg);
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        padding: .4rem .75rem;
+        flex: 1;
+        min-width: 180px;
+        transition: border-color .2s}
+
+
+    
+body.faq-list-page .filter-search:focus-within {border-color: var(--accent)}
+
+
+    
+body.faq-list-page .filter-search i {color: var(--text-muted);
+        font-size: .85rem;
+        flex-shrink: 0}
+
+
+    
+body.faq-list-page .filter-search input {background: none;
+        border: none;
+        outline: none;
+        color: var(--text);
+        font-family: var(--font-body);
+        font-size: .84rem;
+        flex: 1;
+        min-width: 0}
+
+
+    
+body.faq-list-page .filter-search input::placeholder {color: var(--text-muted)}
+
+
+    
+body.faq-list-page .filter-clear-search {background: none;
+        border: none;
+        color: var(--text-muted);
+        cursor: pointer;
+        font-size: .8rem;
+        padding: 0;
+        line-height: 1;
+        transition: color .2s}
+
+
+    
+body.faq-list-page .filter-clear-search:hover {color: var(--danger)}
+
+
+    
+body.faq-list-page .filter-select {background: var(--bg);
+        border: 1px solid var(--border);
+        color: var(--text);
+        padding: .42rem .75rem;
+        border-radius: 8px;
+        font-size: .82rem;
+        font-family: var(--font-body);
+        outline: none;
+        cursor: pointer;
+        transition: border-color .2s}
+
+
+    
+body.faq-list-page .filter-select:focus {border-color: var(--accent)}
+
+
+    
+body.faq-list-page .filter-result {font-size: .78rem;
+        color: var(--text-muted);
+        display: flex;
+        align-items: center;
+        gap: .35rem;
+        margin-left: auto}
+
+
+    
+body.faq-list-page .table-card {background: var(--bg-card);
+        border: 1px solid var(--border);
+        border-radius: var(--radius);
+        padding: 1.5rem}
+
+
+    
+body.faq-list-page table.dataTable {width: 100% !important;
+        border-collapse: collapse}
+
+
+    
+body.faq-list-page table.dataTable th,
+body.faq-list-page table.dataTable td {padding: .7rem .8rem;
+        text-align: left;
+        border-bottom: 1px solid var(--border);
+        font-size: .85rem}
+
+
+    
+body.faq-list-page table.dataTable th {color: var(--text-dim);
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: .04em;
+        font-size: .7rem}
+
+
+    
+body.faq-list-page table.dataTable tbody tr:hover {background: rgba(255, 255, 255, .02)}
+
+
+    
+body.faq-list-page .faq-question {
+    display: block;
+    max-width: 320px;
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+    font-weight: 600;
+    font-size: .85rem;
+}
+
+
+    
+body.faq-list-page .faq-answer-preview {font-size: .78rem;
+        color: var(--text-dim);
+        line-height: 1.5;
+        max-width: 350px}
+
+
+    
+body.faq-list-page .cat-tag {display: inline-flex;
+        align-items: center;
+        gap: 4px;
+        padding: 3px 9px;
+        border-radius: 99px;
+        font-size: .68rem;
+        font-weight: 700;
+        background: color-mix(in srgb, var(--cat-color) 12%, transparent);
+        color: var(--cat-color);
+        border: 1px solid color-mix(in srgb, var(--cat-color) 25%, transparent)}
+
+
+    
+body.faq-list-page .order-badge {display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 24px;
+        height: 24px;
+        border-radius: 6px;
+        background: var(--bg);
+        border: 1px solid var(--border);
+        font-size: .72rem;
+        font-family: var(--font-mono);
+        color: var(--text-dim)}
+
+
+    
+body.faq-list-page .row-actions {display: flex;
+        gap: .3rem;
+        align-items: center}
+
+
+    
+body.faq-list-page .btn-icon {width: 30px;
+        height: 30px;
+        border-radius: 6px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        background: transparent;
+        border: 1px solid var(--border);
+        color: var(--text-dim);
+        cursor: pointer;
+        transition: all .2s;
+        text-decoration: none;
+        font-size: .8rem}
+
+
+    
+body.faq-list-page .btn-icon:hover {background: var(--accent);
+        color: #fff;
+        border-color: var(--accent)}
+
+
+    
+body.faq-list-page .btn-icon-danger:hover {background: var(--danger);
+        border-color: var(--danger)}
+
+
+    
+body.faq-list-page .btn {display: inline-flex;
+        align-items: center;
+        gap: .45rem;
+        padding: .55rem 1.1rem;
+        border-radius: 8px;
+        font-family: var(--font-body);
+        font-size: .83rem;
+        font-weight: 500;
+        cursor: pointer;
+        transition: all .2s;
+        text-decoration: none;
+        border: 1px solid var(--border);
+        white-space: nowrap}
+
+
+    
+body.faq-list-page .btn-primary {background: var(--accent);
+        color: #fff;
+        border-color: var(--accent)}
+
+
+    
+body.faq-list-page .btn-primary:hover {background: #1d4ed8;
+        transform: translateY(-1px);
+        box-shadow: 0 4px 16px var(--accent-glow)}
+
+
+    
+body.faq-list-page .btn-secondary {background: transparent;
+        border: 1px solid var(--border);
+        color: var(--text-dim)}
+
+
+    
+body.faq-list-page .btn-secondary:hover {background: var(--bg-hover);
+        border-color: var(--border-acc);
+        color: var(--text)}
+
+
+    
+body.faq-list-page .empty-state {padding: 3.5rem 2rem;
+        text-align: center;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: .6rem}
+
+
+    
+body.faq-list-page .empty-icon {width: 64px;
+        height: 64px;
+        border-radius: 18px;
+        background: var(--bg);
+        border: 1px solid var(--border);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1.5rem;
+        color: var(--text-muted);
+        margin-bottom: .5rem}
+
+
+    
+body.faq-list-page .empty-state h3 {font-family: var(--font-head);
+        font-size: 1.1rem;
+        font-weight: 700}
+
+
+    
+body.faq-list-page .empty-state p {font-size: .85rem;
+        color: var(--text-muted);
+        max-width: 360px}
+
+
+    
+body.faq-list-page .empty-state a {color: var(--accent)}
+
+    
+
+/* Accessibility and validation refinements */
+body.faq-form-page .switch { position: relative; }
+body.faq-form-page .switch input { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); clip-path: inset(50%); white-space: nowrap; border: 0; }
+body.faq-form-page .switch:focus-within .switch-slider { outline: 2px solid var(--accent); outline-offset: 3px; }
+body.faq-form-page .form-control.error { border-color: var(--danger); box-shadow: 0 0 0 3px color-mix(in srgb, var(--danger) 16%, transparent); }
+
+
+@media (max-width: 768px) {
+    body.faq-list-page .faq-question { max-width: 220px; }
+}

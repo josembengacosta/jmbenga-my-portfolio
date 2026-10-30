@@ -15,6 +15,7 @@
   --bg-hover: rgba(255, 255, 255, 0.025);
   --border: rgba(255, 255, 255, 0.07);
   --border-accent: rgba(37, 99, 235, 0.35);
+  --border-acc: var(--border-accent); /* alias de compatibilidade para componentes antigos */
   --text: #e2e8f4;
   --text-dim: #8896aa;
   --text-muted: #4a5568;
@@ -74,6 +75,29 @@ body {
   transition: background 0.35s, color 0.35s;
   font-size: 15px;
   -webkit-font-smoothing: antialiased;
+}
+
+/* Base independente do CSS público (main.css). */
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+ul,
+ol {
+  list-style: none;
+}
+
+img {
+  max-width: 100%;
+  height: auto;
+}
+
+button,
+input,
+select,
+textarea {
+  font: inherit;
 }
 
 /* ═══════════ SCROLLBAR ═══════════ */
@@ -1560,3 +1584,4 @@ table.dataTable tbody tr:last-child td {
   font-size: 0.75rem;
   color: var(--text-muted) !important;
 }
+

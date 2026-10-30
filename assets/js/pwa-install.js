@@ -1,12 +1,13 @@
 // ============================================
-// SISTEMA PWA INSTALL - OTIMIZADO
+// SISTEMA PWA INSTALL - OTIMIZADO assets/js/pwa-install.js
 // ============================================
 
 class PWAInstallManager {
   constructor() {
     this.deferredPrompt = null;
     this.isInstalled = false;
-    this.isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
+    this.isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) ||
+      (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
     this.isAndroid = /Android/.test(navigator.userAgent);
     this.isDesktop = !this.isIOS && !this.isAndroid;
     this.supportsPWA = false;
@@ -26,6 +27,12 @@ class PWAInstallManager {
 
     // 3. Verificar suporte PWA
     this.checkSupport();
+
+    // iOS/Safari normalmente não dispara beforeinstallprompt.
+    // Mostrar uma opção de instruções quando a PWA puder ser instalada.
+    if (this.isIOS && this.supportsPWA && !this.isInstalled) {
+      this.showInstallButton();
+    }
 
     // 4. Debug info
     if (this.debug) {
@@ -176,12 +183,18 @@ class PWAInstallManager {
     installBtn.className = "pwa-install-btn";
     installBtn.setAttribute("aria-label", "Instalar aplicativo");
 
-    // Conteúdo do botão
-    installBtn.innerHTML = `
-      <i class="fas fa-download"></i>
-      <span class="btn-text">Instalar App</span>
-      <span class="btn-subtext">Offline &amp; Mais Rápido</span>
-    `;
+    // No iOS não há prompt de instalação programático: o botão abre instruções.
+    installBtn.innerHTML = this.isIOS && !this.deferredPrompt
+      ? `
+        <i class="fas fa-mobile-alt" aria-hidden="true"></i>
+        <span class="btn-text">Como instalar</span>
+        <span class="btn-subtext">Adicionar ao ecrã inicial</span>
+      `
+      : `
+        <i class="fas fa-download" aria-hidden="true"></i>
+        <span class="btn-text">Instalar App</span>
+        <span class="btn-subtext">Offline &amp; Mais Rápido</span>
+      `;
 
     // Event listeners
     installBtn.addEventListener("click", () => this.installApp());
@@ -207,10 +220,13 @@ class PWAInstallManager {
       installBtn.classList.add("show");
     });
 
-    // Auto-esconder após 30 segundos (não spam)
-    this.autoHideTimeout = setTimeout(() => {
-      this.hideInstallButton();
-    }, 30000);
+    // Botões com prompt real desaparecem após 30 segundos.
+    // O botão manual do iOS permanece disponível.
+    if (this.deferredPrompt) {
+      this.autoHideTimeout = setTimeout(() => {
+        this.hideInstallButton();
+      }, 30000);
+    }
   }
 
   hideInstallButton() {
@@ -241,11 +257,12 @@ class PWAInstallManager {
     try {
       console.log(" Mostrando prompt de instalação...");
 
-      // Mostrar o prompt nativo do navegador
-      this.deferredPrompt.prompt();
+      // Guardar o evento e aguardar o prompt nativo do navegador.
+      const installPrompt = this.deferredPrompt;
+      await installPrompt.prompt();
 
-      // Esperar a escolha do usuário
-      const { outcome } = await this.deferredPrompt.userChoice;
+      // Esperar a escolha do utilizador.
+      const { outcome } = await installPrompt.userChoice;
 
       console.log(" Usuário escolheu:", outcome);
 
@@ -472,10 +489,10 @@ if ("serviceWorker" in navigator) {
               navigator.serviceWorker.controller
             ) {
               window.showToast &&
-                showToast(
-                  '<strong>Nova versão disponível!</strong> <a onclick="location.reload()" style="color:#fff;text-decoration:underline;cursor:pointer;">Atualizar agora</a>',
+                window.showToast(
+                  "Nova versão disponível. Actualize a página para carregar a versão mais recente.",
                   "info",
-                  0
+                  6000
                 );
             }
           });

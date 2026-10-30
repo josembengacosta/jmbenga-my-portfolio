@@ -1,0 +1,83 @@
+# JMbenga Portfolio — política de rastreio
+# Este ficheiro orienta crawlers; não substitui a segurança do servidor.
+
+User-agent: *
+Allow: /
+Disallow: /api/
+Disallow: /jm-panel/
+Disallow: /status/
+Disallow: /includes/
+Disallow: /database/
+
+# Pesquisa e recuperação de conteúdo no ChatGPT
+User-agent: OAI-SearchBot
+Allow: /
+Disallow: /api/
+Disallow: /jm-panel/
+Disallow: /status/
+Disallow: /includes/
+Disallow: /database/
+
+User-agent: ChatGPT-User
+Allow: /
+Disallow: /api/
+Disallow: /jm-panel/
+Disallow: /status/
+Disallow: /includes/
+Disallow: /database/
+
+# Recolha para treino de modelos — permitida para conteúdo público
+User-agent: GPTBot
+Allow: /
+Disallow: /api/
+Disallow: /jm-panel/
+Disallow: /status/
+Disallow: /includes/
+Disallow: /database/
+
+# Recolha para treino de modelos Claude — permitida para conteúdo público
+User-agent: ClaudeBot
+Allow: /
+Disallow: /api/
+Disallow: /jm-panel/
+Disallow: /status/
+Disallow: /includes/
+Disallow: /database/
+
+# Pesquisa e recuperação de conteúdo no Claude
+User-agent: Claude-SearchBot
+Allow: /
+Disallow: /api/
+Disallow: /jm-panel/
+Disallow: /status/
+Disallow: /includes/
+Disallow: /database/
+
+User-agent: Claude-User
+Allow: /
+Disallow: /api/
+Disallow: /jm-panel/
+Disallow: /status/
+Disallow: /includes/
+Disallow: /database/
+
+# Recolha para treino/grounding em produtos Gemini — permitida
+User-agent: Google-Extended
+Allow: /
+Disallow: /api/
+Disallow: /jm-panel/
+Disallow: /status/
+Disallow: /includes/
+Disallow: /database/
+
+# Pesquisa assistida por IA adicional
+User-agent: PerplexityBot
+Allow: /
+Disallow: /api/
+Disallow: /jm-panel/
+Disallow: /status/
+Disallow: /includes/
+Disallow: /database/
+
+# Sitemap XML servido dinamicamente pelo PHP
+Sitemap: https://jmbenga.freedev.app/sitemap.php
