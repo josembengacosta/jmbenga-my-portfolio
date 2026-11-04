@@ -1,6 +1,10 @@
 # 🎯 JMbenga Portfolio
 
+<<<<<<< HEAD
 > 🌐 **Acede ao projeto online:** [jmbenga.free.dev.app](https://www.jmbenga.free.dev.app)
+=======
+> 🌐 **Acede ao projeto online:** [jmbenga.freedev.app]((https://jmbenga.freedev.app/))
+>>>>>>> origin/main
 
 Portfólio profissional Full Stack desenvolvido para apresentar os meus projetos, competências e gerir conteúdos em tempo real através de um painel de administração integrado.
 
