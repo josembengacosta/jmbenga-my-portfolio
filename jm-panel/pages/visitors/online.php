@@ -28,7 +28,7 @@ $os          = parseOSFromUA($clientUA);
 // ── Buscar visitantes online (inicial) ───────────────────────
 $onlineStmt = $db->query("
     SELECT * FROM _visitor
-    WHERE is_online = 1 AND is_bot = 0
+    WHERE is_online = 1 AND is_bot = 0 AND status_visitor <> 'blocked'
     ORDER BY last_seen DESC
 ");
 $online = $onlineStmt->fetchAll();
@@ -38,9 +38,11 @@ $csrfToken = $_SESSION['admin_csrf_token'];
 <!DOCTYPE html>
 <html lang="pt" data-theme="dark" data-base-url="<?= BASE_URL ?>">
 <?php include __DIR__ . '/../../include/head.php'; ?>
+<link rel="stylesheet"
+    href="<?= BASE_URL ?>/assets/css/jmbenga-visitors.css?v=<?= file_exists(ROOT_PATH . '/assets/css/jmbenga-visitors.css') ? filemtime(ROOT_PATH . '/assets/css/jmbenga-visitors.css') : '1' ?>">
 </head>
 
-<body>
+<body class="visitors-online-page">
     <?php include __DIR__ . '/../../include/sidebar.php'; ?>
     <div class="main">
         <?php include __DIR__ . '/../../include/header.php'; ?>
@@ -322,106 +324,188 @@ $csrfToken = $_SESSION['admin_csrf_token'];
     </style>
 
     <script>
-    const BASE = '<?= BASE_URL ?>';
-    const CSRF = '<?= $csrfToken ?>';
+    const BASE = <?= json_encode(BASE_URL, JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_AMP | JSON_HEX_QUOT) ?>;
+    const CSRF = <?= json_encode($csrfToken, JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_AMP | JSON_HEX_QUOT) ?>;
+    const onlineContainer = document.getElementById('onlineContainer');
+    const onlineSubtitle = document.getElementById('onlineSubtitle');
 
-    // ═══ ACTUALIZAÇÃO DINÂMICA DA GRELHA (SEM RELOAD) ═══
+    function makeTextElement(tag, className, value) {
+        const element = document.createElement(tag);
+        if (className) element.className = className;
+        element.textContent = value == null || value === '' ? '—' : String(value);
+        return element;
+    }
+
+    function makeEmptyOnlineState() {
+        const empty = document.createElement('div');
+        empty.className = 'empty-state';
+
+        const iconBox = document.createElement('div');
+        iconBox.className = 'empty-icon';
+        const icon = document.createElement('i');
+        icon.className = 'fas fa-wifi-slash';
+        iconBox.appendChild(icon);
+
+        empty.append(
+            iconBox,
+            makeTextElement('h3', '', 'Nenhum visitante online'),
+            makeTextElement('p', '', 'Não há visitantes activos neste momento.')
+        );
+        return empty;
+    }
+
+    function renderOnlineVisitors(visitors) {
+        onlineContainer.replaceChildren();
+
+        if (!Array.isArray(visitors) || visitors.length === 0) {
+            onlineContainer.appendChild(makeEmptyOnlineState());
+            return;
+        }
+
+        const grid = document.createElement('div');
+        grid.className = 'online-grid';
+        grid.id = 'onlineGrid';
+
+        visitors.forEach(visitor => {
+            const id = Number(visitor.id_visitor);
+            if (!Number.isSafeInteger(id) || id <= 0) return;
+
+            const deviceIcon = visitor.device_type === 'desktop' ? 'desktop' :
+                visitor.device_type === 'mobile' ? 'mobile-alt' :
+                visitor.device_type === 'tablet' ? 'tablet-alt' : 'question-circle';
+
+            const durationSeconds = Math.max(0, Number(visitor.session_duration) || 0);
+            const duration = durationSeconds > 0 ?
+                `${Math.floor(durationSeconds / 60)}m ${durationSeconds % 60}s` :
+                'agora';
+
+            const card = document.createElement('div');
+            card.className = 'online-card';
+            card.id = `online-${id}`;
+
+            const dot = document.createElement('div');
+            dot.className = 'online-dot';
+
+            const info = document.createElement('div');
+            info.className = 'online-info';
+            info.appendChild(makeTextElement('strong', '', visitor.ip_address));
+            info.appendChild(makeTextElement(
+                'div',
+                'online-location',
+                `${visitor.country_name || '—'}, ${visitor.city || '—'}`
+            ));
+
+            const device = document.createElement('div');
+            device.className = 'online-device';
+            const deviceIconElement = document.createElement('i');
+            deviceIconElement.className = `fas fa-${deviceIcon}`;
+            device.append(deviceIconElement, document.createTextNode(
+                ` ${visitor.browser || '—'} / ${visitor.os || '—'}`
+            ));
+
+            info.append(
+                device,
+                makeTextElement(
+                    'div',
+                    'online-meta',
+                    `${Number(visitor.pages_viewed) || 0} páginas · ${duration}`
+                )
+            );
+
+            const actions = document.createElement('div');
+            actions.className = 'online-actions';
+
+            const viewLink = document.createElement('a');
+            viewLink.href = `${BASE}/jm-panel/visitors/view?id=${id}`;
+            viewLink.className = 'btn-icon';
+            viewLink.title = 'Ver';
+            const viewIcon = document.createElement('i');
+            viewIcon.className = 'fas fa-eye';
+            viewLink.appendChild(viewIcon);
+
+            const blockButton = document.createElement('button');
+            blockButton.type = 'button';
+            blockButton.className = 'btn-icon btn-icon-danger block-visitor';
+            blockButton.dataset.id = String(id);
+            blockButton.title = 'Bloquear';
+            const blockIcon = document.createElement('i');
+            blockIcon.className = 'fas fa-ban';
+            blockButton.appendChild(blockIcon);
+
+            actions.append(viewLink, blockButton);
+            card.append(dot, info, actions);
+            grid.appendChild(card);
+        });
+
+        onlineContainer.appendChild(grid);
+    }
+
     async function refreshOnlineVisitors() {
         try {
-            const res = await fetch(BASE + '/jm-panel/visitors/api?action=online');
-            const data = await res.json();
-            if (!data.success) return;
-
-            const container = document.getElementById('onlineContainer');
-            const subtitle = document.getElementById('onlineSubtitle');
-            const count = data.visitors.length;
-
-            // Actualizar subtítulo
-            subtitle.innerHTML =
-                `${count} online &nbsp;·&nbsp; <span style="color:var(--success)"><i class="fas fa-circle" style="font-size:.45rem"></i> Actualização em tempo real</span>`;
-
-            if (count === 0) {
-                container.innerHTML = `
-                    <div class="empty-state">
-                        <div class="empty-icon"><i class="fas fa-wifi-slash"></i></div>
-                        <h3>Nenhum visitante online</h3>
-                        <p>Não há visitantes activos neste momento.</p>
-                    </div>`;
-                return;
-            }
-
-            // Construir grelha
-            let html = '<div class="online-grid" id="onlineGrid">';
-            data.visitors.forEach(v => {
-                const deviceIcon = v.device_type === 'desktop' ? 'desktop' :
-                    v.device_type === 'mobile' ? 'mobile-alt' :
-                    v.device_type === 'tablet' ? 'tablet-alt' : 'question-circle';
-                const duration = v.session_duration ? Math.floor(v.session_duration / 60) + 'm ' + (v
-                    .session_duration % 60) + 's' : 'agora';
-                html += `
-                    <div class="online-card" id="online-${v.id_visitor}">
-                        <div class="online-dot"></div>
-                        <div class="online-info">
-                            <strong>${v.ip_address}</strong>
-                            <div class="online-location">${v.country_name || '—'}, ${v.city || '—'}</div>
-                            <div class="online-device">
-                                <i class="fas fa-${deviceIcon}"></i>
-                                ${v.browser || '—'} / ${v.os || '—'}
-                            </div>
-                            <div class="online-meta">
-                                ${v.pages_viewed} páginas &nbsp;·&nbsp; ${duration}
-                            </div>
-                        </div>
-                        <div class="online-actions">
-                            <a href="${BASE}/jm-panel/visitors/view?id=${v.id_visitor}" class="btn-icon" title="Ver"><i class="fas fa-eye"></i></a>
-                            <button class="btn-icon btn-icon-danger block-visitor" data-id="${v.id_visitor}" title="Bloquear"><i class="fas fa-ban"></i></button>
-                        </div>
-                    </div>`;
+            const response = await fetch(BASE + '/jm-panel/visitors/api?action=online', {
+                headers: {
+                    'X-Requested-With': 'XMLHttpRequest'
+                },
+                cache: 'no-store'
             });
-            html += '</div>';
-            container.innerHTML = html;
+            const data = await response.json();
+            if (!response.ok || !data.success) return;
 
-            // Re-vincular eventos de bloqueio
-            bindBlockButtons();
+            const visitors = Array.isArray(data.visitors) ? data.visitors : [];
+            const status = document.createElement('span');
+            status.className = 'online-live-status';
+            const liveDot = document.createElement('i');
+            liveDot.className = 'fas fa-circle';
+            liveDot.setAttribute('aria-hidden', 'true');
+            status.append(liveDot, document.createTextNode(' Actualização em tempo real'));
 
-        } catch (err) {
-            /* silencioso */ }
+            onlineSubtitle.replaceChildren(
+                document.createTextNode(`${visitors.length} online · `),
+                status
+            );
+
+            renderOnlineVisitors(visitors);
+        } catch (error) {
+            // A grelha mantém os últimos dados quando a actualização falha.
+        }
     }
 
-    // Vincular eventos de bloqueio aos botões recém-criados
-    function bindBlockButtons() {
-        document.querySelectorAll('.block-visitor').forEach(btn => {
-            btn.removeEventListener('click', handleBlock);
-            btn.addEventListener('click', handleBlock);
-        });
-    }
+    onlineContainer.addEventListener('click', async event => {
+        const button = event.target.closest('.block-visitor');
+        if (!button) return;
 
-    async function handleBlock() {
-        const id = this.dataset.id;
+        const id = button.dataset.id;
+        if (!/^[1-9]\d*$/.test(id || '')) return;
+
+        button.disabled = true;
         try {
-            const res = await fetch(BASE + '/jm-panel/visitors/block?id=' + id, {
+            const response = await fetch(BASE + '/jm-panel/visitors/block?id=' + encodeURIComponent(id), {
                 method: 'POST',
                 headers: {
                     'X-Requested-With': 'XMLHttpRequest',
                     'X-CSRF-Token': CSRF
                 }
             });
-            const data = await res.json();
-            if (data.success) {
-                const card = document.getElementById('online-' + id);
-                if (card) {
-                    card.style.transition = 'opacity .3s';
-                    card.style.opacity = '0';
-                    setTimeout(() => card.remove(), 300);
-                }
+            const data = await response.json();
+
+            if (!response.ok || !data.success) {
+                throw new Error(data.message || 'Não foi possível bloquear o visitante.');
             }
-        } catch (err) {}
-    }
 
-    // Vincular eventos iniciais
-    bindBlockButtons();
+            const card = document.getElementById('online-' + id);
+            if (card) card.remove();
 
-    // Actualizar a cada 30 segundos
+            const remaining = onlineContainer.querySelectorAll('.online-card').length;
+            if (remaining === 0) renderOnlineVisitors([]);
+            onlineSubtitle.firstChild.textContent = `${remaining} online · `;
+        } catch (error) {
+            button.disabled = false;
+            window.alert(error.message || 'Erro de rede ao bloquear o visitante.');
+        }
+    });
+
+    // Primeira actualização após a renderização; depois, a cada 30 segundos.
+    refreshOnlineVisitors();
     setInterval(refreshOnlineVisitors, 30000);
     </script>
 </body>

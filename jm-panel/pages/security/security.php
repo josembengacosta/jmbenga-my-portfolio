@@ -24,10 +24,10 @@ $sessionMins = floor((time() - $loginTime) / 60);
 // ═══ ESTATÍSTICAS DE SEGURANÇA ════════════════════════════════
 $totalAdmins      = (int) $db->query("SELECT COUNT(*) FROM _employees")->fetchColumn();
 $activeAdmins     = (int) $db->query("SELECT COUNT(*) FROM _employees WHERE status_employees = 'active'")->fetchColumn();
-$blockedToday     = (int) $db->query("SELECT COUNT(*) FROM _admin_access_log WHERE DATE(creat_log) = CURDATE()")->fetchColumn();
+$blockedToday     = (int) $db->query("SELECT COUNT(*) FROM _admin_access_log WHERE creat_log >= CURDATE() AND creat_log < DATE_ADD(CURDATE(), INTERVAL 1 DAY)")->fetchColumn();
 $whitelistedIPs   = (int) $db->query("SELECT COUNT(*) FROM _admin_ip_whitelist WHERE active = 1")->fetchColumn();
-$failedLoginsToday = (int) $db->query("SELECT COUNT(*) FROM _audit_log WHERE action = 'auth.failed_login' AND DATE(creat_log) = CURDATE()")->fetchColumn();
-$successLoginsToday = (int) $db->query("SELECT COUNT(*) FROM _audit_log WHERE action = 'auth.login' AND DATE(creat_log) = CURDATE()")->fetchColumn();
+$failedLoginsToday = (int) $db->query("SELECT COUNT(*) FROM _audit_log WHERE action = 'auth.failed_login' AND creat_log >= CURDATE() AND creat_log < DATE_ADD(CURDATE(), INTERVAL 1 DAY)")->fetchColumn();
+$successLoginsToday = (int) $db->query("SELECT COUNT(*) FROM _audit_log WHERE action = 'auth.login' AND creat_log >= CURDATE() AND creat_log < DATE_ADD(CURDATE(), INTERVAL 1 DAY)")->fetchColumn();
 
 // ── Últimas entradas do audit log ───────────────────────────
 $auditStmt = $db->query("
@@ -63,216 +63,11 @@ $chartData = $chartStmt->fetchAll();
 <html lang="pt" data-theme="dark" data-base-url="<?= BASE_URL ?>">
 <?php include __DIR__ . '/../../include/head.php'; ?>
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<link rel="stylesheet" href="<?= BASE_URL ?>/assets/css/jmbenga-security.css?v=<?= is_file(ROOT_PATH . '/assets/css/jmbenga-security.css') ? (int)filemtime(ROOT_PATH . '/assets/css/jmbenga-security.css') : time() ?>">
 </head>
-<style>
-.page-top {
-    display: flex;
-    justify-content: space-between;
-    align-items: flex-start;
-    flex-wrap: wrap;
-    gap: 1rem;
-    margin-bottom: 1.5rem
-}
 
-.breadcrumb {
-    display: flex;
-    align-items: center;
-    gap: .5rem;
-    font-size: .78rem;
-    color: var(--text-muted);
-    margin-bottom: .5rem
-}
 
-.breadcrumb a {
-    color: var(--text-dim);
-    text-decoration: none;
-    transition: color .2s
-}
-
-.breadcrumb a:hover {
-    color: var(--accent)
-}
-
-.breadcrumb i {
-    font-size: .6rem
-}
-
-.page-title {
-    font-family: var(--font-head);
-    font-size: 1.5rem;
-    font-weight: 800;
-    letter-spacing: -.02em;
-    margin-bottom: .2rem
-}
-
-.page-sub {
-    font-size: .8rem;
-    color: var(--text-muted)
-}
-
-.kpi-row {
-    display: flex;
-    gap: .75rem;
-    flex-wrap: wrap;
-    margin-bottom: 1.5rem
-}
-
-.kpi-card {
-    flex: 1;
-    min-width: 120px;
-    background: var(--bg-card);
-    border: 1px solid var(--border);
-    border-radius: var(--radius);
-    padding: .85rem 1rem;
-    display: flex;
-    align-items: center;
-    gap: .75rem;
-    transition: all .22s
-}
-
-.kpi-card:hover {
-    transform: translateY(-2px);
-    border-color: var(--border-acc);
-    box-shadow: 0 6px 24px rgba(0, 0, 0, .25)
-}
-
-.kpi-icon {
-    width: 36px;
-    height: 36px;
-    border-radius: 9px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: .9rem;
-    flex-shrink: 0
-}
-
-.kpi-val {
-    font-family: var(--font-head);
-    font-size: 1.35rem;
-    font-weight: 800;
-    letter-spacing: -.02em;
-    line-height: 1
-}
-
-.kpi-lbl {
-    font-size: .68rem;
-    color: var(--text-muted);
-    margin-top: 2px;
-    white-space: nowrap
-}
-
-.charts-row {
-    display: grid;
-    grid-template-columns: 2fr 1fr;
-    gap: 1.2rem;
-    margin-bottom: 1.5rem
-}
-
-@media(max-width:1200px) {
-    .charts-row {
-        grid-template-columns: 1fr
-    }
-}
-
-.chart-card,
-.table-card {
-    background: var(--bg-card);
-    border: 1px solid var(--border);
-    border-radius: var(--radius);
-    padding: 1.5rem
-}
-
-.card-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: 1rem
-}
-
-.card-header h3 {
-    font-family: var(--font-head);
-    font-size: 1rem;
-    font-weight: 700
-}
-
-.chart-container {
-    position: relative;
-    height: 280px;
-    width: 100%
-}
-
-.mini-table {
-    width: 100%;
-    border-collapse: collapse
-}
-
-.mini-table th,
-.mini-table td {
-    padding: .5rem .6rem;
-    text-align: left;
-    border-bottom: 1px solid var(--border);
-    font-size: .8rem
-}
-
-.mini-table th {
-    color: var(--text-dim);
-    font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: .04em;
-    font-size: .68rem
-}
-
-table.dataTable {
-    width: 100% !important;
-    border-collapse: collapse
-}
-
-table.dataTable th,
-table.dataTable td {
-    padding: .7rem .8rem;
-    text-align: left;
-    border-bottom: 1px solid var(--border);
-    font-size: .85rem
-}
-
-table.dataTable th {
-    color: var(--text-dim);
-    font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: .04em;
-    font-size: .7rem
-}
-
-.btn {
-    display: inline-flex;
-    align-items: center;
-    gap: .45rem;
-    padding: .55rem 1.1rem;
-    border-radius: 8px;
-    font-size: .83rem;
-    font-weight: 500;
-    cursor: pointer;
-    transition: all .2s;
-    text-decoration: none;
-    border: 1px solid var(--border);
-    white-space: nowrap
-}
-
-.btn-secondary {
-    background: transparent;
-    border: 1px solid var(--border);
-    color: var(--text-dim)
-}
-
-.btn-secondary:hover {
-    background: var(--bg-hover);
-    border-color: var(--border-acc);
-    color: var(--text)
-}
-</style>
-
-<body>
+<body class="security-hub-page">
     <?php include __DIR__ . '/../../include/sidebar.php'; ?>
     <div class="main">
         <?php include __DIR__ . '/../../include/header.php'; ?>
@@ -414,12 +209,15 @@ table.dataTable th {
     });
 
     // Gráfico de autenticação
-    const chartData = <?= json_encode($chartData) ?>;
-    const labels = chartData.map(d => d.d);
-    const success = chartData.map(d => d.success);
-    const failed = chartData.map(d => d.failed);
+    const chartData = <?= json_encode($chartData, JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_AMP | JSON_HEX_QUOT | JSON_INVALID_UTF8_SUBSTITUTE) ?>;
+    const chartCanvas = document.getElementById('authChart');
 
-    new Chart(document.getElementById('authChart'), {
+    if (chartCanvas && typeof Chart !== 'undefined') {
+        const labels = chartData.map(d => d.d);
+        const success = chartData.map(d => Number(d.success) || 0);
+        const failed = chartData.map(d => Number(d.failed) || 0);
+
+        new Chart(chartCanvas, {
         type: 'bar',
         data: {
             labels: labels,
@@ -471,7 +269,8 @@ table.dataTable th {
                 }
             }
         }
-    });
+        });
+    }
     </script>
 </body>
 

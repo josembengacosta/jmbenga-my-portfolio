@@ -1,54 +1,53 @@
-<!DOCTYPE html>
-<html lang="pt" data-theme="dark">
+<!doctype html>
+<html lang="pt-AO">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta name="robots" content="noindex, nofollow">
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="#0a0d14">
-  <title>Offline | JMbenga</title>
+  <meta name="robots" content="noindex, nofollow">
+  <title>Ligação indisponível | JMbenga Portfolio</title>
   <style>
     :root {
       color-scheme: dark;
       --accent: #2563eb;
       --bg: #0a0d14;
       --card: #131b2e;
-      --border: rgba(255,255,255,.09);
+      --border: rgba(255, 255, 255, .09);
       --text: #e8edf5;
       --muted: #9aa9c0;
     }
     * { box-sizing: border-box; }
-    html { min-height: 100%; }
     body {
       min-height: 100vh;
       margin: 0;
       padding: 24px;
       display: grid;
       place-items: center;
-      background: radial-gradient(ellipse at top, rgba(37,99,235,.16), transparent 55%), var(--bg);
+      background: radial-gradient(ellipse at top, rgba(37, 99, 235, .16), transparent 55%), var(--bg);
       color: var(--text);
       font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
       text-align: center;
     }
-    .container {
+    main {
       width: min(100%, 500px);
       padding: clamp(24px, 6vw, 40px);
       border: 1px solid var(--border);
       border-radius: 22px;
       background: var(--card);
-      box-shadow: 0 24px 70px rgba(0,0,0,.25);
+      box-shadow: 0 24px 70px rgba(0, 0, 0, .25);
     }
-    .icon-wrap {
-      width: 84px;
-      height: 84px;
-      margin: 0 auto 22px;
+    .icon {
+      width: 76px;
+      height: 76px;
+      margin: 0 auto 20px;
       display: grid;
       place-items: center;
-      border: 1px solid rgba(37,99,235,.35);
-      border-radius: 24px;
-      background: rgba(37,99,235,.12);
+      border: 1px solid rgba(37, 99, 235, .35);
+      border-radius: 22px;
+      background: rgba(37, 99, 235, .12);
       color: #7da5ff;
+      font-size: 2rem;
     }
-    .icon-wrap svg { width: 42px; height: 42px; }
     .eyebrow {
       margin: 0 0 10px;
       color: #7da5ff;
@@ -57,14 +56,23 @@
       letter-spacing: .14em;
       text-transform: uppercase;
     }
-    h1 { margin: 0 0 12px; font-size: clamp(1.7rem, 6vw, 2.2rem); line-height: 1.15; }
-    p { margin: 0 auto 22px; max-width: 40ch; color: var(--muted); line-height: 1.7; }
+    h1 {
+      margin: 0 0 12px;
+      font-size: clamp(1.7rem, 6vw, 2.2rem);
+      line-height: 1.15;
+    }
+    p {
+      max-width: 42ch;
+      margin: 0 auto 18px;
+      color: var(--muted);
+      line-height: 1.7;
+    }
     .btn {
       display: inline-flex;
+      min-height: 46px;
       align-items: center;
       justify-content: center;
       gap: 9px;
-      min-height: 46px;
       padding: 12px 20px;
       border: 0;
       border-radius: 12px;
@@ -72,54 +80,116 @@
       color: #fff;
       font: inherit;
       font-weight: 650;
-      text-decoration: none;
       cursor: pointer;
       transition: transform .2s ease, box-shadow .2s ease, opacity .2s ease;
     }
     .btn:hover { transform: translateY(-2px); box-shadow: 0 8px 24px rgba(37,99,235,.3); }
     .btn:focus-visible { outline: 3px solid #a9c2ff; outline-offset: 3px; }
     .btn:disabled { cursor: wait; opacity: .75; }
-    .hint { margin: 18px 0 0; font-size: .8rem; }
-    .status { min-height: 1.3em; margin-top: 12px; font-size: .85rem; color: var(--muted); }
-    @media (prefers-reduced-motion: reduce) { *, *::before, *::after { transition-duration: .01ms !important; animation-duration: .01ms !important; } }
+    .status { min-height: 1.5em; margin: 16px 0 0; font-size: .88rem; }
+    .hint { margin: 14px auto 0; font-size: .8rem; }
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after { transition-duration: .01ms !important; animation-duration: .01ms !important; }
+    }
   </style>
 </head>
 <body>
-  <main class="container">
-    <div class="icon-wrap" aria-hidden="true">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
-        <path d="M2 8.8A15.8 15.8 0 0 1 19.1 5.5M5.2 12a10.5 10.5 0 0 1 7.9-2.8M8.8 15.4a5.2 5.2 0 0 1 4.8-.4M12 20h.01"/>
-        <path d="M3 3l18 18"/>
-      </svg>
-    </div>
+  <main>
+    <div class="icon" aria-hidden="true">⌁</div>
     <p class="eyebrow">JMbenga Portfolio</p>
-    <h1>Estás offline</h1>
-    <p>A ligação à Internet parece estar indisponível. Algumas páginas e funcionalidades podem não funcionar até recuperares a ligação.</p>
-    <button class="btn" id="retryButton" type="button">
-      <svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 7v5h-5M4 17v-5h5"/><path d="M5.6 9A7 7 0 0 1 18 6l2 6M4 12l2 6a7 7 0 0 0 12.4-3"/></svg>
-      Tentar novamente
-    </button>
-    <p class="status" id="statusMessage" role="status" aria-live="polite"></p>
-    <p class="hint">Quando a ligação regressar, tenta actualizar a página.</p>
+    <h1>Não foi possível contactar o site</h1>
+    <p>A ligação à Internet pode estar indisponível ou o servidor pode estar temporariamente inacessível. Esta página não consegue, por si só, distinguir as duas situações.</p>
+    <button class="btn" id="retryButton" type="button">Tentar novamente</button>
+    <p class="status" id="statusMessage" role="status" aria-live="polite">A verificar a ligação ao servidor…</p>
+    <p class="hint">As páginas públicas visitadas anteriormente podem continuar disponíveis em cache.</p>
   </main>
   <script>
     (function () {
       'use strict';
-      var button = document.getElementById('retryButton');
-      var status = document.getElementById('statusMessage');
+
+      const button = document.getElementById('retryButton');
+      const status = document.getElementById('statusMessage');
       if (!button || !status) return;
 
-      button.addEventListener('click', function () {
+      let probeInProgress = null;
+
+      async function getAppScope() {
+        try {
+          if ('serviceWorker' in navigator) {
+            const registration = await navigator.serviceWorker.getRegistration();
+            if (registration && registration.scope) return new URL(registration.scope);
+          }
+        } catch (error) {
+          // Usa o caminho da página como alternativa quando não houver registo disponível.
+        }
+        return new URL('./', window.location.href);
+      }
+
+      async function probeServer() {
+        if (probeInProgress) return probeInProgress;
+
+        probeInProgress = (async function () {
+          const controller = new AbortController();
+          const timeoutId = window.setTimeout(() => controller.abort(), 5000);
+
+          try {
+            const appScope = await getAppScope();
+            const probeUrl = new URL('manifest.php', appScope);
+            probeUrl.searchParams.set('__pwa_probe', String(Date.now()));
+
+            const response = await fetch(probeUrl.href, {
+              method: 'GET',
+              cache: 'no-store',
+              credentials: 'same-origin',
+              headers: {
+                Accept: 'application/manifest+json',
+                'Cache-Control': 'no-cache'
+              },
+              signal: controller.signal
+            });
+
+            const contentType = response.headers.get('Content-Type') || '';
+            return response.ok && contentType.toLowerCase().includes('application/manifest+json');
+          } catch (error) {
+            return false;
+          } finally {
+            window.clearTimeout(timeoutId);
+          }
+        })().finally(() => {
+          probeInProgress = null;
+        });
+
+        return probeInProgress;
+      }
+
+      async function refreshStatus() {
+        status.textContent = 'A verificar a ligação ao servidor…';
+        const reachable = await probeServer();
+        status.textContent = reachable
+          ? 'O servidor está acessível. Podes tentar abrir novamente o portefólio.'
+          : 'Ainda não foi possível contactar o servidor. Verifica a ligação e tenta novamente.';
+        return reachable;
+      }
+
+      button.addEventListener('click', async function () {
         button.disabled = true;
-        status.textContent = 'A verificar a ligação…';
-        window.location.reload();
-        window.setTimeout(function () {
-          button.disabled = false;
-          status.textContent = navigator.onLine
-            ? 'A ligação pode ter regressado. Se esta página continuar, tenta novamente.'
-            : 'Ainda sem ligação à Internet. Tenta novamente quando estiver disponível.';
-        }, 1200);
+        button.textContent = 'A verificar…';
+        const reachable = await probeServer();
+
+        if (reachable) {
+          const appScope = await getAppScope();
+          window.location.replace(new URL('home', appScope).href);
+          return;
+        }
+
+        status.textContent = 'O servidor continua inacessível. A página será mantida até ser possível tentar novamente.';
+        button.disabled = false;
+        button.textContent = 'Tentar novamente';
       });
+
+      window.addEventListener('online', refreshStatus);
+      window.addEventListener('offline', refreshStatus);
+      refreshStatus();
     }());
   </script>
 </body>

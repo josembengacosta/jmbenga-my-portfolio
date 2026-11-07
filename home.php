@@ -50,6 +50,53 @@
     }
     $skills_for_hero = array_slice($skills_for_hero, 0, 7);
 
+    // Texto rotativo do Hero: usa as competências reais, visíveis e com nível >= 70%.
+    // Limita-se a Frontend/Backend para manter a mensagem focada no desenvolvimento.
+    $typing_skill_rows = array_values(array_filter(
+        $skills_raw,
+        static function (array $row): bool {
+            return in_array(($row['category_skill'] ?? ''), ['frontend', 'backend'], true)
+                && (int)($row['percentage_skill'] ?? 0) >= 70
+                && trim((string)($row['name_skill'] ?? '')) !== '';
+        }
+    ));
+
+    usort($typing_skill_rows, static function (array $a, array $b): int {
+        $level_order = (int)($b['percentage_skill'] ?? 0) <=> (int)($a['percentage_skill'] ?? 0);
+        return $level_order !== 0
+            ? $level_order
+            : ((int)($a['display_order'] ?? 0) <=> (int)($b['display_order'] ?? 0));
+    });
+
+    $typing_words = [];
+    $seen_typing_words = [];
+    foreach ($typing_skill_rows as $typing_skill) {
+        $typing_name = trim((string)$typing_skill['name_skill']);
+        $typing_key = function_exists('mb_strtolower')
+            ? mb_strtolower($typing_name, 'UTF-8')
+            : strtolower($typing_name);
+
+        if (isset($seen_typing_words[$typing_key])) {
+            continue;
+        }
+
+        $seen_typing_words[$typing_key] = true;
+        $typing_words[] = $typing_name;
+
+        if (count($typing_words) >= 8) {
+            break;
+        }
+    }
+
+    // JSON seguro para transportar os nomes da BD num atributo HTML.
+    $typing_words_json = json_encode(
+        $typing_words,
+        JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_AMP | JSON_HEX_QUOT
+    );
+    if ($typing_words_json === false) {
+        $typing_words_json = '[]';
+    }
+
     // O contador público deve reflectir apenas projectos realmente publicados.
     // O valor promocional de projects_count não pode inflacionar esta métrica.
     $total_projects = (int)$pdo->query(
@@ -406,10 +453,12 @@
                      <span class="line"><span>Da Costa</span></span>
                  </h1>
 
+                 <?php if (!empty($typing_words)): ?>
                  <div class="typing-container">
-                     <span class="typing-prefix">Especialista em </span>
-                     <span class="typing-word" id="typing-word"></span>
+                     <span class="typing-prefix">Experiência com </span>
+                     <span class="typing-word" id="typing-word" data-words="<?= e($typing_words_json) ?>"></span>
                  </div>
+                 <?php endif; ?>
 
                  <p class="hero-subtitle"><?= e($hero_subtitle) ?></p>
 

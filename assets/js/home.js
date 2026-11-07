@@ -9,7 +9,26 @@
   const element = document.getElementById("typing-word");
   if (!element) return;
 
-  const words = ["React.js", "Vue.js", "Node.js", "PHP 8", "UI/UX Design", "APIs REST", "MySQL", "TypeScript"];
+  // As palavras são fornecidas pelo PHP a partir das competências visíveis na BD.
+  // Não manter uma segunda lista manual aqui: o painel é a fonte de verdade.
+  let words = [];
+  try {
+    const parsedWords = JSON.parse(element.dataset.words || "[]");
+    if (Array.isArray(parsedWords)) {
+      words = parsedWords
+        .filter((word) => typeof word === "string")
+        .map((word) => word.trim())
+        .filter(Boolean);
+    }
+  } catch (error) {
+    console.warn("Não foi possível ler as competências do texto rotativo.", error);
+  }
+
+  if (words.length === 0) {
+    element.textContent = "";
+    return;
+  }
+
   const reduceMotion = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches ?? false;
   if (reduceMotion) {
     element.textContent = words[0];

@@ -296,28 +296,115 @@ if (APP_ENV === 'production') {
 }
 
 /* --------------------------------------------------------------------------
- | Sessão e compatibilidade com o painel administrativo legado
+ | Sessões separadas por contexto: público e painel administrativo
+ |
+ | A sessão é escolhida aqui, antes de qualquer session_start() noutro include.
+ | - Público: jm_visitor, usada também pelo CSRF dos formulários públicos.
+ | - Painel:  jm_panel_sess, limitada ao caminho administrativo.
  |------------------------------------------------------------------------- */
+if (!defined('PUBLIC_SESSION_NAME')) {
+    define('PUBLIC_SESSION_NAME', 'jm_visitor');
+}
+if (!defined('ADMIN_SESSION_NAME')) {
+    define('ADMIN_SESSION_NAME', 'jm_panel_sess');
+}
+
+// Caminho-base da aplicação (ex.: /portfolio-jmbenga no XAMPP; vazio em produção).
+$baseUrlPath = parse_url((string) BASE_URL, PHP_URL_PATH);
+$appBasePath = is_string($baseUrlPath) ? rtrim($baseUrlPath, '/') : '';
+if ($appBasePath === '/') {
+    $appBasePath = '';
+}
+
+// Normalizar o caminho solicitado e retirar o prefixo da aplicação quando existe.
+$requestPathValue = parse_url((string) ($_SERVER['REQUEST_URI'] ?? '/'), PHP_URL_PATH);
+$appRequestPath = is_string($requestPathValue) && $requestPathValue !== ''
+    ? '/' . ltrim($requestPathValue, '/')
+    : '/';
+
+if (
+    $appBasePath !== ''
+    && ($appRequestPath === $appBasePath || str_starts_with($appRequestPath, $appBasePath . '/'))
+) {
+    $appRequestPath = substr($appRequestPath, strlen($appBasePath));
+    if ($appRequestPath === '') {
+        $appRequestPath = '/';
+    }
+}
+
+$adminRoutePath = '/' . trim((string) ADMIN_PATH, '/');
+if ($adminRoutePath === '/') {
+    $adminRoutePath = '/jm-panel';
+}
+$isAdminRequest = $appRequestPath === $adminRoutePath
+    || str_starts_with($appRequestPath, $adminRoutePath . '/');
+
+$adminCookiePath = rtrim($appBasePath . $adminRoutePath, '/');
+if ($adminCookiePath === '') {
+    $adminCookiePath = '/';
+}
+$publicCookiePath = $appBasePath !== '' ? $appBasePath : '/';
+
+if (!defined('APP_BASE_PATH')) {
+    define('APP_BASE_PATH', $appBasePath);
+}
+if (!defined('APP_ADMIN_COOKIE_PATH')) {
+    define('APP_ADMIN_COOKIE_PATH', $adminCookiePath);
+}
+if (!defined('APP_PUBLIC_COOKIE_PATH')) {
+    define('APP_PUBLIC_COOKIE_PATH', $publicCookiePath);
+}
+if (!defined('APP_SESSION_CONTEXT')) {
+    define('APP_SESSION_CONTEXT', $isAdminRequest ? 'admin' : 'public');
+}
+if (!defined('APP_SESSION_NAME')) {
+    define('APP_SESSION_NAME', $isAdminRequest ? ADMIN_SESSION_NAME : PUBLIC_SESSION_NAME);
+}
+if (!defined('APP_SESSION_COOKIE_PATH')) {
+    define('APP_SESSION_COOKIE_PATH', $isAdminRequest ? APP_ADMIN_COOKIE_PATH : APP_PUBLIC_COOKIE_PATH);
+}
+
+if (session_status() === PHP_SESSION_DISABLED) {
+    error_log('[config] A extensão de sessões PHP está desactivada.');
+    http_response_code(500);
+    exit('Não foi possível iniciar uma sessão segura.');
+}
+
 if (session_status() === PHP_SESSION_NONE) {
     ini_set('session.use_strict_mode', '1');
     ini_set('session.use_only_cookies', '1');
+    ini_set('session.use_cookies', '1');
+    ini_set('session.use_trans_sid', '0');
     ini_set('session.cookie_httponly', '1');
-    ini_set('session.cookie_samesite', 'Lax');
 
+    $httpsValue = strtolower(trim((string) ($_SERVER['HTTPS'] ?? '')));
     $isHttps = strtolower((string) parse_url(BASE_URL, PHP_URL_SCHEME)) === 'https'
-        || (!empty($_SERVER['HTTPS']) && strtolower((string) $_SERVER['HTTPS']) !== 'off');
+        || ($httpsValue !== '' && !in_array($httpsValue, ['off', '0'], true));
 
+    session_name(APP_SESSION_NAME);
     session_set_cookie_params([
         'lifetime' => (int) SESSION_LIFETIME,
-        'path' => '/',
+        'path' => APP_SESSION_COOKIE_PATH,
         'secure' => $isHttps,
         'httponly' => true,
-        'samesite' => 'Lax',
+        'samesite' => $isAdminRequest ? 'Strict' : 'Lax',
     ]);
-    session_start();
+
+    if (!session_start()) {
+        error_log('[config] Não foi possível iniciar a sessão da aplicação.');
+        http_response_code(500);
+        exit('Não foi possível iniciar uma sessão segura.');
+    }
+} elseif (session_name() !== APP_SESSION_NAME) {
+    // Não continuar silenciosamente com uma sessão diferente da esperada para a rota.
+    error_log('[config] Sessão já iniciada com nome inesperado para o contexto actual.');
+    http_response_code(500);
+    exit('A configuração da sessão está inconsistente.');
 }
 
-if (empty($_SESSION['admin_csrf_token']) || !is_string($_SESSION['admin_csrf_token'])) {
+// O token administrativo só existe na sessão do painel, nunca na sessão pública.
+if (APP_SESSION_CONTEXT === 'admin'
+    && (empty($_SESSION['admin_csrf_token']) || !is_string($_SESSION['admin_csrf_token']))) {
     $_SESSION['admin_csrf_token'] = bin2hex(random_bytes(32));
 }
 

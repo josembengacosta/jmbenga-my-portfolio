@@ -11,6 +11,9 @@
   const input = document.getElementById("jm-chatbot-input");
   const send = document.getElementById("jm-chatbot-send");
   const messages = document.getElementById("jm-chatbot-messages");
+  // Elementos opcionais do indicador de disponibilidade no cabeçalho.
+  const chatbotStatus = document.getElementById("jm-chatbot-status");
+  const chatbotStatusText = document.getElementById("jm-chatbot-status-text");
 
   // Se o HTML estiver incompleto, não inicializar parcialmente o chatbot.
   if (!panel || !toggle || !closeBtn || !form || !input || !send || !messages) return;
@@ -33,6 +36,28 @@
   let activeController = null;
   // Incrementado ao limpar para ignorar respostas de pedidos cancelados.
   let activeRequestId = 0;
+
+  // Estado inicial conservador: não afirmar que a API está online sem resposta válida.
+  let lastStableChatbotStatus = {
+    state: "unknown",
+    text: "Disponibilidade por confirmar",
+  };
+
+  function setChatbotStatus(state, label, remember = false) {
+    const validStates = ["unknown", "available", "busy", "warning", "unavailable", "offline"];
+    const safeState = validStates.includes(state) ? state : "unknown";
+    const safeLabel = String(label || "Disponibilidade por confirmar");
+
+    if (remember) {
+      lastStableChatbotStatus = { state: safeState, text: safeLabel };
+    }
+
+    // Compatível com versões antigas do footer que ainda não tenham o indicador.
+    if (!chatbotStatus || !chatbotStatusText) return;
+
+    chatbotStatus.dataset.state = safeState;
+    chatbotStatusText.textContent = safeLabel;
+  }
 
   // ── Persistência via sessionStorage ─────────────────────────
   function safeSessionGet() {
@@ -166,6 +191,8 @@
     messages.appendChild(notice);
     scrollToEnd();
     setSending(false);
+    // Se havia um pedido activo, repor o último estado confirmado ao cancelar.
+    setChatbotStatus(lastStableChatbotStatus.state, lastStableChatbotStatus.text);
   }
 
   // ── Acessibilidade: focus trap ─────────────────────────────
@@ -362,6 +389,7 @@
     saveSession();
     setSending(true);
     const thisRequestId = ++activeRequestId;
+    setChatbotStatus("busy", "A processar mensagem...");
 
     const typing = addTyping();
     activeController = typeof AbortController !== "undefined" ? new AbortController() : null;
@@ -394,11 +422,19 @@
       typing.remove();
 
       if (!response.ok || !data || typeof data.response !== "string" || !data.response.trim()) {
+        if (response.status === 429) {
+          setChatbotStatus("busy", "Temporariamente ocupado", true);
+        } else if (response.status >= 500 || response.status === 404) {
+          setChatbotStatus("unavailable", "Assistente temporariamente indisponível", true);
+        } else {
+          setChatbotStatus("warning", "Não foi possível processar a resposta", true);
+        }
         renderMessage("error", getServerError(data, response.status));
         saveSession();
         return;
       }
 
+      setChatbotStatus("available", "Assistente disponível", true);
       renderMessage("bot", data.response.trim());
       history.push({ role: "user", text }, { role: "model", text: data.response.trim() });
       history = history.map(normalizeHistoryItem).filter(Boolean).slice(-MAX_HISTORY_ITEMS);
@@ -407,10 +443,13 @@
       typing.remove();
       if (thisRequestId !== activeRequestId) return;
       if (error && error.name === "AbortError") {
+        setChatbotStatus("unavailable", "Tempo de resposta excedido", true);
         renderMessage("error", "O assistente demorou demasiado tempo a responder. Verifica a ligação e tenta novamente.");
       } else if (navigator.onLine === false) {
+        setChatbotStatus("offline", "Sem ligação à Internet", true);
         renderMessage("error", "Estás sem ligação à Internet. A tua mensagem ficou nesta conversa; tenta enviá-la novamente quando a ligação voltar.");
       } else {
+        setChatbotStatus("unavailable", "Falha de comunicação com o assistente", true);
         renderMessage("error", "Não foi possível contactar o assistente. Verifica a ligação ou tenta novamente dentro de instantes.");
       }
       saveSession();

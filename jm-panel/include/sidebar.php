@@ -38,6 +38,10 @@ $navOpen = static fn(array $segments): string =>
     $navMatches($segments) ? ' open' : '';
 
 $adminBase = rtrim((string) BASE_URL, '/') . '/jm-panel';
+$sidebarRole = (string) ($_SESSION['admin_role'] ?? 'admin');
+$sidebarCanSeeDashboard = in_array($sidebarRole, ['super_admin', 'admin'], true);
+$sidebarCanSeeOperations = in_array($sidebarRole, ['super_admin', 'admin'], true);
+$sidebarIsSuperAdmin = $sidebarRole === 'super_admin';
 
 /*
  * Os contadores do menu não podem depender de variáveis definidas apenas
@@ -50,7 +54,7 @@ $adminBase = rtrim((string) BASE_URL, '/') . '/jm-panel';
  */
 $sidebarDb = $GLOBALS['pdo'] ?? null;
 
-if ($sidebarDb instanceof PDO) {
+if ($sidebarDb instanceof PDO && $sidebarCanSeeOperations) {
     if (!isset($totalProjects) || !is_numeric($totalProjects)) {
         try {
             $totalProjects = (int) $sidebarDb
@@ -91,7 +95,7 @@ $onlineVisitorsBadge = max(0, (int) ($onlineVisitors ?? 0));
 
 $contentRoutes = ['/projects', '/skills', '/testimonials', '/faq'];
 $communicationRoutes = ['/messages', '/feedback'];
-$systemRoutes = ['/settings', '/security', '/profile'];
+$systemRoutes = ['/settings', '/security'];
 $contentOpen = $navMatches($contentRoutes);
 $communicationOpen = $navMatches($communicationRoutes);
 $systemOpen = $navMatches($systemRoutes);
@@ -107,11 +111,13 @@ $systemOpen = $navMatches($systemRoutes);
 
     <nav class="sidebar-nav" aria-label="Menu principal">
 
-        <!-- Dashboard -->
+        <!-- Dashboard: Super Admin e Admin -->
+        <?php if ($sidebarCanSeeDashboard): ?>
         <a href="<?= e($adminBase) ?>/home" class="nav-item<?= $navActive('/jm-panel/home') ?>">
             <i class="fas fa-home" aria-hidden="true"></i>
             <span>Dashboard</span>
         </a>
+        <?php endif; ?>
 
         <!-- Conteúdo -->
         <div class="nav-section-label">Conteúdo</div>
@@ -145,6 +151,7 @@ $systemOpen = $navMatches($systemRoutes);
             </div>
         </div>
 
+        <?php if ($sidebarCanSeeOperations): ?>
         <!-- Comunicação -->
         <div class="nav-section-label">Comunicação</div>
 
@@ -171,6 +178,9 @@ $systemOpen = $navMatches($systemRoutes);
             </div>
         </div>
 
+        <?php endif; ?>
+
+        <?php if ($sidebarCanSeeOperations): ?>
         <!-- Analítica -->
         <div class="nav-section-label">Analítica</div>
 
@@ -187,6 +197,9 @@ $systemOpen = $navMatches($systemRoutes);
             <span>Analytics</span>
         </a>
 
+        <?php endif; ?>
+
+        <?php if ($sidebarIsSuperAdmin): ?>
         <!-- Sistema -->
         <div class="nav-section-label">Sistema</div>
 
@@ -206,12 +219,16 @@ $systemOpen = $navMatches($systemRoutes);
                     <i class="fas fa-shield-alt" aria-hidden="true"></i>
                     <span>Segurança</span>
                 </a>
-                <a href="<?= e($adminBase) ?>/profile" class="<?= trim($navActive('/profile')) ?>">
-                    <i class="fas fa-user-circle" aria-hidden="true"></i>
-                    <span>Meu Perfil</span>
-                </a>
             </div>
         </div>
+
+        <?php endif; ?>
+
+        <!-- Perfil pessoal: disponível para todos os perfis -->
+        <a href="<?= e($adminBase) ?>/profile" class="nav-item<?= $navActive('/profile') ?>">
+            <i class="fas fa-user-circle" aria-hidden="true"></i>
+            <span>Meu Perfil</span>
+        </a>
 
         <!-- Terminar sessão -->
         <a href="#" class="nav-item nav-logout" id="sidebarLogoutBtn">

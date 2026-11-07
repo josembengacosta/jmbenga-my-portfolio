@@ -47,12 +47,13 @@ $parseMaintenanceDate = static function ($value): ?int {
 
 try {
     require_once __DIR__ . '/../includes/config.php';
+    require_once __DIR__ . '/../includes/functions.php';
     $base_url = $resolveBaseUrl();
     require_once __DIR__ . '/../includes/db.php';
 
     if ($pdo instanceof PDO) {
         $platformQuery = $pdo->query(
-            'SELECT status, version, maintenance_msg, maintenance_start, maintenance_end, maintenance_services
+            'SELECT status, version, maintenance_msg, maintenance_start, maintenance_end
              FROM _platform WHERE id_platform = 1 LIMIT 1'
         );
         $platform = $platformQuery->fetch(PDO::FETCH_ASSOC);
@@ -65,8 +66,10 @@ try {
             }
 
             $platform_ver = (string) ($platform['version'] ?? '1.0');
-            if (isset($platform['maintenance_msg']) && is_string($platform['maintenance_msg'])
-                && trim($platform['maintenance_msg']) !== '') {
+            if (
+                isset($platform['maintenance_msg']) && is_string($platform['maintenance_msg'])
+                && trim($platform['maintenance_msg']) !== ''
+            ) {
                 $maint_msg = $platform['maintenance_msg'];
             }
             $maint_end_ts = $parseMaintenanceDate($platform['maintenance_end'] ?? null);
@@ -98,6 +101,7 @@ try {
 }
 
 $base_url = $resolveBaseUrl();
+$notifyCsrfToken = function_exists('csrf_token') ? csrf_token() : '';
 
 // O cabeçalho deve sugerir uma nova tentativa coerente com a previsão, quando
 // esta existe. Sem previsão válida, utiliza uma hora como intervalo indicativo.
@@ -148,6 +152,8 @@ $escape = static function ($value): string {
 $sendJson = static function (array $payload, int $statusCode = 200): void {
     http_response_code($statusCode);
     header('Content-Type: application/json; charset=utf-8');
+    header('Cache-Control: no-store, no-cache, must-revalidate');
+    header('X-Content-Type-Options: nosniff');
     echo json_encode($payload, JSON_UNESCAPED_UNICODE | JSON_INVALID_UTF8_SUBSTITUTE);
     exit;
 };
@@ -161,15 +167,25 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST' && isset($_POST['action']))
     }
 
     if ($action === 'notify_register') {
-        $emailInput = $_POST['email'] ?? '';
-        $emailInput = is_string($emailInput) ? trim($emailInput) : '';
+        // O registo altera dados: exige a sessão pública e o respectivo token CSRF.
+        if (!function_exists('csrf_verify') || !csrf_verify()) {
+            $sendJson(['ok' => false, 'message' => 'A sessão expirou. Actualiza a página e tenta novamente.'], 403);
+        }
+
+        // Honeypot anti-automação; a resposta genérica não revela a detecção.
+        $honeypot = $_POST['_hp'] ?? '';
+        if ((!is_string($honeypot) && !is_numeric($honeypot)) || trim((string) $honeypot) !== '') {
+            $sendJson(['ok' => true, 'message' => 'Registo recebido. Obrigado!']);
+        }
+
+        $emailValue = $_POST['email'] ?? '';
+        $emailInput = is_string($emailValue) ? trim($emailValue) : '';
         if ($emailInput === '' || strlen($emailInput) > 254 || !filter_var($emailInput, FILTER_VALIDATE_EMAIL)) {
             $sendJson(['ok' => false, 'message' => 'E-mail inválido.'], 422);
         }
 
         $email = strtolower($emailInput);
-        $remoteIp = (string) ($_SERVER['REMOTE_ADDR'] ?? '');
-        $ip = filter_var($remoteIp, FILTER_VALIDATE_IP) ? $remoteIp : '0.0.0.0';
+        $ip = function_exists('get_ip') ? (string) get_ip() : '0.0.0.0';
 
         try {
             $check = $pdo->prepare('SELECT id_notify FROM _maintenance_notify WHERE email_notify = ? LIMIT 1');
@@ -178,9 +194,27 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST' && isset($_POST['action']))
                 $sendJson(['ok' => true, 'message' => 'Este e-mail já está na lista de avisos.']);
             }
 
+            // Limite de cinco novos endereços por IP em cada janela de uma hora.
+            $rate = $pdo->prepare(
+                'SELECT COUNT(*) FROM _maintenance_notify
+                 WHERE ip_notify = ? AND creat_notify > DATE_SUB(NOW(), INTERVAL 1 HOUR)'
+            );
+            $rate->execute([$ip]);
+            if ((int) $rate->fetchColumn() >= 5) {
+                header('Retry-After: 3600');
+                $sendJson(['ok' => false, 'message' => 'Atingiste o limite de registos. Tenta novamente mais tarde.'], 429);
+            }
+
             $insert = $pdo->prepare('INSERT INTO _maintenance_notify (email_notify, ip_notify) VALUES (?, ?)');
             $insert->execute([$email, $ip]);
             $sendJson(['ok' => true, 'message' => 'Registado! Serás avisado quando o site regressar.']);
+        } catch (PDOException $e) {
+            // A chave única de email também protege contra submissões concorrentes.
+            if ((string) $e->getCode() === '23000') {
+                $sendJson(['ok' => true, 'message' => 'Este e-mail já está na lista de avisos.']);
+            }
+            error_log('[maintenance-notify-register] ' . $e->getMessage());
+            $sendJson(['ok' => false, 'message' => 'Erro ao registar. Tenta novamente.'], 500);
         } catch (Throwable $e) {
             error_log('[maintenance-notify-register] ' . $e->getMessage());
             $sendJson(['ok' => false, 'message' => 'Erro ao registar. Tenta novamente.'], 500);
@@ -905,10 +939,10 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST' && isset($_POST['action']))
             <div class="services-title"><i class="fas fa-hdd"></i> Estado dos Serviços</div>
             <ul class="service-list">
                 <?php foreach ($services as $key => $state):
-                $label = $service_labels[$key] ?? ucfirst(str_replace('_', ' ', $key));
-                $state = is_string($state) && array_key_exists($state, $state_map) ? $state : 'pending';
-                $s = $state_map[$state];
-            ?>
+                        $label = $service_labels[$key] ?? ucfirst(str_replace('_', ' ', $key));
+                        $state = is_string($state) && array_key_exists($state, $state_map) ? $state : 'pending';
+                        $s = $state_map[$state];
+                    ?>
                 <li>
                     <span class="s-dot <?= $s['dot'] ?>"></span>
                     <?= $escape($label) ?>
@@ -922,6 +956,12 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST' && isset($_POST['action']))
             <!-- Formulário de notificação -->
             <label class="notify-lbl" for="notifyEmail"><i class="far fa-envelope"></i> Queres ser avisado quando
                 regressarmos?</label>
+            <input type="hidden" id="notifyCsrf" value="<?= $escape($notifyCsrfToken) ?>">
+            <label aria-hidden="true" tabindex="-1"
+                style="position:absolute;left:-10000px;width:1px;height:1px;overflow:hidden">
+                Não preencher este campo
+                <input type="text" id="notifyWebsite" name="_hp" tabindex="-1" autocomplete="off">
+            </label>
             <div class="notify-group">
                 <input type="email" id="notifyEmail" class="notify-input" placeholder="O teu e-mail"
                     autocomplete="email" maxlength="254" required>
@@ -948,6 +988,7 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST' && isset($_POST['action']))
     var SECONDS_REMAINING = <?= (int)$seconds_remaining ?>;
     var SECONDS_TOTAL = <?= (int)max(1, $seconds_total ?: $seconds_remaining ?: 1) ?>;
     var BASE_URL = <?= json_encode($base_url, JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP) ?>;
+    var NOTIFY_CSRF = <?= json_encode($notifyCsrfToken, JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP) ?>;
 
     // ── Tema ─────────────────────────────────────────────────────
     (function() {
@@ -1050,7 +1091,9 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST' && isset($_POST['action']))
         var btn = document.getElementById('btnNotify'),
             input = document.getElementById('notifyEmail'),
             fb = document.getElementById('notifyFb'),
-            cntEl = document.getElementById('notifyCount');
+            cntEl = document.getElementById('notifyCount'),
+            csrfInput = document.getElementById('notifyCsrf'),
+            honeypot = document.getElementById('notifyWebsite');
         if (!btn || !input || !fb || !cntEl) return;
 
         function showFb(msg, ok) {
@@ -1068,6 +1111,10 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST' && isset($_POST['action']))
             fd.append('action', 'notify_count');
             fetch(window.location.href, {
                     method: 'POST',
+                    credentials: 'same-origin',
+                    headers: {
+                        'Accept': 'application/json'
+                    },
                     body: fd
                 })
                 .then(function(r) {
@@ -1093,8 +1140,14 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST' && isset($_POST['action']))
             var fd = new FormData();
             fd.append('action', 'notify_register');
             fd.append('email', email);
+            fd.append('csrf_token', csrfInput ? csrfInput.value : NOTIFY_CSRF);
+            fd.append('_hp', honeypot ? honeypot.value : '');
             fetch(window.location.href, {
                     method: 'POST',
+                    credentials: 'same-origin',
+                    headers: {
+                        'Accept': 'application/json'
+                    },
                     body: fd
                 })
                 .then(function(r) {

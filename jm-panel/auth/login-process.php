@@ -38,15 +38,17 @@ if (strlen($login) > 255 || strlen($password) > 4096) {
 $db = $GLOBALS['pdo'];
 
 try {
+    if (isAdminLoginIpRateLimited()) {
+        redirect('/jm-panel/entrar?msg=error&error=' . rawurlencode('Demasiadas tentativas a partir desta ligação. Aguarde 15 minutos e tente novamente.'));
+    }
+
     // Placeholders separados para compatibilidade com prepared statements nativos do PDO.
     $stmt = $db->prepare("
         SELECT e.*,
                s.login_attempts,
                s.block_until,
                s.block_level,
-               s.remember_token,
-               s.lockscreen,
-               s.access_code
+               s.lockscreen
         FROM _employees AS e
         LEFT JOIN _employees_security AS s ON s.id_employees = e.id_employees
         WHERE e.email_employees = :email_login
@@ -61,6 +63,7 @@ try {
 
     // Não revelar se o e-mail/username existe.
     if (!$admin) {
+        recordAdminLoginIpFailure(null);
         redirect('/jm-panel/entrar?msg=error&error=' . rawurlencode('Credenciais inválidas. Verifique os dados e tente novamente.'));
     }
 
@@ -83,10 +86,24 @@ try {
     $storedPassword = $admin['password_employees'] ?? null;
     if (!is_string($storedPassword) || !password_verify($password, $storedPassword)) {
         recordFailedAdminLogin((int) $admin['id_employees']);
+        recordAdminLoginIpFailure((int) $admin['id_employees']);
         redirect('/jm-panel/entrar?msg=error&error=' . rawurlencode('Credenciais inválidas. Verifique os dados e tente novamente.'));
     }
 
     $adminId = (int) $admin['id_employees'];
+
+    // Actualiza hashes antigos se o custo do bcrypt tiver sido elevado no futuro.
+    if (is_string($storedPassword) && password_needs_rehash($storedPassword, PASSWORD_BCRYPT, ['cost' => 12])) {
+        try {
+            $newPasswordHash = password_hash($password, PASSWORD_BCRYPT, ['cost' => 12]);
+            if (is_string($newPasswordHash) && $newPasswordHash !== '') {
+                $db->prepare('UPDATE _employees SET password_employees = ? WHERE id_employees = ?')
+                    ->execute([$newPasswordHash, $adminId]);
+            }
+        } catch (Throwable $rehashError) {
+            error_log('[ADMIN LOGIN] Não foi possível actualizar o hash da palavra-passe: ' . $rehashError->getMessage());
+        }
+    }
 
     // Impede session fixation e roda o token CSRF após autenticação.
     if (!session_regenerate_id(true)) {
@@ -112,7 +129,8 @@ try {
     logAudit($adminId, null, 'auth.login', 'employees', $adminId);
 
     // Aceita apenas um destino interno do painel. Nunca redirecciona para um host externo.
-    $return = $_SESSION['admin_return_url'] ?? '/jm-panel/home';
+    $defaultRoute = (($_SESSION['admin_role'] ?? '') === 'editor') ? '/jm-panel/projects' : '/jm-panel/home';
+    $return = $_SESSION['admin_return_url'] ?? $defaultRoute;
     unset($_SESSION['admin_return_url']);
 
     if (!is_string($return)
@@ -122,7 +140,11 @@ try {
         || preg_match('/[\x00-\x1F\x7F]/', $return)
         || preg_match('/^[a-z][a-z0-9+.-]*:/i', $return)
         || !str_starts_with($return, '/jm-panel/')) {
-        $return = '/jm-panel/home';
+        $return = $defaultRoute;
+    }
+
+    if (($_SESSION['admin_role'] ?? '') === 'editor' && $return === '/jm-panel/home') {
+        $return = '/jm-panel/projects';
     }
 
     if (!empty($_SESSION['admin_lockscreen'])) {

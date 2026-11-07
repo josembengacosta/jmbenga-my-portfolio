@@ -80,4 +80,5 @@ Disallow: /includes/
 Disallow: /database/
 
 # Sitemap XML servido dinamicamente pelo PHP
-Sitemap: https://jmbenga.freedev.app/sitemap.php
+
+Sitemap: http://localhost/portfolio-jmbenga/sitemap.php

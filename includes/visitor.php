@@ -17,17 +17,49 @@ if (preg_match('/bot|crawler|spider|curl|wget|python|headless|prerender/i', $ua)
     return;
 }
 
-// Iniciar/retomar a sessão de rastreamento antes de qualquer saída HTML.
+// A sessão pública é escolhida centralmente por includes/config.php antes deste include.
+$publicSessionName = defined('PUBLIC_SESSION_NAME') ? PUBLIC_SESSION_NAME : 'jm_visitor';
+
 if (session_status() === PHP_SESSION_NONE) {
     if (headers_sent()) {
         error_log('[visitor.php] Não foi possível iniciar a sessão: os headers já foram enviados.');
         return;
     }
-    session_name('jm_visitor');
+
+    ini_set('session.use_strict_mode', '1');
+    ini_set('session.use_only_cookies', '1');
+    ini_set('session.use_cookies', '1');
+    ini_set('session.use_trans_sid', '0');
+    ini_set('session.cookie_httponly', '1');
+
+    session_name($publicSessionName);
+
+    $publicCookiePath = defined('APP_PUBLIC_COOKIE_PATH')
+        ? (string) APP_PUBLIC_COOKIE_PATH
+        : '/';
+    $httpsValue = strtolower(trim((string) ($_SERVER['HTTPS'] ?? '')));
+    $isHttps = (defined('APP_ENV') && APP_ENV === 'production')
+        || ($httpsValue !== '' && !in_array($httpsValue, ['off', '0'], true));
+
+    session_set_cookie_params([
+        'lifetime' => defined('SESSION_LIFETIME') ? (int) SESSION_LIFETIME : 0,
+        'path' => $publicCookiePath,
+        'secure' => $isHttps,
+        'httponly' => true,
+        'samesite' => 'Lax',
+    ]);
+
     if (!session_start()) {
         error_log('[visitor.php] Não foi possível iniciar a sessão de visitante.');
         return;
     }
+}
+
+// Se este include for carregado por engano dentro do painel, não rastrear a
+// sessão administrativa nem misturar os seus dados com o visitante público.
+if (session_status() !== PHP_SESSION_ACTIVE || session_name() !== $publicSessionName) {
+    error_log('[visitor.php] Contexto de sessão não público; rastreamento ignorado.');
+    return;
 }
 
 if (empty($_SESSION['visitor_session_id'])) {

@@ -1,176 +1,66 @@
 {
-  "name": "JMbenga Dev",
+  "id": "./",
+  "name": "JMbenga Portfolio",
   "short_name": "JMbenga",
-  "description": "Portfólio de José Mbenga - Desenvolvedor Full Stack & UI/UX Designer",
-  
-  "start_url": "https://jmbenga.freedev.app/",
-  "scope": "https://jmbenga.freedev.app/",
-  
+  "description": "Portefólio de José Mbenga — desenvolvimento web, backend e interfaces digitais.",
+  "start_url": "./home",
+  "scope": "./",
   "display": "standalone",
   "display_override": ["standalone", "minimal-ui"],
-  
   "background_color": "#0f172a",
   "theme_color": "#2563eb",
-  
-  "orientation": "portrait-primary",
-  
+  "lang": "pt-AO",
+  "dir": "ltr",
+  "categories": ["business", "productivity", "education"],
+  "prefer_related_applications": false,
   "icons": [
- 
-    {
-      "src": "./assets/img/icons/apple-touch-icon.png",
-      "sizes": "180x180",
-      "type": "image/png",
-      "purpose": "any"
-    },
-
-    {
-      "src": "./assets/img/icons/icon-72x72.png",
-      "sizes": "72x72",
-      "type": "image/png",
-      "purpose": "any maskable"
-    },
-    {
-      "src": "./assets/img/icons/icon-96x96.png",
-      "sizes": "96x96",
-      "type": "image/png",
-      "purpose": "any maskable"
-    },
-    {
-      "src": "./assets/img/icons/icon-128x128.png",
-      "sizes": "128x128",
-      "type": "image/png",
-      "purpose": "any maskable"
-    },
-    {
-      "src": "./assets/img/icons/icon-144x144.png",
-      "sizes": "144x144",
-      "type": "image/png",
-      "purpose": "any maskable"
-    },
-    {
-      "src": "./assets/img/icons/icon-152x152.png",
-      "sizes": "152x152",
-      "type": "image/png",
-      "purpose": "any maskable"
-    },
-
     {
       "src": "./assets/img/icons/icon-192x192.png",
       "sizes": "192x192",
       "type": "image/png",
-      "purpose": "any maskable"
-    },
-    {
-      "src": "./assets/img/icons/icon-384x384.png",
-      "sizes": "384x384",
-      "type": "image/png",
-      "purpose": "any maskable"
+      "purpose": "any"
     },
     {
       "src": "./assets/img/icons/icon-512x512.png",
       "sizes": "512x512",
       "type": "image/png",
-      "purpose": "any maskable"
-    }
-  ],
-  
-  "categories": ["business", "productivity", "education", "utilities"],
-  
-  "lang": "pt-BR",
-  "dir": "ltr",
-  
-  "prefer_related_applications": false,
-  "related_applications": [],
-  
-
-  "screenshots": [
+      "purpose": "any"
+    },
     {
-      "src": "./assets/img/screenshots/mobile-screenshot.png",
-      "sizes": "375x667",
+      "src": "./assets/img/icons/apple-touch-icon-180x180.png",
+      "sizes": "180x180",
       "type": "image/png",
-      "form_factor": "narrow",
-      "label": "Mobile View"
-    },
-    {
-      "src": "./assets/img/screenshots/desktop-screenshot.png",
-      "sizes": "1280x720",
-      "type": "image/png",
-      "form_factor": "wide",
-      "label": "Desktop View"
+      "purpose": "any"
     }
   ],
-  
-
-    "shortcuts": [
+  "shortcuts": [
     {
-      "name": "Ver Projetos",
-      "short_name": "Projetos",
-      "description": "Explore todos os meus projetos",
-      "url": "https://jmbenga.freedev.app/pages/all-projects.php",
-      "icons": [{
-        "src": "./assets/img/icons/file-graph.svg",
-        "sizes": "96x96",
-        "type": "image/svg+xml"
-      }]
+      "name": "Ver projectos",
+      "short_name": "Projectos",
+      "description": "Consultar os projectos do portefólio.",
+      "url": "./projects",
+      "icons": [{ "src": "./assets/img/icons/file-graph.svg", "sizes": "96x96", "type": "image/svg+xml" }]
     },
     {
-      "name": "Baixar Currículo",
-      "short_name": "CV",
-      "description": "Baixe meu currículo em PDF",
-      "url": "https://jmbenga.freedev.app/descarregar/descarregar_jmbenga.pdf",
-      "icons": [{
-        "src": "./assets/img/icons/file-cv.svg",
-        "sizes": "96x96",
-        "type": "image/png"
-      }]
+      "name": "Descarregar currículo",
+      "short_name": "Currículo",
+      "description": "Aceder ao currículo de José Mbenga.",
+      "url": "./download/cv",
+      "icons": [{ "src": "./assets/img/icons/file-cv.svg", "sizes": "96x96", "type": "image/svg+xml" }]
     },
     {
-      "name": "Entre em Contato",
-      "short_name": "Contato",
-      "description": "Envie uma mensagem",
-      "url": "https://jmbenga.freedev.app/index.php#contact",
-      "icons": [{
-        "src": "./assets/img/icons/contact.svg",
-        "sizes": "96x96",
-        "type": "image/svg+xml"
-      }]
+      "name": "Entrar em contacto",
+      "short_name": "Contacto",
+      "description": "Abrir a secção de contacto.",
+      "url": "./home#contact",
+      "icons": [{ "src": "./assets/img/icons/contact.svg", "sizes": "96x96", "type": "image/svg+xml" }]
     },
     {
-      "name": "Minhas Habilidades",
-      "short_name": "Skills",
-      "description": "Veja minhas tecnologias",
-      "url": "https://jmbenga.freedev.app/index.php#skills",
-      "icons": [{
-        "src": "./assets/img/icons/skills.svg",
-        "sizes": "96x96",
-        "type": "image/svg+xml"
-      }]
-    }
-  ],
-  
-  "share_target": {
-    "action": "https://jmbenga.freedev.app/index.php",
-    "method": "GET",
-    "enctype": "application/x-www-form-urlencoded",
-    "params": {
-      "title": "title",
-      "text": "text",
-      "url": "url"
-    }
-  },
-  
-  "edge_side_panel": {
-    "preferred_width": 400
-  },
-  
-  "launch_handler": {
-    "client_mode": ["focus-existing", "navigate-new"]
-  },
-  
-  "protocol_handlers": [
-    {
-      "protocol": "web+jmbenga",
-      "url": "./index.php?protocol=%s"
+      "name": "Consultar competências",
+      "short_name": "Competências",
+      "description": "Ver as competências técnicas.",
+      "url": "./home#skills",
+      "icons": [{ "src": "./assets/img/icons/skills.svg", "sizes": "96x96", "type": "image/svg+xml" }]
     }
   ]
 }

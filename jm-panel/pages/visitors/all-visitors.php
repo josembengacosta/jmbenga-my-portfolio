@@ -31,10 +31,21 @@ $browser     = parseBrowserFromUA($clientUA);
 $os          = parseOSFromUA($clientUA);
 
 // ── Filtros via GET ─────────────────────────────────────────
-$filterDevice = $_GET['device'] ?? 'all';
-$filterCountry = $_GET['country'] ?? 'all';
-$filterStatus = $_GET['status'] ?? 'all';
-$search       = trim($_GET['search'] ?? '');
+$filterDevice  = isset($_GET['device']) && is_string($_GET['device']) ? $_GET['device'] : 'all';
+$filterCountry = isset($_GET['country']) && is_string($_GET['country']) ? strtoupper(trim($_GET['country'])) : 'all';
+$filterStatus  = isset($_GET['status']) && is_string($_GET['status']) ? $_GET['status'] : 'all';
+$search        = isset($_GET['search']) && is_string($_GET['search']) ? trim($_GET['search']) : '';
+
+if (!in_array($filterStatus, ['all', 'online', 'blocked', 'bot'], true)) {
+    $filterStatus = 'all';
+}
+if (strlen($filterDevice) > 30) {
+    $filterDevice = 'all';
+}
+if (strlen($filterCountry) > 10) {
+    $filterCountry = 'all';
+}
+$search = mb_substr($search, 0, 120);
 
 // ── Query dinâmica ──────────────────────────────────────────
 $where  = [];
@@ -90,9 +101,11 @@ $csrfToken = $_SESSION['admin_csrf_token'];
 <!DOCTYPE html>
 <html lang="pt" data-theme="dark" data-base-url="<?= BASE_URL ?>">
 <?php include __DIR__ . '/../../include/head.php'; ?>
+<link rel="stylesheet"
+    href="<?= BASE_URL ?>/assets/css/jmbenga-visitors.css?v=<?= file_exists(ROOT_PATH . '/assets/css/jmbenga-visitors.css') ? filemtime(ROOT_PATH . '/assets/css/jmbenga-visitors.css') : '1' ?>">
 </head>
 
-<body>
+<body class="visitors-list-page">
 
     <?php include __DIR__ . '/../../include/sidebar.php'; ?>
 
@@ -221,9 +234,25 @@ $csrfToken = $_SESSION['admin_csrf_token'];
                     <p>Tenta ajustar os filtros ou <a href="<?= BASE_URL ?>/jm-panel/visitors">ver todos</a>.</p>
                 </div>
                 <?php else: ?>
+                <div class="bulk-selection-toolbar" role="region" aria-label="Acções em massa">
+                    <div class="bulk-selection-copy">
+                        <strong id="bulkSelectedCount">0 seleccionados</strong>
+                        <span>Selecciona visitantes offline. Os visitantes online ficam protegidos contra
+                            eliminação.</span>
+                    </div>
+                    <button type="button" class="btn bulk-delete-btn" id="bulkDeleteBtn" disabled>
+                        <i class="fas fa-trash-alt"></i>
+                        <span>Eliminar seleccionados</span>
+                    </button>
+                </div>
                 <table id="visitorsTable" class="display responsive nowrap" style="width:100%">
                     <thead>
                         <tr>
+                            <th class="visitor-select-col">
+                                <input type="checkbox" id="selectPageVisitors"
+                                    aria-label="Seleccionar visitantes desta página"
+                                    title="Seleccionar visitantes offline desta página">
+                            </th>
                             <th>Visitante</th>
                             <th>País</th>
                             <th>Dispositivo</th>
@@ -237,7 +266,13 @@ $csrfToken = $_SESSION['admin_csrf_token'];
                     </thead>
                     <tbody>
                         <?php foreach ($visitors as $v): ?>
-                        <tr id="row-<?= $v['id_visitor'] ?>" class="<?= $v['is_online'] ? 'row-online' : '' ?>">
+                        <tr id="row-<?= (int)$v['id_visitor'] ?>"
+                            class="<?= !empty($v['is_online']) ? 'row-online' : '' ?>">
+                            <td class="visitor-select-col">
+                                <input type="checkbox" class="visitor-select" value="<?= (int)$v['id_visitor'] ?>"
+                                    aria-label="Seleccionar visitante <?= e($v['ip_address']) ?>"
+                                    <?= !empty($v['is_online']) ? 'disabled title="Visitantes online não podem ser eliminados."' : '' ?>>
+                            </td>
                             <td>
                                 <div class="visitor-ip">
                                     <strong><?= e($v['ip_address']) ?></strong>
@@ -747,43 +782,193 @@ $csrfToken = $_SESSION['admin_csrf_token'];
     </style>
 
     <script>
-    const BASE = '<?= BASE_URL ?>';
-    const CSRF = '<?= $csrfToken ?>';
+    const BASE = <?= json_encode(BASE_URL, JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_AMP | JSON_HEX_QUOT) ?>;
+    const CSRF = <?= json_encode($csrfToken, JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_AMP | JSON_HEX_QUOT) ?>;
 
     // ── DataTable ─────────────────────────────────────────────────
     $(document).ready(function() {
         if ($('#visitorsTable').length) {
-            $('#visitorsTable').DataTable({
+            visitorsDataTable = $('#visitorsTable').DataTable({
                 responsive: true,
                 pageLength: 20,
                 language: {
                     url: 'https://cdn.datatables.net/plug-ins/1.13.6/i18n/pt-PT.json'
                 },
                 order: [
-                    [7, 'desc']
+                    [8, 'desc']
                 ],
                 dom: '<"dt-top"lf>rt<"dt-bottom"ip>',
                 columnDefs: [{
                         orderable: false,
-                        targets: [3, 6, 8]
+                        targets: [0, 4, 7, 9]
                     },
                     {
                         searchable: false,
-                        targets: [4, 5, 8]
+                        targets: [0, 5, 6, 9]
                     }
                 ]
             });
+            visitorsDataTable.on('draw', syncBulkSelectionUI);
+            syncBulkSelectionUI();
         }
     });
+
+    // ═══ SELECÇÃO E ELIMINAÇÃO EM MASSA ═══
+    const selectedVisitorIds = new Set();
+    const selectPageCheckbox = document.getElementById('selectPageVisitors');
+    const bulkDeleteButton = document.getElementById('bulkDeleteBtn');
+    const selectedCountLabel = document.getElementById('bulkSelectedCount');
+    let visitorsDataTable = null;
+
+    function getCurrentPageCheckboxes() {
+        if (visitorsDataTable) {
+            const nodes = visitorsDataTable.rows({
+                page: 'current'
+            }).nodes();
+            return $(nodes).find('.visitor-select:not(:disabled)').toArray();
+        }
+        return Array.from(document.querySelectorAll('.visitor-select:not(:disabled)'));
+    }
+
+    function syncBulkSelectionUI() {
+        document.querySelectorAll('.visitor-select').forEach(input => {
+            input.checked = selectedVisitorIds.has(input.value);
+        });
+
+        const selectableOnPage = getCurrentPageCheckboxes();
+        const checkedOnPage = selectableOnPage.filter(input => selectedVisitorIds.has(input.value)).length;
+
+        if (selectPageCheckbox) {
+            selectPageCheckbox.checked = selectableOnPage.length > 0 && checkedOnPage === selectableOnPage.length;
+            selectPageCheckbox.indeterminate = checkedOnPage > 0 && checkedOnPage < selectableOnPage.length;
+            selectPageCheckbox.disabled = selectableOnPage.length === 0;
+        }
+
+        if (selectedCountLabel) {
+            selectedCountLabel.textContent =
+                `${selectedVisitorIds.size} seleccionado${selectedVisitorIds.size === 1 ? '' : 's'}`;
+        }
+
+        if (bulkDeleteButton) {
+            bulkDeleteButton.disabled = selectedVisitorIds.size === 0 || selectedVisitorIds.size > 500;
+            const label = bulkDeleteButton.querySelector('span');
+            if (label) {
+                label.textContent = selectedVisitorIds.size > 500 ?
+                    'Máximo de 500 por operação' :
+                    'Eliminar seleccionados';
+            }
+        }
+    }
+
+    document.addEventListener('change', event => {
+        const input = event.target;
+        if (input.matches('.visitor-select')) {
+            if (input.checked) selectedVisitorIds.add(input.value);
+            else selectedVisitorIds.delete(input.value);
+            syncBulkSelectionUI();
+        }
+    });
+
+    if (selectPageCheckbox) {
+        selectPageCheckbox.addEventListener('change', function() {
+            getCurrentPageCheckboxes().forEach(input => {
+                input.checked = this.checked;
+                if (this.checked) selectedVisitorIds.add(input.value);
+                else selectedVisitorIds.delete(input.value);
+            });
+            syncBulkSelectionUI();
+        });
+    }
+
+    if (visitorsDataTable) {
+        visitorsDataTable.on('draw', syncBulkSelectionUI);
+    }
+    syncBulkSelectionUI();
+
+    async function deleteSelectedVisitors() {
+        if (!selectedVisitorIds.size || selectedVisitorIds.size > 500) return;
+
+        const count = selectedVisitorIds.size;
+        let confirmed = false;
+
+        if (window.Swal) {
+            const result = await Swal.fire({
+                title: 'Eliminar visitantes seleccionados?',
+                text: `Serão eliminados ${count} registo(s) e as respectivas pageviews. Esta acção não pode ser anulada.`,
+                icon: 'warning',
+                showCancelButton: true,
+                confirmButtonText: 'Sim, eliminar',
+                cancelButtonText: 'Cancelar',
+                confirmButtonColor: '#dc2626',
+                reverseButtons: true,
+                focusCancel: true
+            });
+            confirmed = result.isConfirmed;
+        } else {
+            confirmed = window.confirm(
+                `Eliminar ${count} visitante(s) seleccionado(s) e as respectivas pageviews? Esta acção não pode ser anulada.`
+                );
+        }
+
+        if (!confirmed) return;
+
+        const formData = new FormData();
+        selectedVisitorIds.forEach(id => formData.append('ids[]', id));
+
+        bulkDeleteButton.disabled = true;
+        const originalLabel = bulkDeleteButton.innerHTML;
+        bulkDeleteButton.innerHTML = '<i class="fas fa-spinner fa-spin"></i><span>A eliminar…</span>';
+
+        try {
+            const response = await fetch(BASE + '/jm-panel/visitors/bulk-delete', {
+                method: 'POST',
+                headers: {
+                    'X-Requested-With': 'XMLHttpRequest',
+                    'X-CSRF-Token': CSRF
+                },
+                body: formData
+            });
+
+            const raw = await response.text();
+            let data;
+            try {
+                data = JSON.parse(raw);
+            } catch {
+                throw new Error('O servidor devolveu uma resposta inválida.');
+            }
+
+            if (!response.ok || !data.success) {
+                throw new Error(data.message || 'Não foi possível eliminar os visitantes seleccionados.');
+            }
+
+            selectedVisitorIds.clear();
+            showToast(data.message || `${data.deleted_count || 0} visitante(s) eliminado(s).`, 'success');
+            setTimeout(() => window.location.reload(), 900);
+        } catch (error) {
+            showToast(error.message || 'Erro de rede ao eliminar visitantes.', 'error');
+            bulkDeleteButton.innerHTML = originalLabel;
+            syncBulkSelectionUI();
+        }
+    }
+
+    if (bulkDeleteButton) {
+        bulkDeleteButton.addEventListener('click', deleteSelectedVisitors);
+    }
 
     function showToast(message, type = 'success') {
         const container = document.getElementById('toast-container') || createToastContainer();
         const toast = document.createElement('div');
-        toast.className = `toast toast-${type}`;
-        let iconClass = type === 'success' ? 'fa-check-circle' : (type === 'error' ? 'fa-times-circle' :
+        const icon = document.createElement('i');
+        const text = document.createElement('span');
+        const iconClass = type === 'success' ? 'fa-check-circle' : (type === 'error' ? 'fa-times-circle' :
             'fa-info-circle');
-        toast.innerHTML = `<i class="fas fa-${iconClass}"></i> ${message}`;
+
+        toast.className = `toast toast-${type}`;
+        icon.className = `fas ${iconClass}`;
+        text.textContent = String(message ?? '');
+        toast.append(icon, text);
         container.appendChild(toast);
+
         setTimeout(() => {
             toast.style.opacity = '0';
             toast.style.transform = 'translateX(20px)';
@@ -844,7 +1029,8 @@ $csrfToken = $_SESSION['admin_csrf_token'];
                 }
             }
         } catch (err) {
-            /* silencioso */ }
+            /* silencioso */
+        }
     }
 
     // Primeira actualização após 30 segundos, depois a cada 60 segundos

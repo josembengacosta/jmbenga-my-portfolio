@@ -1,148 +1,294 @@
 <?php
+declare(strict_types=1);
+
 // ══════════════════════════════════════════════════════════════
 // JMbenga Portfolio — Processador Configurações Gerais (AJAX)
 // ══════════════════════════════════════════════════════════════
 require_once __DIR__ . '/../../include/functions_admin.php';
 
 startAdminSession();
+checkAdminRememberMe();
 requireAdminLogin();
 requireNoLockscreen();
 
 header('Content-Type: application/json; charset=utf-8');
+header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
 
 $db = $GLOBALS['pdo'];
-$adminId = (int)$_SESSION['admin_id'];
+$adminId = (int) ($_SESSION['admin_id'] ?? 0);
 
-// ── Apenas POST ───────────────────────────────────────────────
-if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
-    http_response_code(405);
-    echo json_encode(['success' => false, 'message' => 'Método não permitido.']);
+function generalJsonResponse(array $payload, int $statusCode = 200): void
+{
+    http_response_code($statusCode);
+    echo json_encode($payload, JSON_UNESCAPED_UNICODE | JSON_INVALID_UTF8_SUBSTITUTE);
     exit;
 }
 
-// ── CSRF ──────────────────────────────────────────────────────
+function generalPostString(
+    string $key,
+    array &$errors,
+    bool $mustExist = false,
+    bool $mustNotBeEmpty = false
+): string {
+    if (!array_key_exists($key, $_POST)) {
+        if ($mustExist) {
+            $errors[] = "O campo {$key} não foi enviado. Actualiza a página e tenta novamente.";
+        }
+        return '';
+    }
+
+    if (!is_string($_POST[$key])) {
+        $errors[] = "O campo {$key} tem um formato inválido.";
+        return '';
+    }
+
+    $value = trim($_POST[$key]);
+    if ($mustNotBeEmpty && $value === '') {
+        $errors[] = "O campo {$key} é obrigatório.";
+    }
+    return $value;
+}
+
+function generalSafeStoredCvPath(string $filename, string $directory): ?string
+{
+    if (
+        $filename === '' || basename($filename) !== $filename ||
+        !preg_match('/^cv_[A-Za-z0-9_-]+\.pdf$/i', $filename)
+    ) {
+        return null;
+    }
+
+    $candidate = $directory . DIRECTORY_SEPARATOR . $filename;
+    if (is_link($candidate)) {
+        return null;
+    }
+
+    $realFile = realpath($candidate);
+    if ($realFile === false || !is_file($realFile) || dirname($realFile) !== $directory) {
+        return null;
+    }
+
+    return $realFile;
+}
+
+function generalRemoveNewUpload(?string $path): void
+{
+    if ($path !== null && is_file($path) && !is_link($path)) {
+        @unlink($path);
+    }
+}
+
+if (($_SERVER['REQUEST_METHOD'] ?? '') !== 'POST') {
+    header('Allow: POST');
+    generalJsonResponse(['success' => false, 'message' => 'Método não permitido.'], 405);
+}
+
 $token = $_POST['csrf_token'] ?? $_SERVER['HTTP_X_CSRF_TOKEN'] ?? '';
-if (!validateAdminCsrf($token)) {
-    http_response_code(403);
-    echo json_encode(['success' => false, 'message' => 'Token de segurança inválido.']);
-    exit;
+if (!is_string($token) || !validateAdminCsrf($token)) {
+    generalJsonResponse(['success' => false, 'message' => 'Token de segurança inválido ou expirado.'], 403);
 }
 
-// ── Validações básicas ────────────────────────────────────────
-$siteName     = trim($_POST['site_name'] ?? '');
-$emailContact = trim($_POST['email_contact'] ?? '');
+if ($adminId <= 0) {
+    generalJsonResponse(['success' => false, 'message' => 'Sessão administrativa inválida. Inicia sessão novamente.'], 401);
+}
 
+// ── Recolha e validação dos campos ────────────────────────────
 $errors = [];
-if ($siteName === '') $errors[] = 'O nome do site é obrigatório.';
-if ($emailContact !== '' && !filter_var($emailContact, FILTER_VALIDATE_EMAIL)) $errors[] = 'O email de contacto é inválido.';
+$siteName = generalPostString('site_name', $errors, true, true);
+$emailContact = generalPostString('email_contact', $errors, true, true);
+$heroSubtitle = generalPostString('hero_subtitle', $errors, true);
+$aboutText = generalPostString('about_text', $errors, true);
+$phoneContact = generalPostString('phone_contact', $errors, true);
+$location = generalPostString('location', $errors, true);
+$version = generalPostString('version', $errors, true, true);
+$yearsExperience = generalPostString('years_experience', $errors, true, true);
+$projectsCount = generalPostString('projects_count', $errors, true, true);
+$clientsCount = generalPostString('clients_count', $errors, true, true);
 
-// ── Upload do CV (PDF) ────────────────────────────────────────
-$cvFileValue = null;  // se não houver ficheiro enviado, mantém o actual
-$uploadDir   = ROOT_PATH . '/assets/downloads/';
-
-// Garante que a pasta existe
-if (!is_dir($uploadDir)) {
-    mkdir($uploadDir, 0755, true);
+if ($siteName !== '' && mb_strlen($siteName, 'UTF-8') > 120) {
+    $errors[] = 'O nome do site não pode ultrapassar 120 caracteres.';
+}
+if ($emailContact !== '' && (mb_strlen($emailContact, 'UTF-8') > 254 || !filter_var($emailContact, FILTER_VALIDATE_EMAIL))) {
+    $errors[] = 'O email de contacto é inválido.';
+}
+if (mb_strlen($heroSubtitle, 'UTF-8') > 300) {
+    $errors[] = 'O subtítulo do Hero não pode ultrapassar 300 caracteres.';
+}
+if (mb_strlen($aboutText, 'UTF-8') > 10000) {
+    $errors[] = 'O texto Sobre Mim não pode ultrapassar 10.000 caracteres.';
+}
+if (mb_strlen($phoneContact, 'UTF-8') > 30) {
+    $errors[] = 'O telefone não pode ultrapassar 30 caracteres.';
+}
+if (mb_strlen($location, 'UTF-8') > 120) {
+    $errors[] = 'A localização não pode ultrapassar 120 caracteres.';
+}
+if ($version !== '' && !preg_match('/^[A-Za-z0-9][A-Za-z0-9._+-]{0,9}$/D', $version)) {
+    $errors[] = 'A versão deve ter até 10 caracteres e usar apenas letras, números, ponto, hífen ou sinal +.';
 }
 
-if (!empty($_FILES['cv_file']) && $_FILES['cv_file']['error'] === UPLOAD_ERR_OK) {
-    $tmpName      = $_FILES['cv_file']['tmp_name'];
-    $originalName = basename($_FILES['cv_file']['name']);
-    $ext          = strtolower(pathinfo($originalName, PATHINFO_EXTENSION));
+foreach ([
+    'Anos de experiência' => $yearsExperience,
+    'Número de projectos' => $projectsCount,
+    'Número de clientes' => $clientsCount,
+] as $label => $number) {
+    if (!preg_match('/^\d{1,6}$/D', $number)) {
+        $errors[] = "{$label}: introduz um número inteiro entre 0 e 999999.";
+    }
+}
 
-    if ($ext !== 'pdf') {
-        $errors[] = 'O ficheiro do CV deve ser um PDF.';
-    } elseif ($_FILES['cv_file']['size'] > 5 * 1024 * 1024) { // 5 MB
-        $errors[] = 'O ficheiro PDF não pode exceder 5 MB.';
-    } else {
-        // Gera um nome seguro: cv_<timestamp>.pdf
-        $newName  = 'cv_' . time() . '.pdf';
-        $destPath = $uploadDir . $newName;
-
-        if (move_uploaded_file($tmpName, $destPath)) {
-            // Obtém o ficheiro antigo para remover
-            $stmt = $db->prepare("SELECT config_value FROM _site_config WHERE config_key = 'cv_file'");
-            $stmt->execute();
-            $oldFile = $stmt->fetchColumn();
-
-            if ($oldFile && file_exists($uploadDir . $oldFile)) {
-                unlink($uploadDir . $oldFile);
-            }
-
-            $cvFileValue = $newName;
+$allowContact = 0;
+$allowFeedback = 0;
+foreach (['allow_contact' => 'allowContact', 'allow_feedback' => 'allowFeedback'] as $field => $target) {
+    if (array_key_exists($field, $_POST)) {
+        if (!is_string($_POST[$field]) || $_POST[$field] !== '1') {
+            $errors[] = "O campo {$field} tem um valor inválido.";
         } else {
-            $errors[] = 'Erro ao mover o ficheiro. Verifica as permissões da pasta.';
+            if ($target === 'allowContact') $allowContact = 1;
+            if ($target === 'allowFeedback') $allowFeedback = 1;
+        }
+    }
+}
+
+// ── Validar o upload sem mover nem apagar ficheiros ainda ──────
+$hasNewCv = false;
+$uploadTmp = null;
+if (array_key_exists('cv_file', $_FILES)) {
+    $file = $_FILES['cv_file'];
+    if (!is_array($file) || !isset($file['error']) || !is_int($file['error'])) {
+        $errors[] = 'O envio do CV contém dados inválidos.';
+    } elseif ($file['error'] !== UPLOAD_ERR_NO_FILE) {
+        if ($file['error'] !== UPLOAD_ERR_OK) {
+            $uploadErrors = [
+                UPLOAD_ERR_INI_SIZE => 'O CV excede o limite de upload configurado no servidor.',
+                UPLOAD_ERR_FORM_SIZE => 'O CV excede o limite permitido pelo formulário.',
+                UPLOAD_ERR_PARTIAL => 'O CV foi enviado apenas parcialmente. Tenta novamente.',
+                UPLOAD_ERR_NO_TMP_DIR => 'O servidor não tem uma pasta temporária disponível.',
+                UPLOAD_ERR_CANT_WRITE => 'O servidor não conseguiu escrever o ficheiro enviado.',
+                UPLOAD_ERR_EXTENSION => 'Uma extensão do PHP interrompeu o envio do CV.',
+            ];
+            $errors[] = $uploadErrors[$file['error']] ?? 'Falha desconhecida durante o envio do CV.';
+        } else {
+            $tmpName = $file['tmp_name'] ?? '';
+            $originalName = $file['name'] ?? '';
+            $fileSize = $file['size'] ?? null;
+            $extension = is_string($originalName) ? strtolower(pathinfo($originalName, PATHINFO_EXTENSION)) : '';
+
+            if (!is_string($tmpName) || !is_uploaded_file($tmpName)) {
+                $errors[] = 'O ficheiro temporário do CV não é válido.';
+            } elseif ($extension !== 'pdf') {
+                $errors[] = 'O ficheiro do CV deve ter a extensão PDF.';
+            } elseif (!is_int($fileSize) || $fileSize <= 0 || $fileSize > 5 * 1024 * 1024) {
+                $errors[] = 'O ficheiro PDF deve ter tamanho superior a zero e não exceder 5 MB.';
+            } else {
+                $signature = @file_get_contents($tmpName, false, null, 0, 8);
+                $mimeType = null;
+                if (class_exists('finfo')) {
+                    $finfo = new finfo(FILEINFO_MIME_TYPE);
+                    $mimeType = $finfo->file($tmpName);
+                }
+
+                if (!is_string($signature) || strpos($signature, '%PDF-') !== 0) {
+                    $errors[] = 'O conteúdo do ficheiro não parece ser um PDF válido.';
+                } elseif (!in_array($mimeType, ['application/pdf', 'application/x-pdf'], true)) {
+                    $errors[] = 'O tipo MIME do ficheiro enviado não é PDF.';
+                } else {
+                    $hasNewCv = true;
+                    $uploadTmp = $tmpName;
+                }
+            }
         }
     }
 }
 
 if (!empty($errors)) {
-    echo json_encode(['success' => false, 'errors' => $errors]);
-    exit;
+    generalJsonResponse(['success' => false, 'errors' => $errors], 422);
 }
 
+// ── Preparar destino seguro do novo CV (se existir) ────────────
+$uploadDirectory = null;
+$newCvName = null;
+$newCvPath = null;
+if ($hasNewCv) {
+    $rootReal = realpath(ROOT_PATH);
+    if ($rootReal === false) {
+        generalJsonResponse(['success' => false, 'message' => 'A pasta raiz do site não está disponível.'], 500);
+    }
+
+    $uploadDirectoryCandidate = $rootReal . DIRECTORY_SEPARATOR . 'assets' . DIRECTORY_SEPARATOR . 'downloads';
+    if (is_link($uploadDirectoryCandidate)) {
+        generalJsonResponse(['success' => false, 'message' => 'A pasta de CV não pode ser um link simbólico.'], 500);
+    }
+    if (!is_dir($uploadDirectoryCandidate) && !@mkdir($uploadDirectoryCandidate, 0755, true) && !is_dir($uploadDirectoryCandidate)) {
+        generalJsonResponse(['success' => false, 'message' => 'Não foi possível preparar a pasta de CV. Verifica as permissões.'], 500);
+    }
+
+    $uploadDirectory = realpath($uploadDirectoryCandidate);
+    if ($uploadDirectory === false || !is_dir($uploadDirectory)) {
+        generalJsonResponse(['success' => false, 'message' => 'A pasta de CV não está acessível.'], 500);
+    }
+
+    try {
+        $newCvName = 'cv_' . bin2hex(random_bytes(16)) . '.pdf';
+    } catch (Throwable $randomError) {
+        generalJsonResponse(['success' => false, 'message' => 'Não foi possível gerar um nome seguro para o CV.'], 500);
+    }
+    $newCvPath = $uploadDirectory . DIRECTORY_SEPARATOR . $newCvName;
+    if (!is_string($uploadTmp) || !move_uploaded_file($uploadTmp, $newCvPath)) {
+        generalJsonResponse(['success' => false, 'message' => 'Não foi possível guardar o novo CV. Verifica as permissões da pasta.'], 500);
+    }
+}
+
+// ── Gravação transaccional ────────────────────────────────────
+$oldCvName = null;
+$updatedKeys = [];
 try {
-    // ── Actualizar _site_config (grupos: general, contact) ──────
+    $db->beginTransaction();
+
+    if ($hasNewCv) {
+        $oldCvStmt = $db->prepare("SELECT config_value FROM _site_config WHERE config_key = 'cv_file' FOR UPDATE");
+        $oldCvStmt->execute();
+        $oldValue = $oldCvStmt->fetchColumn();
+        $oldCvName = is_string($oldValue) ? $oldValue : null;
+    }
+
     $configFields = [
-        // Grupo general
-        'site_name'        => ['group' => 'general'],
-        'hero_subtitle'    => ['group' => 'general'],
-        'about_text'       => ['group' => 'general'],
-        'years_experience' => ['group' => 'general'],
-        'projects_count'   => ['group' => 'general'],
-        'clients_count'    => ['group' => 'general'],
-        'cv_file'          => ['group' => 'general', 'is_file' => true],
-        // Grupo contact
-        'email_contact'    => ['group' => 'contact'],
-        'phone_contact'    => ['group' => 'contact'],
-        'location'         => ['group' => 'contact'],
+        'site_name'        => ['value' => $siteName, 'group' => 'general'],
+        'hero_subtitle'    => ['value' => $heroSubtitle, 'group' => 'general'],
+        'about_text'       => ['value' => $aboutText, 'group' => 'general'],
+        'years_experience' => ['value' => $yearsExperience, 'group' => 'general'],
+        'projects_count'   => ['value' => $projectsCount, 'group' => 'general'],
+        'clients_count'    => ['value' => $clientsCount, 'group' => 'general'],
+        'email_contact'    => ['value' => $emailContact, 'group' => 'contact'],
+        'phone_contact'    => ['value' => $phoneContact, 'group' => 'contact'],
+        'location'         => ['value' => $location, 'group' => 'contact'],
     ];
 
-    $updatedKeys = [];
+    if ($hasNewCv && $newCvName !== null) {
+        $configFields['cv_file'] = ['value' => $newCvName, 'group' => 'general'];
+    }
+
+    $upsert = $db->prepare(
+        "INSERT INTO _site_config (config_key, config_value, config_group, is_public)\n" .
+        "VALUES (?, ?, ?, 1)\n" .
+        "ON DUPLICATE KEY UPDATE config_value = VALUES(config_value), config_group = VALUES(config_group), is_public = 1"
+    );
 
     foreach ($configFields as $key => $info) {
-        // Se é o campo de ficheiro e temos um novo valor, usa-o; caso contrário ignora (mantém o anterior)
-        if (!empty($info['is_file'])) {
-            if ($cvFileValue !== null) {
-                $value = $cvFileValue;
-            } else {
-                // Nenhum novo ficheiro enviado; não actualiza este campo
-                continue;
-            }
-        } else {
-            if (isset($_POST[$key])) {
-                $value = trim($_POST[$key]);
-            } else {
-                continue;
-            }
-        }
-
-        // Verificar se já existe
-        $stmt = $db->prepare("SELECT id_config FROM _site_config WHERE config_key = ?");
-        $stmt->execute([$key]);
-
-        if ($stmt->fetch()) {
-            // Update
-            $db->prepare("UPDATE _site_config SET config_value = ? WHERE config_key = ?")
-               ->execute([$value, $key]);
-        } else {
-            // Insert
-            $db->prepare("INSERT INTO _site_config (config_key, config_value, config_group, is_public) VALUES (?, ?, ?, 1)")
-               ->execute([$key, $value, $info['group']]);
-        }
-
+        $upsert->execute([$key, $info['value'], $info['group']]);
         $updatedKeys[] = $key;
     }
 
-    // ── Actualizar _platform ────────────────────────────────────
-    $version       = trim($_POST['version'] ?? '1.0');
-    $allowContact  = isset($_POST['allow_contact']) ? 1 : 0;
-    $allowFeedback = isset($_POST['allow_feedback']) ? 1 : 0;
+    $platformCheck = $db->query('SELECT id_platform FROM _platform WHERE id_platform = 1 FOR UPDATE')->fetchColumn();
+    if ($platformCheck === false) {
+        throw new RuntimeException('A linha principal de _platform não existe.');
+    }
 
-    $db->prepare("UPDATE _platform SET version = ?, allow_contact = ?, allow_feedback = ? WHERE id_platform = 1")
-       ->execute([$version, $allowContact, $allowFeedback]);
+    $platformUpdate = $db->prepare(
+        'UPDATE _platform SET version = ?, allow_contact = ?, allow_feedback = ? WHERE id_platform = 1'
+    );
+    $platformUpdate->execute([$version, $allowContact, $allowFeedback]);
 
-    // ── Auditoria ──────────────────────────────────────────────
     logAudit(
         $adminId,
         null,
@@ -150,14 +296,39 @@ try {
         '_site_config',
         null,
         null,
-        ['updated_keys' => $updatedKeys, 'platform_version' => $version]
+        [
+            'updated_keys' => $updatedKeys,
+            'platform_version' => $version,
+            'allow_contact' => $allowContact,
+            'allow_feedback' => $allowFeedback,
+            'cv_replaced' => $hasNewCv,
+        ]
     );
 
-    echo json_encode(['success' => true, 'message' => 'Configurações gerais actualizadas com sucesso.']);
-    exit;
-
-} catch (PDOException $e) {
-    error_log('[SETTINGS GENERAL] ' . $e->getMessage());
-    echo json_encode(['success' => false, 'errors' => ['Erro interno ao guardar as configurações. Tenta novamente.']]);
-    exit;
+    $db->commit();
+} catch (Throwable $error) {
+    if ($db->inTransaction()) {
+        $db->rollBack();
+    }
+    generalRemoveNewUpload($newCvPath);
+    error_log('[SETTINGS GENERAL] ' . $error->getMessage());
+    generalJsonResponse(
+        ['success' => false, 'message' => 'Não foi possível guardar as configurações. Nenhum CV anterior foi removido. Tenta novamente.'],
+        500
+    );
 }
+
+// Só depois do COMMIT tentamos remover o CV anterior, e apenas se o nome
+// corresponder ao padrão interno e resolver dentro da pasta de downloads.
+if ($hasNewCv && $oldCvName !== null && $oldCvName !== $newCvName && $uploadDirectory !== null) {
+    $oldCvPath = generalSafeStoredCvPath($oldCvName, $uploadDirectory);
+    if ($oldCvPath !== null && !@unlink($oldCvPath)) {
+        error_log('[SETTINGS GENERAL] Não foi possível remover o CV antigo após a substituição confirmada.');
+    }
+}
+
+generalJsonResponse([
+    'success' => true,
+    'message' => 'Configurações gerais actualizadas com sucesso.',
+    'updated_keys' => $updatedKeys,
+]);

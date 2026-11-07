@@ -1,4 +1,5 @@
 <?php
+
 /**
  * includes/header.php — Cabeçalho global do portefólio JMbenga.
  * SEO técnico, Open Graph, tema, recursos CSS e suporte a $extra_head.
@@ -113,7 +114,7 @@ if ($_og_candidate === '') {
     $_og_candidate = $_cfg('og_image', '');
 }
 if ($_og_candidate === '') {
-    $_og_candidate = '/assets/img/profile/og.jpg';
+    $_og_candidate = '/assets/img/profile/og.png';
 }
 
 $_og_parts = parse_url($_og_candidate);
@@ -131,7 +132,7 @@ if (
     || preg_match('/[\x00-\x20]/', $_og_candidate)
     || preg_match('/^[a-z][a-z0-9+.-]*:/i', $_og_candidate)
 ) {
-    $_og_image = $baseUrl . '/assets/img/profile/og.jpg';
+    $_og_image = $baseUrl . '/assets/img/profile/og.png';
 } else {
     $_og_image = $baseUrl . '/' . ltrim($_og_candidate, '/');
 }
@@ -151,6 +152,36 @@ if (!in_array($_og_type, ['website', 'article', 'profile'], true)) {
 
 $_og_locale = 'pt_AO';
 $_og_image_alt = trim((string) ($page_og_image_alt ?? 'Portefólio de José Mbenga — JMbenga'));
+
+/* -------------------------------------------------------------------------
+ * Favicon configurado em Aparência. Só aceita um ficheiro simples existente
+ * dentro de assets/img/icons; caso contrário, usa os ícones padrão.
+ * ---------------------------------------------------------------------- */
+$_favicon_name = trim($_cfg('favicon', ''));
+$_favicon_url = '';
+$_favicon_type = '';
+$_favicon_version = '1';
+$_favicon_extension = strtolower(pathinfo($_favicon_name, PATHINFO_EXTENSION));
+if (
+    $_favicon_name !== ''
+    && basename($_favicon_name) === $_favicon_name
+    && preg_match('/\A[A-Za-z0-9._-]+\z/', $_favicon_name)
+    && in_array($_favicon_extension, ['ico', 'png', 'svg'], true)
+    && defined('ROOT_PATH')
+) {
+    $_favicon_path = rtrim((string) ROOT_PATH, DIRECTORY_SEPARATOR)
+        . DIRECTORY_SEPARATOR . 'assets' . DIRECTORY_SEPARATOR . 'img'
+        . DIRECTORY_SEPARATOR . 'icons' . DIRECTORY_SEPARATOR . $_favicon_name;
+    if (is_file($_favicon_path) && !is_link($_favicon_path) && is_readable($_favicon_path)) {
+        $_favicon_url = $baseUrl . '/assets/img/icons/' . rawurlencode($_favicon_name);
+        $_favicon_type = match ($_favicon_extension) {
+            'svg' => 'image/svg+xml',
+            'png' => 'image/png',
+            default => 'image/x-icon',
+        };
+        $_favicon_version = (string) filemtime($_favicon_path);
+    }
+}
 
 ?>
 <!DOCTYPE html>
@@ -195,9 +226,14 @@ $_og_image_alt = trim((string) ($page_og_image_alt ?? 'Portefólio de José Mben
     <!-- Canonical: URL final sem parâmetros de consulta -->
     <link rel="canonical" href="<?= e($_canonical_url) ?>">
 
-    <!-- Ícones -->
-    <link rel="icon" type="image/svg+xml" href="<?= e($baseUrl) ?>/assets/img/icons/favicon.svg">
-    <link rel="shortcut icon" href="<?= e($baseUrl) ?>/assets/img/icons/favicon.ico">
+    <!-- Ícone configurável no painel de Aparência; preserva os ícones padrão como fallback. -->
+    <?php if ($_favicon_url !== ''): ?>
+        <link rel="icon" type="<?= e($_favicon_type) ?>" href="<?= e($_favicon_url) ?>?v=<?= e($_favicon_version) ?>">
+        <link rel="shortcut icon" href="<?= e($_favicon_url) ?>?v=<?= e($_favicon_version) ?>">
+    <?php else: ?>
+        <link rel="icon" type="image/svg+xml" href="<?= e($baseUrl) ?>/assets/img/icons/favicon.svg">
+        <link rel="shortcut icon" href="<?= e($baseUrl) ?>/assets/img/icons/favicon.ico">
+    <?php endif; ?>
     <link rel="apple-touch-icon" href="<?= e($baseUrl) ?>/assets/img/icons/apple-touch-icon-180x180.png">
 
     <!-- PWA -->
@@ -219,23 +255,23 @@ $_og_image_alt = trim((string) ($page_og_image_alt ?? 'Portefólio de José Mben
 
     <!-- Cor dinâmica do portfólio -->
     <?php if ($_accentCandidate = trim((string) $_cfg('accent_color', '#2563eb'))): ?>
-    <?php if (preg_match('/\A#[0-9a-fA-F]{6}\z/', $_accentCandidate) && strtolower($_accentCandidate) !== '#2563eb'): ?>
-    <style>
-    :root {
-        --accent: <?=e($_accentCandidate) ?>;
-        --accent-dim: <?=e($_accentCandidate) ?>;
-        --accent-glow: <?=e($_accentCandidate) ?>33;
-        --border-acc: <?=e($_accentCandidate) ?>66;
-    }
+        <?php if (preg_match('/\A#[0-9a-fA-F]{6}\z/', $_accentCandidate) && strtolower($_accentCandidate) !== '#2563eb'): ?>
+            <style>
+                :root {
+                    --accent: <?= e($_accentCandidate) ?>;
+                    --accent-dim: <?= e($_accentCandidate) ?>;
+                    --accent-glow: <?= e($_accentCandidate) ?>33;
+                    --border-acc: <?= e($_accentCandidate) ?>66;
+                }
 
-    @media (max-width: 768px) {
-        .loader-logo {
-            font-size: 1.4rem !important;
-            letter-spacing: -0.01em !important;
-        }
-    }
-    </style>
-    <?php endif; ?>
+                @media (max-width: 768px) {
+                    .loader-logo {
+                        font-size: 1.4rem !important;
+                        letter-spacing: -0.01em !important;
+                    }
+                }
+            </style>
+        <?php endif; ?>
     <?php endif; ?>
 
     <!-- Recursos específicos da página. O conteúdo deve ser HTML confiável do próprio projeto. -->

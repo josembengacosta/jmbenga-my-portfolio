@@ -36,68 +36,207 @@ unset($_SESSION['form_data'], $_SESSION['form_errors'], $_SESSION['form_success'
 
 if (empty($formData)) $formData = $configs;
 
-// Valores actuais
-$accentColor     = $formData['accent_color']      ?? '#2563eb';
-$darkModeDefault = $formData['dark_mode_default'] ?? '1';
-$fontHeading     = $formData['font_heading']      ?? 'Syne';
-$fontBody        = $formData['font_body']         ?? 'DM Sans';
-$heroPhoto       = $formData['photo_hero']        ?? '';
-$aboutPhoto      = $formData['photo_profile']     ?? '';
-$faviconFile     = $formData['favicon']           ?? '';
-
-// Paleta de cores alargada (30 cores)
-$colorPalette = [
-    // ── Azuis ─────────────────────────────
-    ['name' => 'Azul Royal',      'color' => '#2563eb', 'class' => 'royal'],
-    ['name' => 'Azul Céu',        'color' => '#0ea5e9', 'class' => 'sky'],
-    ['name' => 'Azul Marinho',    'color' => '#1e3a8a', 'class' => 'navy'],
-    ['name' => 'Azul Petróleo',   'color' => '#0891b2', 'class' => 'teal'],
-    ['name' => 'Índigo',          'color' => '#4f46e5', 'class' => 'indigo'],
-
-    // ── Verdes ────────────────────────────
-    ['name' => 'Verde Esmeralda', 'color' => '#10b981', 'class' => 'emerald'],
-    ['name' => 'Verde Lima',      'color' => '#84cc16', 'class' => 'lime'],
-    ['name' => 'Verde Floresta',  'color' => '#166534', 'class' => 'forest'],
-    ['name' => 'Menta',           'color' => '#34d399', 'class' => 'mint'],
-    ['name' => 'Verde Água',      'color' => '#14b8a6', 'class' => 'aqua'],
-
-    // ── Roxos / Violetas ──────────────────
-    ['name' => 'Roxo Violeta',    'color' => '#8b5cf6', 'class' => 'violet'],
-    ['name' => 'Lavanda',         'color' => '#a78bfa', 'class' => 'lavender'],
-    ['name' => 'Roxo Escuro',     'color' => '#6d28d9', 'class' => 'darkviolet'],
-    ['name' => 'Magenta',         'color' => '#d946ef', 'class' => 'magenta'],
-
-    // ── Laranjas / Amarelos ───────────────
-    ['name' => 'Laranja Âmbar',   'color' => '#f59e0b', 'class' => 'amber'],
-    ['name' => 'Laranja Fogo',    'color' => '#f97316', 'class' => 'orange'],
-    ['name' => 'Amarelo Ouro',    'color' => '#eab308', 'class' => 'yellow'],
-    ['name' => 'Pêssego',         'color' => '#fb923c', 'class' => 'peach'],
-
-    // ── Rosas / Vermelhos ────────────────
-    ['name' => 'Rosa Pink',       'color' => '#ec4899', 'class' => 'pink'],
-    ['name' => 'Vermelho Coral',  'color' => '#ef4444', 'class' => 'coral'],
-    ['name' => 'Vermelho Escuro', 'color' => '#b91c1c', 'class' => 'darkred'],
-    ['name' => 'Rosa Claro',      'color' => '#f472b6', 'class' => 'lightpink'],
-
-    // ── Cianos / Turquesas ────────────────
-    ['name' => 'Ciano',           'color' => '#06b6d4', 'class' => 'cyan'],
-    ['name' => 'Turquesa',        'color' => '#2dd4bf', 'class' => 'turquoise'],
-
-    // ── Neutros / Escuros ────────────────
-    ['name' => 'Cinza Slate',     'color' => '#64748b', 'class' => 'slate'],
-    ['name' => 'Cinza Escuro',    'color' => '#334155', 'class' => 'darkgray'],
-    ['name' => 'Branco Gelo',     'color' => '#f1f5f9', 'class' => 'ice'],
-    ['name' => 'Preto',           'color' => '#000000', 'class' => 'black'],
+// Paleta organizada por famílias: 48 opções no total.
+$colorGroups = [
+    'Azuis' => [
+        ['name' => 'Azul Royal', 'color' => '#2563eb'],
+        ['name' => 'Azul Céu', 'color' => '#0ea5e9'],
+        ['name' => 'Azul Marinho', 'color' => '#1e3a8a'],
+        ['name' => 'Azul Petróleo', 'color' => '#0891b2'],
+        ['name' => 'Índigo', 'color' => '#4f46e5'],
+        ['name' => 'Cobalto', 'color' => '#1d4ed8'],
+        ['name' => 'Azul Eléctrico', 'color' => '#3b82f6'],
+        ['name' => 'Azul Aço', 'color' => '#475569'],
+        ['name' => 'Azul Bebé', 'color' => '#7dd3fc'],
+    ],
+    'Verdes' => [
+        ['name' => 'Verde Esmeralda', 'color' => '#10b981'],
+        ['name' => 'Verde Lima', 'color' => '#84cc16'],
+        ['name' => 'Verde Floresta', 'color' => '#166534'],
+        ['name' => 'Menta', 'color' => '#34d399'],
+        ['name' => 'Verde Água', 'color' => '#14b8a6'],
+        ['name' => 'Oliva', 'color' => '#65a30d'],
+        ['name' => 'Verde Sálvia', 'color' => '#84a98c'],
+        ['name' => 'Verde Néon', 'color' => '#a3e635'],
+    ],
+    'Roxos e violetas' => [
+        ['name' => 'Roxo Violeta', 'color' => '#8b5cf6'],
+        ['name' => 'Lavanda', 'color' => '#a78bfa'],
+        ['name' => 'Roxo Escuro', 'color' => '#6d28d9'],
+        ['name' => 'Magenta', 'color' => '#d946ef'],
+        ['name' => 'Ametista', 'color' => '#7c3aed'],
+        ['name' => 'Ameixa', 'color' => '#7e22ce'],
+        ['name' => 'Orquídea', 'color' => '#c084fc'],
+    ],
+    'Laranjas e amarelos' => [
+        ['name' => 'Laranja Âmbar', 'color' => '#f59e0b'],
+        ['name' => 'Laranja Fogo', 'color' => '#f97316'],
+        ['name' => 'Amarelo Ouro', 'color' => '#eab308'],
+        ['name' => 'Pêssego', 'color' => '#fb923c'],
+        ['name' => 'Terracota', 'color' => '#c2410c'],
+        ['name' => 'Cobre', 'color' => '#b45309'],
+        ['name' => 'Dourado', 'color' => '#ca8a04'],
+    ],
+    'Rosas e vermelhos' => [
+        ['name' => 'Rosa Pink', 'color' => '#ec4899'],
+        ['name' => 'Vermelho Coral', 'color' => '#ef4444'],
+        ['name' => 'Vermelho Escuro', 'color' => '#b91c1c'],
+        ['name' => 'Rosa Claro', 'color' => '#f472b6'],
+        ['name' => 'Bordô', 'color' => '#881337'],
+        ['name' => 'Vinho', 'color' => '#9f1239'],
+        ['name' => 'Salmão', 'color' => '#fb7185'],
+    ],
+    'Cianos e turquesas' => [
+        ['name' => 'Ciano', 'color' => '#06b6d4'],
+        ['name' => 'Turquesa', 'color' => '#2dd4bf'],
+        ['name' => 'Azul Piscina', 'color' => '#22d3ee'],
+    ],
+    'Neutros e escuros' => [
+        ['name' => 'Cinza Slate', 'color' => '#64748b'],
+        ['name' => 'Cinza Escuro', 'color' => '#334155'],
+        ['name' => 'Branco Gelo', 'color' => '#f1f5f9'],
+        ['name' => 'Preto', 'color' => '#000000'],
+        ['name' => 'Grafite', 'color' => '#1f2937'],
+        ['name' => 'Prata', 'color' => '#94a3b8'],
+        ['name' => 'Marfim', 'color' => '#fef3c7'],
+    ],
 ];
+
+$colorPalette = [];
+foreach ($colorGroups as $groupColors) {
+    foreach ($groupColors as $paletteColor) {
+        $colorPalette[] = $paletteColor;
+    }
+}
 
 // Fontes disponíveis
 $headingFonts = ['Syne', 'Inter', 'Poppins', 'Space Grotesk', 'Outfit', 'Cabinet Grotesk'];
 $bodyFonts    = ['DM Sans', 'Inter', 'Poppins', 'Nunito', 'Work Sans', 'Manrope'];
+
+// Normalizar valores vindos da sessão/base de dados antes de os usar no HTML/CSS.
+$formData = is_array($formData) ? $formData : [];
+$readConfigString = static function (array $source, string $key, string $default = ''): string {
+    $value = $source[$key] ?? $default;
+    return is_string($value) || is_numeric($value) ? (string) $value : $default;
+};
+
+$accentColor = $readConfigString($formData, 'accent_color', '#2563eb');
+if (!preg_match('/^#[0-9A-Fa-f]{6}$/', $accentColor)) {
+    $accentColor = '#2563eb';
+}
+
+$darkModeDefault = $readConfigString($formData, 'dark_mode_default', '1');
+if (!in_array($darkModeDefault, ['0', '1'], true)) {
+    $darkModeDefault = '1';
+}
+
+$fontHeading = $readConfigString($formData, 'font_heading', 'Syne');
+if (!in_array($fontHeading, $headingFonts, true)) {
+    $fontHeading = 'Syne';
+}
+$fontBody = $readConfigString($formData, 'font_body', 'DM Sans');
+if (!in_array($fontBody, $bodyFonts, true)) {
+    $fontBody = 'DM Sans';
+}
+
+// Só aceitar nomes simples de ficheiro; nunca caminhos ou URLs nas pré-visualizações.
+$isSafeAssetName = static function (string $value, array $extensions): bool {
+    if ($value === '') {
+        return true;
+    }
+    if (strlen($value) > 255 || basename($value) !== $value || $value === '.' || $value === '..') {
+        return false;
+    }
+    if (!preg_match('/^[A-Za-z0-9._-]+$/', $value)) {
+        return false;
+    }
+    return in_array(strtolower(pathinfo($value, PATHINFO_EXTENSION)), $extensions, true);
+};
+
+$heroPhoto = $readConfigString($formData, 'photo_hero');
+if (!$isSafeAssetName($heroPhoto, ['jpg', 'jpeg', 'png', 'webp', 'avif', 'gif'])) {
+    $heroPhoto = '';
+}
+$aboutPhoto = $readConfigString($formData, 'photo_profile');
+if (!$isSafeAssetName($aboutPhoto, ['jpg', 'jpeg', 'png', 'webp', 'avif', 'gif'])) {
+    $aboutPhoto = '';
+}
+$faviconFile = $readConfigString($formData, 'favicon');
+if (!$isSafeAssetName($faviconFile, ['ico', 'png', 'svg'])) {
+    $faviconFile = '';
+}
+
+// Resolver a existência física antes de mostrar uma pré-visualização.
+$resolveAppearanceAsset = static function (string $filename, string $folder, array $extensions): ?array {
+    if (
+        $filename === ''
+        || basename($filename) !== $filename
+        || !preg_match('/\A[A-Za-z0-9._-]+\z/', $filename)
+        || !in_array(strtolower(pathinfo($filename, PATHINFO_EXTENSION)), $extensions, true)
+        || !defined('ROOT_PATH')
+        || !defined('BASE_URL')
+    ) {
+        return null;
+    }
+
+    $relativeFolder = $folder === 'icons' ? 'icons' : 'profile';
+    $path = rtrim((string) ROOT_PATH, DIRECTORY_SEPARATOR)
+        . DIRECTORY_SEPARATOR . 'assets' . DIRECTORY_SEPARATOR . 'img'
+        . DIRECTORY_SEPARATOR . $relativeFolder . DIRECTORY_SEPARATOR . $filename;
+    if (!is_file($path) || is_link($path) || !is_readable($path)) {
+        return null;
+    }
+
+    $url = rtrim((string) BASE_URL, '/') . '/assets/img/' . $relativeFolder . '/' . rawurlencode($filename);
+    return ['file' => $filename, 'path' => $path, 'url' => $url . '?v=' . (string) filemtime($path)];
+};
+
+$heroPreview = $resolveAppearanceAsset($heroPhoto, 'profile', ['jpg', 'jpeg', 'png', 'webp', 'avif', 'gif']);
+$aboutFallbackPreview = $resolveAppearanceAsset($aboutPhoto, 'profile', ['jpg', 'jpeg', 'png', 'webp', 'avif', 'gif']);
+$faviconPreview = $resolveAppearanceAsset($faviconFile, 'icons', ['ico', 'png', 'svg']);
+
+// A homepage escolhe primeiro a foto do administrador activo; photo_profile é fallback.
+$aboutPublicPreview = null;
+$aboutPublicSource = 'Nenhuma imagem pública encontrada';
+try {
+    $publicAdminPhotoStmt = $db->query(
+        "SELECT photo_employees
+         FROM _employees
+         WHERE photo_employees IS NOT NULL
+           AND photo_employees <> ''
+           AND status_employees = 'active'
+         ORDER BY (role = 'super_admin') DESC, id_employees ASC
+         LIMIT 1"
+    );
+    $publicAdminPhoto = trim((string) ($publicAdminPhotoStmt->fetchColumn() ?: ''));
+    $publicAdminPhoto = basename(str_replace('\\', '/', $publicAdminPhoto));
+    $aboutPublicPreview = $resolveAppearanceAsset($publicAdminPhoto, 'profile', ['jpg', 'jpeg', 'png', 'webp', 'avif', 'gif']);
+    if ($aboutPublicPreview !== null) {
+        $aboutPublicSource = 'Foto do perfil do administrador activo';
+    }
+} catch (Throwable $photoLookupError) {
+    error_log('[APPEARANCE PREVIEW] Não foi possível verificar a foto do administrador.');
+}
+if ($aboutPublicPreview === null && $aboutFallbackPreview !== null) {
+    $aboutPublicPreview = $aboutFallbackPreview;
+    $aboutPublicSource = 'Foto do About (fallback de Aparência)';
+}
+
+$isPresetAccent = false;
+foreach ($colorPalette as $paletteColor) {
+    if (strcasecmp($accentColor, $paletteColor['color']) === 0) {
+        $isPresetAccent = true;
+        break;
+    }
+}
+$customAccentValue = $isPresetAccent ? '' : $accentColor;
+
+
 ?>
+<?php $pageTitle = 'Aparência'; ?>
 <!DOCTYPE html>
-<html lang="pt" data-theme="dark" data-base-url="<?= BASE_URL ?>">
+<html lang="pt" data-theme="dark" data-base-url="<?= e(BASE_URL) ?>">
 <?php include __DIR__ . '/../../include/head.php'; ?>
-</head>
 <style>
 .page-top {
     display: flex;
@@ -224,11 +363,23 @@ $bodyFonts    = ['DM Sans', 'Inter', 'Poppins', 'Nunito', 'Work Sans', 'Manrope'
 }
 
 /* Paleta de cores */
+.color-group {
+    margin-bottom: 1.25rem;
+}
+
+.color-group-title {
+    color: var(--text-muted);
+    font-size: .72rem;
+    font-weight: 700;
+    letter-spacing: .06em;
+    text-transform: uppercase;
+    margin-bottom: .65rem;
+}
+
 .color-palette {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(110px, 1fr));
-    gap: .65rem;
-    margin-bottom: 1.5rem;
+    grid-template-columns: repeat(auto-fill, minmax(108px, 1fr));
+    gap: .6rem;
 }
 
 .color-option {
@@ -242,7 +393,13 @@ $bodyFonts    = ['DM Sans', 'Inter', 'Poppins', 'Nunito', 'Work Sans', 'Manrope'
     border-radius: var(--radius);
     cursor: pointer;
     transition: all .2s;
-    text-align: center
+    text-align: center;
+    position: relative;
+}
+
+.color-option:focus-within {
+    outline: 2px solid var(--color);
+    outline-offset: 3px;
 }
 
 .color-option:hover {
@@ -255,8 +412,12 @@ $bodyFonts    = ['DM Sans', 'Inter', 'Poppins', 'Nunito', 'Work Sans', 'Manrope'
     background: color-mix(in srgb, var(--color) 10%, var(--bg))
 }
 
-.color-option input {
-    display: none
+.color-option input[type="radio"] {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    opacity: 0;
+    pointer-events: none;
 }
 
 .color-swatch {
@@ -270,7 +431,21 @@ $bodyFonts    = ['DM Sans', 'Inter', 'Poppins', 'Nunito', 'Work Sans', 'Manrope'
 .color-name {
     font-size: .75rem;
     font-weight: 600;
-    color: var(--text-dim)
+    color: var(--text-dim);
+}
+
+.color-hex {
+    color: var(--text-muted);
+    font-size: .65rem;
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    letter-spacing: .02em;
+}
+
+.custom-color-help {
+    display: block;
+    color: var(--text-muted);
+    font-size: .7rem;
+    margin-top: .45rem;
 }
 
 /* Cor personalizada */
@@ -450,6 +625,24 @@ $bodyFonts    = ['DM Sans', 'Inter', 'Poppins', 'Nunito', 'Work Sans', 'Manrope'
     color: var(--accent)
 }
 
+@media(max-width:480px) {
+    .form-section {
+        padding: 1.1rem;
+    }
+
+    .custom-color-input {
+        flex-wrap: wrap;
+    }
+
+    .custom-color-input .form-control {
+        min-width: 0;
+    }
+
+    .theme-preview {
+        width: min(160px, 42vw);
+    }
+}
+
 /* Tipografia */
 .form-grid {
     display: grid;
@@ -522,17 +715,69 @@ $bodyFonts    = ['DM Sans', 'Inter', 'Poppins', 'Nunito', 'Work Sans', 'Manrope'
 
 /* Imagens */
 .img-preview {
-    margin-top: .5rem;
+    margin-top: .65rem;
     width: 100%;
-    max-width: 200px;
-    border-radius: 8px;
+    max-width: 240px;
+    min-height: 90px;
+    padding: .55rem;
+    border-radius: 10px;
     overflow: hidden;
-    border: 1px solid var(--border)
+    border: 1px solid var(--border);
+    background: var(--bg);
 }
 
 .img-preview img {
     width: 100%;
-    display: block
+    max-height: 260px;
+    display: block;
+    object-fit: contain;
+    border-radius: 6px;
+}
+
+.img-preview.icon-preview {
+    width: 88px;
+    min-height: 88px;
+    display: grid;
+    place-items: center;
+}
+
+.img-preview.icon-preview img {
+    width: 64px;
+    height: 64px;
+    object-fit: contain;
+}
+
+.asset-status {
+    display: flex;
+    align-items: flex-start;
+    gap: .45rem;
+    margin-top: .55rem;
+    color: var(--text-muted);
+    font-size: .72rem;
+    line-height: 1.55;
+}
+
+.asset-status.is-ok {
+    color: var(--success);
+}
+
+.asset-status.is-warning {
+    color: var(--warning);
+}
+
+.asset-status.is-error {
+    color: var(--danger);
+}
+
+.asset-note {
+    margin-top: .65rem;
+    padding: .7rem .8rem;
+    border: 1px solid var(--border);
+    border-radius: 9px;
+    background: var(--bg);
+    color: var(--text-dim);
+    font-size: .72rem;
+    line-height: 1.6;
 }
 
 .btn {
@@ -588,6 +833,7 @@ $bodyFonts    = ['DM Sans', 'Inter', 'Poppins', 'Nunito', 'Work Sans', 'Manrope'
     border-top: 1px solid var(--border)
 }
 </style>
+</head>
 
 <body>
     <?php include __DIR__ . '/../../include/sidebar.php'; ?>
@@ -626,9 +872,9 @@ $bodyFonts    = ['DM Sans', 'Inter', 'Poppins', 'Nunito', 'Work Sans', 'Manrope'
             </div>
             <?php endif; ?>
 
-            <form id="appearanceForm" novalidate data-api="<?= BASE_URL ?>/jm-panel/settings/appearance-process"
+            <form id="appearanceForm" novalidate data-api="<?= e(BASE_URL . '/jm-panel/settings/appearance-process') ?>"
                 enctype="multipart/form-data">
-                <input type="hidden" name="csrf_token" value="<?= $_SESSION['admin_csrf_token'] ?>">
+                <input type="hidden" name="csrf_token" value="<?= e($_SESSION['admin_csrf_token'] ?? '') ?>">
 
                 <!-- ═══ SECÇÃO 1: COR DE DESTAQUE ════════════════════════ -->
                 <div class="form-section">
@@ -639,37 +885,50 @@ $bodyFonts    = ['DM Sans', 'Inter', 'Poppins', 'Nunito', 'Work Sans', 'Manrope'
                             <p>Define a cor principal do site (links, botões, badges).</p>
                         </div>
                     </div>
-                    <div class="color-palette">
-                        <?php foreach ($colorPalette as $palette): ?>
-                        <label class="color-option <?= $accentColor === $palette['color'] ? 'selected' : '' ?>"
-                            style="--color:<?= $palette['color'] ?>">
-                            <input type="radio" name="accent_color" value="<?= $palette['color'] ?>"
-                                <?= $accentColor === $palette['color'] ? 'checked' : '' ?>>
-                            <span class="color-swatch"></span>
-                            <span class="color-name"><?= $palette['name'] ?></span>
-                        </label>
-                        <?php endforeach; ?>
+                    <?php foreach ($colorGroups as $groupName => $groupColors): ?>
+                    <div class="color-group">
+                        <h4 class="color-group-title"><?= e($groupName) ?></h4>
+                        <div class="color-palette">
+                            <?php foreach ($groupColors as $palette): ?>
+                            <?php $isSelectedColor = strcasecmp($accentColor, $palette['color']) === 0; ?>
+                            <label class="color-option <?= $isSelectedColor ? 'selected' : '' ?>"
+                                style="--color:<?= e($palette['color']) ?>"
+                                title="<?= e($palette['name'] . ' ' . $palette['color']) ?>">
+                                <input type="radio" name="accent_color" value="<?= e($palette['color']) ?>"
+                                    <?= $isSelectedColor ? 'checked' : '' ?> aria-label="<?= e($palette['name']) ?>">
+                                <span class="color-swatch" aria-hidden="true"></span>
+                                <span class="color-name"><?= e($palette['name']) ?></span>
+                                <span class="color-hex"><?= e($palette['color']) ?></span>
+                            </label>
+                            <?php endforeach; ?>
+                        </div>
                     </div>
+                    <?php endforeach; ?>
                     <div class="custom-color-row">
-                        <label class="form-label">Ou escolhe uma cor personalizada</label>
+                        <label class="form-label" for="customColorHex">Ou escolhe uma cor personalizada</label>
                         <div class="custom-color-input">
                             <input type="color" id="customColorPicker" value="<?= e($accentColor) ?>"
-                                class="color-picker-native">
-                            <input type="text" id="customColorHex" name="accent_color_custom" class="form-control"
-                                value="<?= e($accentColor) ?>" placeholder="#2563eb" maxlength="7">
+                                class="color-picker-native" aria-label="Selector de cor personalizada">
+                            <input type="text" id="customColorHex" class="form-control" value="<?= e($accentColor) ?>"
+                                placeholder="#2563eb" maxlength="7" autocomplete="off" spellcheck="false"
+                                aria-describedby="customColorHelp">
+                            <input type="hidden" name="accent_color_custom" id="accentColorCustomValue"
+                                value="<?= e($customAccentValue) ?>">
                             <button type="button" class="btn btn-secondary" id="applyCustomColor">Aplicar</button>
                         </div>
+                        <span class="custom-color-help" id="customColorHelp">Formato hexadecimal: #RRGGBB. A
+                            pré-visualização actualiza-se ao escolher ou aplicar a cor.</span>
                     </div>
 
                     <!-- Preview visual da cor -->
                     <div class="color-preview">
                         <h4>Pré-visualização</h4>
                         <div class="preview-row">
-                            <span class="preview-badge" style="background:<?= $accentColor ?>">Badge</span>
-                            <span class="preview-link" style="color:<?= $accentColor ?>">Link de exemplo</span>
-                            <button class="preview-btn" style="background:<?= $accentColor ?>">Botão</button>
+                            <span class="preview-badge" style="background:<?= e($accentColor) ?>">Badge</span>
+                            <span class="preview-link" style="color:<?= e($accentColor) ?>">Link de exemplo</span>
+                            <button class="preview-btn" style="background:<?= e($accentColor) ?>">Botão</button>
                             <div class="preview-bar">
-                                <div class="preview-bar-fill" style="background:<?= $accentColor ?>;width:75%"></div>
+                                <div class="preview-bar-fill" style="background:<?= e($accentColor) ?>;width:75%"></div>
                             </div>
                         </div>
                     </div>
@@ -728,11 +987,11 @@ $bodyFonts    = ['DM Sans', 'Inter', 'Poppins', 'Nunito', 'Work Sans', 'Manrope'
                             <label class="form-label">Fonte para Títulos</label>
                             <select name="font_heading" class="form-control font-select" id="fontHeadingSelect">
                                 <?php foreach ($headingFonts as $font): ?>
-                                <option value="<?= $font ?>" <?= $fontHeading === $font ? 'selected' : '' ?>
-                                    style="font-family:'<?= $font ?>',sans-serif"><?= $font ?></option>
+                                <option value="<?= e($font) ?>" <?= $fontHeading === $font ? 'selected' : '' ?>
+                                    style="font-family:'<?= e($font) ?>',sans-serif"><?= $font ?></option>
                                 <?php endforeach; ?>
                             </select>
-                            <div class="font-preview" style="font-family:'<?= $fontHeading ?>',sans-serif"
+                            <div class="font-preview" style="font-family:'<?= e($fontHeading) ?>',sans-serif"
                                 id="headingPreview">
                                 Título Grande e Impactante
                             </div>
@@ -741,11 +1000,11 @@ $bodyFonts    = ['DM Sans', 'Inter', 'Poppins', 'Nunito', 'Work Sans', 'Manrope'
                             <label class="form-label">Fonte para Corpo de Texto</label>
                             <select name="font_body" class="form-control font-select" id="fontBodySelect">
                                 <?php foreach ($bodyFonts as $font): ?>
-                                <option value="<?= $font ?>" <?= $fontBody === $font ? 'selected' : '' ?>
-                                    style="font-family:'<?= $font ?>',sans-serif"><?= $font ?></option>
+                                <option value="<?= e($font) ?>" <?= $fontBody === $font ? 'selected' : '' ?>
+                                    style="font-family:'<?= e($font) ?>',sans-serif"><?= $font ?></option>
                                 <?php endforeach; ?>
                             </select>
-                            <div class="font-preview" style="font-family:'<?= $fontBody ?>',sans-serif"
+                            <div class="font-preview" style="font-family:'<?= e($fontBody) ?>',sans-serif"
                                 id="bodyPreview">
                                 Este é um parágrafo de exemplo para demonstrar a aparência da fonte seleccionada no
                                 corpo de texto do site.
@@ -760,35 +1019,102 @@ $bodyFonts    = ['DM Sans', 'Inter', 'Poppins', 'Nunito', 'Work Sans', 'Manrope'
                         <span class="section-icon"><i class="fas fa-image"></i></span>
                         <div>
                             <h3>Imagens do Site</h3>
-                            <p>Foto do Hero, foto do About e Favicon.</p>
+                            <p>Pré-visualiza os ficheiros e identifica onde cada configuração é utilizada.</p>
                         </div>
                     </div>
                     <div class="form-grid">
                         <div class="form-group">
-                            <label class="form-label">Foto do Hero (nome do ficheiro)</label>
-                            <input type="text" name="photo_hero" class="form-control" value="<?= e($heroPhoto) ?>"
-                                placeholder="hero.jpg">
-                            <span class="form-hint">Coloca o ficheiro em /assets/img/profile/</span>
-                            <?php if ($heroPhoto): ?>
-                            <div class="img-preview"><img src="<?= BASE_URL ?>/assets/img/profile/<?= e($heroPhoto) ?>"
-                                    alt="Hero"></div>
+                            <label class="form-label" for="photoHeroInput">Foto do Hero (nome do ficheiro)</label>
+                            <input id="photoHeroInput" type="text" name="photo_hero" class="form-control"
+                                value="<?= e($heroPhoto) ?>" placeholder="hero.jpg" autocomplete="off">
+                            <span class="form-hint">Ficheiro em <code>/assets/img/profile/</code>.</span>
+                            <?php if ($heroPhoto !== '' && $heroPreview): ?>
+                            <div class="img-preview">
+                                <img src="<?= e($heroPreview['url']) ?>"
+                                    alt="Pré-visualização do ficheiro reservado para Hero" loading="lazy">
+                            </div>
+                            <span class="asset-status is-ok"><i class="fas fa-check-circle"></i> Ficheiro encontrado:
+                                <?= e($heroPreview['file']) ?>. Está guardado, mas não é utilizado pelo Hero
+                                actual.</span>
+                            <?php elseif ($heroPhoto !== ''): ?>
+                            <span class="asset-status is-error"><i class="fas fa-exclamation-circle"></i> O nome antigo
+                                continua guardado, mas o ficheiro não existe em <code>/assets/img/profile/</code>. Limpa
+                                este campo para manter a apresentação actual.</span>
+                            <?php else: ?>
+                            <span class="asset-status"><i class="fas fa-info-circle"></i> Configuração correcta: o Hero
+                                mantém o editor de código e não tem uma fotografia associada.</span>
                             <?php endif; ?>
+                            <div class="asset-note">
+                                <strong>Estado na homepage:</strong> a versão actual de <code>home.php</code> mantém o
+                                editor de código na área Hero. O campo <code>photo_hero</code> fica reservado e não
+                                altera essa apresentação. Deixa-o vazio para preservar o desenho actual.
+                            </div>
                         </div>
+
                         <div class="form-group">
-                            <label class="form-label">Foto do About (nome do ficheiro)</label>
-                            <input type="text" name="photo_profile" class="form-control" value="<?= e($aboutPhoto) ?>"
-                                placeholder="about.jpg">
-                            <span class="form-hint">Coloca o ficheiro em /assets/img/profile/</span>
-                            <?php if ($aboutPhoto): ?>
-                            <div class="img-preview"><img src="<?= BASE_URL ?>/assets/img/profile/<?= e($aboutPhoto) ?>"
-                                    alt="About"></div>
+                            <label class="form-label" for="photoProfileInput">Foto do About (fallback)</label>
+                            <input id="photoProfileInput" type="text" name="photo_profile" class="form-control"
+                                value="<?= e($aboutPhoto) ?>" placeholder="about.jpg" autocomplete="off">
+                            <span class="form-hint">Ficheiro de reserva em <code>/assets/img/profile/</code>.</span>
+                            <?php if ($aboutFallbackPreview): ?>
+                            <div class="img-preview">
+                                <img src="<?= e($aboutFallbackPreview['url']) ?>"
+                                    alt="Imagem alternativa configurada para About" loading="lazy">
+                            </div>
+                            <span class="asset-status is-ok"><i class="fas fa-check-circle"></i> Fallback encontrado:
+                                <?= e($aboutFallbackPreview['file']) ?></span>
+                            <?php elseif ($aboutPhoto !== '' && $aboutPublicPreview !== null): ?>
+                            <span class="asset-status is-warning"><i class="fas fa-info-circle"></i> O fallback antigo
+                                não foi encontrado. A imagem pública está funcional através do administrador activo.
+                                Para manter uma cópia de reserva, actualiza este campo para
+                                <code><?= e($aboutPublicPreview['file']) ?></code>.</span>
+                            <?php elseif ($aboutPhoto !== ''): ?>
+                            <span class="asset-status is-error"><i class="fas fa-exclamation-circle"></i> O fallback
+                                está guardado, mas o ficheiro não existe em assets/img/profile/ e não há uma fotografia
+                                activa válida para o substituir.</span>
+                            <?php else: ?>
+                            <span class="asset-status"><i class="fas fa-info-circle"></i> Nenhuma imagem de fallback
+                                definida.</span>
                             <?php endif; ?>
+                            <div class="asset-note">
+                                <strong>Imagem actualmente usada no About:</strong>
+                                <?php if ($aboutPublicPreview): ?>
+                                <div class="img-preview">
+                                    <img src="<?= e($aboutPublicPreview['url']) ?>"
+                                        alt="Imagem actualmente apresentada no About" loading="lazy">
+                                </div>
+                                <span class="asset-status is-ok"><i class="fas fa-check-circle"></i> Origem:
+                                    <?= e($aboutPublicSource) ?>.</span>
+                                <?php else: ?>
+                                <span class="asset-status is-warning"><i class="fas fa-exclamation-triangle"></i> Não
+                                    foi encontrada uma foto de perfil activa nem um fallback válido; o site apresenta o
+                                    ícone de substituição.</span>
+                                <?php endif; ?>
+                                A lógica pública dá prioridade à foto do administrador activo em
+                                <code>_employees.photo_employees</code>. Só usa <code>photo_profile</code> quando essa
+                                foto não está disponível.
+                            </div>
                         </div>
+
                         <div class="form-group">
-                            <label class="form-label">Favicon (nome do ficheiro)</label>
-                            <input type="text" name="favicon" class="form-control" value="<?= e($faviconFile) ?>"
-                                placeholder="favicon.ico">
-                            <span class="form-hint">Coloca o ficheiro em /assets/img/icons/</span>
+                            <label class="form-label" for="faviconInput">Favicon (nome do ficheiro)</label>
+                            <input id="faviconInput" type="text" name="favicon" class="form-control"
+                                value="<?= e($faviconFile) ?>" placeholder="favicon.ico" autocomplete="off">
+                            <span class="form-hint">Ficheiro em <code>/assets/img/icons/</code>. Formatos: ICO, PNG ou
+                                SVG.</span>
+                            <?php if ($faviconPreview): ?>
+                            <div class="img-preview icon-preview">
+                                <img src="<?= e($faviconPreview['url']) ?>" alt="Pré-visualização do favicon">
+                            </div>
+                            <span class="asset-status is-ok"><i class="fas fa-check-circle"></i> Ficheiro encontrado:
+                                <?= e($faviconPreview['file']) ?>. Será usado no site e no painel.</span>
+                            <?php elseif ($faviconFile !== ''): ?>
+                            <span class="asset-status is-error"><i class="fas fa-exclamation-circle"></i> O nome está
+                                guardado, mas o ficheiro não foi encontrado em assets/img/icons/.</span>
+                            <?php else: ?>
+                            <span class="asset-status"><i class="fas fa-info-circle"></i> Sem favicon personalizado;
+                                serão usados os ícones padrão do JMbenga.</span>
+                            <?php endif; ?>
                         </div>
                     </div>
                 </div>
@@ -804,121 +1130,190 @@ $bodyFonts    = ['DM Sans', 'Inter', 'Poppins', 'Nunito', 'Work Sans', 'Manrope'
     <?php include __DIR__ . '/../../include/modal_logout.php'; ?>
 
     <script>
-    const form = document.getElementById('appearanceForm');
-    const submitBtn = document.getElementById('submitBtn');
-    const accentInputs = document.querySelectorAll('input[name="accent_color"]');
-    const customPicker = document.getElementById('customColorPicker');
-    const customHex = document.getElementById('customColorHex');
-    const applyBtn = document.getElementById('applyCustomColor');
+    (() => {
+        const form = document.getElementById('appearanceForm');
+        const submitBtn = document.getElementById('submitBtn');
+        const accentInputs = [...document.querySelectorAll('input[name="accent_color"]')];
+        const customPicker = document.getElementById('customColorPicker');
+        const customHex = document.getElementById('customColorHex');
+        const customValue = document.getElementById('accentColorCustomValue');
+        const applyBtn = document.getElementById('applyCustomColor');
+        const csrfInput = form.querySelector('[name="csrf_token"]');
+        const hexPattern = /^#[0-9A-F]{6}$/i;
 
-    function showToast(m, t = 'success') {
-        const c = document.getElementById('toast-container') || (() => {
-            const d = document.createElement('div');
-            d.id = 'toast-container';
-            d.style.cssText =
-                'position:fixed;top:1rem;right:1rem;z-index:9999;display:flex;flex-direction:column;gap:.5rem';
-            document.body.appendChild(d);
-            return d;
-        })();
-        const toast = document.createElement('div');
-        toast.className = `toast toast-${t}`;
-        toast.innerHTML = `<i class="fas fa-${t === 'success' ? 'check-circle' : 'times-circle'}"></i> ${m}`;
-        c.appendChild(toast);
-        setTimeout(() => {
-            toast.style.opacity = '0';
-            toast.style.transform = 'translateX(20px)';
-            setTimeout(() => toast.remove(), 300);
-        }, 4000);
-    }
-
-    // ── Actualizar previews de cor ──────────────────────────────
-    function updateColorPreview(color) {
-        document.querySelector('.preview-badge').style.background = color;
-        document.querySelector('.preview-link').style.color = color;
-        document.querySelector('.preview-btn').style.background = color;
-        document.querySelector('.preview-bar-fill').style.background = color;
-    }
-
-    // ── Selecção de cor da paleta ──────────────────────────────
-    accentInputs.forEach(input => {
-        input.addEventListener('change', function() {
-            if (this.checked) {
-                updateColorPreview(this.value);
-                customPicker.value = this.value;
-                customHex.value = this.value;
-                // Actualizar selecção visual
-                document.querySelectorAll('.color-option').forEach(o => o.classList.remove('selected'));
-                this.closest('.color-option').classList.add('selected');
+        function showToast(message, type = 'success') {
+            let container = document.getElementById('toast-container');
+            if (!container) {
+                container = document.createElement('div');
+                container.id = 'toast-container';
+                container.style.cssText =
+                    'position:fixed;top:1rem;right:1rem;z-index:9999;display:flex;flex-direction:column;gap:.5rem';
+                document.body.appendChild(container);
             }
-        });
-    });
 
-    // ── Cor personalizada ──────────────────────────────────────
-    customPicker.addEventListener('input', function() {
-        customHex.value = this.value;
-    });
+            const toast = document.createElement('div');
+            toast.className = `toast toast-${type}`;
+            const icon = document.createElement('i');
+            icon.className = `fas ${type === 'success' ? 'fa-check-circle' : 'fa-times-circle'}`;
+            icon.setAttribute('aria-hidden', 'true');
+            toast.append(icon, document.createTextNode(String(message ?? '')));
+            container.appendChild(toast);
 
-    applyBtn.addEventListener('click', function() {
-        const color = customHex.value;
-        if (/^#[0-9A-F]{6}$/i.test(color)) {
-            updateColorPreview(color);
-            // Desmarcar paletas
-            accentInputs.forEach(i => i.checked = false);
-            document.querySelectorAll('.color-option').forEach(o => o.classList.remove('selected'));
-            // Actualizar campo hidden para submissão
-            let customInput = document.querySelector('input[name="accent_color_custom"]');
-            customInput.value = color;
-        } else {
-            showToast('Formato de cor inválido. Usa #RRGGBB', 'error');
+            window.setTimeout(() => {
+                toast.style.opacity = '0';
+                toast.style.transform = 'translateX(20px)';
+                window.setTimeout(() => toast.remove(), 300);
+            }, 4000);
         }
-    });
 
-    // ── Preview de fontes ──────────────────────────────────────
-    document.getElementById('fontHeadingSelect').addEventListener('change', function() {
-        document.getElementById('headingPreview').style.fontFamily = this.value + ',sans-serif';
-    });
-    document.getElementById('fontBodySelect').addEventListener('change', function() {
-        document.getElementById('bodyPreview').style.fontFamily = this.value + ',sans-serif';
-    });
-
-    // ── Selecção visual do tema ──────────────────────────────────
-    document.querySelectorAll('.theme-card input[name="dark_mode_default"]').forEach(radio => {
-        radio.addEventListener('change', function() {
-            document.querySelectorAll('.theme-card').forEach(c => c.classList.remove('selected'));
-            this.closest('.theme-card').classList.add('selected');
-        });
-    });
-
-    // ── Submissão ──────────────────────────────────────────────
-    form.addEventListener('submit', async function(e) {
-        e.preventDefault();
-        submitBtn.disabled = true;
-        submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> A guardar…';
-        try {
-            const fd = new FormData(form);
-            const res = await fetch(form.dataset.api, {
-                method: 'POST',
-                body: fd,
-                headers: {
-                    'X-Requested-With': 'XMLHttpRequest',
-                    'X-CSRF-Token': document.querySelector('[name="csrf_token"]').value
-                }
+        function clearPaletteSelection() {
+            accentInputs.forEach(input => {
+                input.checked = false;
             });
-            const data = await res.json();
-            if (data.success) {
-                showToast(data.message || 'Aparência actualizada!', 'success');
-                setTimeout(() => location.reload(), 1000);
-            } else {
-                if (data.errors) data.errors.forEach(err => showToast(err, 'error'));
-                else showToast(data.message || 'Erro.', 'error');
-            }
-        } catch (err) {
-            showToast('Erro de rede.', 'error');
-        } finally {
-            submitBtn.disabled = false;
-            submitBtn.innerHTML = '<i class="fas fa-save"></i> Guardar Aparência';
+            document.querySelectorAll('.color-option').forEach(option => option.classList.remove('selected'));
         }
-    });
+
+        function updateColorPreview(color) {
+            const badge = document.querySelector('.preview-badge');
+            const link = document.querySelector('.preview-link');
+            const button = document.querySelector('.preview-btn');
+            const bar = document.querySelector('.preview-bar-fill');
+            if (badge) badge.style.backgroundColor = color;
+            if (link) link.style.color = color;
+            if (button) button.style.backgroundColor = color;
+            if (bar) bar.style.backgroundColor = color;
+        }
+
+        function applyCustomColor(color) {
+            const normalized = color.toUpperCase();
+            customValue.value = normalized;
+            customHex.value = normalized;
+            customPicker.value = normalized;
+            clearPaletteSelection();
+            updateColorPreview(normalized);
+        }
+
+        // Uma cor escolhida na paleta limpa o valor personalizado oculto.
+        accentInputs.forEach(input => {
+            input.addEventListener('change', () => {
+                if (!input.checked) return;
+                customValue.value = '';
+                customPicker.value = input.value;
+                customHex.value = input.value;
+                clearPaletteSelection();
+                input.checked = true;
+                const option = input.closest('.color-option');
+                if (option) option.classList.add('selected');
+                updateColorPreview(input.value);
+            });
+        });
+
+        // O selector nativo aplica imediatamente a cor escolhida.
+        customPicker.addEventListener('input', () => {
+            applyCustomColor(customPicker.value);
+        });
+
+        // O campo hexadecimal actualiza o valor submetido; valores inválidos
+        // permanecem visíveis para que o servidor os rejeite em vez de guardar outra cor.
+        customHex.addEventListener('input', () => {
+            const value = customHex.value.trim();
+            customValue.value = value;
+            clearPaletteSelection();
+            if (hexPattern.test(value)) {
+                customPicker.value = value;
+                updateColorPreview(value);
+                customHex.setCustomValidity('');
+            } else {
+                customHex.setCustomValidity('Introduz uma cor no formato #RRGGBB.');
+            }
+        });
+
+        applyBtn.addEventListener('click', () => {
+            const color = customHex.value.trim();
+            if (!hexPattern.test(color)) {
+                customHex.setCustomValidity('Introduz uma cor no formato #RRGGBB.');
+                customHex.reportValidity();
+                showToast('Formato de cor inválido. Usa #RRGGBB.', 'error');
+                return;
+            }
+            customHex.setCustomValidity('');
+            applyCustomColor(color);
+            showToast('Cor personalizada aplicada à pré-visualização.', 'success');
+        });
+
+        document.getElementById('fontHeadingSelect').addEventListener('change', function() {
+            document.getElementById('headingPreview').style.fontFamily = `'${this.value}', sans-serif`;
+        });
+        document.getElementById('fontBodySelect').addEventListener('change', function() {
+            document.getElementById('bodyPreview').style.fontFamily = `'${this.value}', sans-serif`;
+        });
+
+        document.querySelectorAll('.theme-card input[name="dark_mode_default"]').forEach(radio => {
+            radio.addEventListener('change', function() {
+                document.querySelectorAll('.theme-card').forEach(card => card.classList.remove(
+                    'selected'));
+                const card = this.closest('.theme-card');
+                if (card) card.classList.add('selected');
+            });
+        });
+
+        form.addEventListener('submit', async event => {
+            event.preventDefault();
+            if (!form.reportValidity()) return;
+
+            const selectedPreset = accentInputs.some(input => input.checked);
+            if (!selectedPreset && !hexPattern.test(customValue.value.trim())) {
+                showToast('Selecciona uma cor da paleta ou introduz uma cor hexadecimal válida.',
+                    'error');
+                customHex.focus();
+                return;
+            }
+
+            submitBtn.disabled = true;
+            submitBtn.innerHTML =
+            '<i class="fas fa-spinner fa-spin" aria-hidden="true"></i> A guardar…';
+
+            try {
+                const response = await fetch(form.dataset.api, {
+                    method: 'POST',
+                    body: new FormData(form),
+                    credentials: 'same-origin',
+                    headers: {
+                        'X-Requested-With': 'XMLHttpRequest',
+                        'X-CSRF-Token': csrfInput.value
+                    }
+                });
+
+                const responseText = await response.text();
+                let data;
+                try {
+                    data = JSON.parse(responseText);
+                } catch (_) {
+                    throw new Error(
+                        'O servidor devolveu uma resposta inesperada. Verifica a sessão e tenta novamente.'
+                        );
+                }
+
+                if (!response.ok || !data.success) {
+                    const messages = Array.isArray(data.errors) ? data.errors : [data.message ||
+                        'Não foi possível guardar as configurações.'
+                    ];
+                    messages.forEach(message => showToast(message, 'error'));
+                    return;
+                }
+
+                showToast(data.message || 'Aparência actualizada com sucesso.', 'success');
+                window.setTimeout(() => window.location.reload(), 1000);
+            } catch (error) {
+                showToast(error instanceof Error ? error.message :
+                    'Erro de rede ao guardar as configurações.', 'error');
+            } finally {
+                submitBtn.disabled = false;
+                submitBtn.innerHTML =
+                '<i class="fas fa-save" aria-hidden="true"></i> Guardar Aparência';
+            }
+        });
+    })();
     </script>
 </body>
 

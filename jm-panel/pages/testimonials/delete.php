@@ -1,80 +1,105 @@
 <?php
-// ══════════════════════════════════════════════════════════════
-// JMbenga Portfolio — Eliminar Depoimento (AJAX)
-// ══════════════════════════════════════════════════════════════
+// JMbenga Portfolio — Eliminar depoimento (AJAX)
 require_once __DIR__ . '/../../include/functions_admin.php';
 
 startAdminSession();
+checkAdminRememberMe();
 requireAdminLogin();
 requireNoLockscreen();
 
 header('Content-Type: application/json; charset=utf-8');
 
-$db = $GLOBALS['pdo'];
-
-// ── Apenas POST ───────────────────────────────────────────────
-if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
-    http_response_code(405);
-    echo json_encode(['success' => false, 'message' => 'Método não permitido.']);
+function testimonialJsonResponse(array $payload, int $status = 200): never
+{
+    http_response_code($status);
+    echo json_encode($payload, JSON_UNESCAPED_UNICODE | JSON_INVALID_UTF8_SUBSTITUTE);
     exit;
 }
 
-// ── CSRF ──────────────────────────────────────────────────────
-$token = $_SERVER['HTTP_X_CSRF_TOKEN'] ?? '';
-if (!validateAdminCsrf($token)) {
-    http_response_code(403);
-    echo json_encode(['success' => false, 'message' => 'Token de segurança inválido.']);
-    exit;
+function testimonialPostString(string $key, string $default = ''): string
+{
+    $value = $_POST[$key] ?? $default;
+    return is_string($value) ? trim($value) : $default;
 }
 
-// ── ID do depoimento ──────────────────────────────────────────
-$id = (int)($_GET['id'] ?? 0);
-if ($id <= 0) {
-    http_response_code(400);
-    echo json_encode(['success' => false, 'message' => 'ID de depoimento inválido.']);
-    exit;
+function testimonialStoredPhotoPath(?string $filename): ?string
+{
+    if (
+        $filename === null || $filename === '' || basename($filename) !== $filename ||
+        !preg_match('/^[A-Za-z0-9._-]+$/', $filename) || $filename === '.' || $filename === '..'
+    ) {
+        return null;
+    }
+
+    $directory = ROOT_PATH . '/assets/img/testimonials';
+    $realDirectory = realpath($directory);
+    $candidate = $directory . DIRECTORY_SEPARATOR . $filename;
+    $realFile = realpath($candidate);
+
+    if ($realDirectory === false || $realFile === false || !is_file($realFile) || dirname($realFile) !== $realDirectory) {
+        return null;
+    }
+
+    return $realFile;
 }
 
-// Verificar se o depoimento existe
-$stmt = $db->prepare("SELECT * FROM _testimonials WHERE id_testimonial = ?");
-$stmt->execute([$id]);
-$testimonial = $stmt->fetch();
-
-if (!$testimonial) {
-    http_response_code(404);
-    echo json_encode(['success' => false, 'message' => 'Depoimento não encontrado.']);
-    exit;
-}
-
-// ── Apagar foto associada (se existir) ────────────────────────
-if (!empty($testimonial['photo_testimonial'])) {
-    $photoPath = ROOT_PATH . '/assets/img/testimonials/' . $testimonial['photo_testimonial'];
-    if (file_exists($photoPath)) {
-        unlink($photoPath);
+function testimonialAuditSafely(...$args): void
+{
+    try {
+        logAudit(...$args);
+    } catch (Throwable $auditError) {
+        error_log('[TESTIMONIAL AUDIT] ' . $auditError->getMessage());
     }
 }
 
-// ── Eliminar registo ──────────────────────────────────────────
-try {
-    $db->prepare("DELETE FROM _testimonials WHERE id_testimonial = ?")->execute([$id]);
+$db = $GLOBALS['pdo'] ?? null;
+if (!($db instanceof PDO)) {
+    testimonialJsonResponse(['success' => false, 'message' => 'Base de dados indisponível.'], 503);
+}
+if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+    testimonialJsonResponse(['success' => false, 'message' => 'Método não permitido.'], 405);
+}
+$csrf = $_SERVER['HTTP_X_CSRF_TOKEN'] ?? $_POST['csrf_token'] ?? '';
+if (!is_string($csrf) || !validateAdminCsrf($csrf)) {
+    testimonialJsonResponse(['success' => false, 'message' => 'Token de segurança inválido.'], 403);
+}
+$id = filter_var($_GET['id'] ?? null, FILTER_VALIDATE_INT);
+if ($id === false || $id === null || $id <= 0) {
+    testimonialJsonResponse(['success' => false, 'message' => 'ID de depoimento inválido.'], 400);
+}
 
-    // Auditoria
-    logAudit(
+try {
+    $db->beginTransaction();
+    $stmt = $db->prepare('SELECT * FROM _testimonials WHERE id_testimonial = ? FOR UPDATE');
+    $stmt->execute([$id]);
+    $testimonial = $stmt->fetch(PDO::FETCH_ASSOC);
+    if (!$testimonial) {
+        $db->rollBack();
+        testimonialJsonResponse(['success' => false, 'message' => 'Depoimento não encontrado.'], 404);
+    }
+    $stmt = $db->prepare('DELETE FROM _testimonials WHERE id_testimonial = ?');
+    $stmt->execute([$id]);
+    $db->commit();
+
+    if (!empty($testimonial['photo_testimonial'])) {
+        $photoPath = testimonialStoredPhotoPath((string)$testimonial['photo_testimonial']);
+        if ($photoPath && !@unlink($photoPath)) {
+            error_log('[DELETE TESTIMONIAL] Não foi possível remover a foto: ' . $photoPath);
+        }
+    }
+
+    testimonialAuditSafely(
         (int)$_SESSION['admin_id'],
         null,
         'testimonial.delete',
         '_testimonials',
-        $id,
-        ['name' => $testimonial['name_testimonial']],
+        (int)$id,
+        ['name' => $testimonial['name_testimonial'], 'photo' => $testimonial['photo_testimonial']],
         null
     );
-
-    echo json_encode(['success' => true, 'message' => 'Depoimento eliminado com sucesso.']);
-    exit;
-
-} catch (PDOException $e) {
-    error_log('[DELETE TESTIMONIAL] ' . $e->getMessage());
-    http_response_code(500);
-    echo json_encode(['success' => false, 'message' => 'Erro ao eliminar o depoimento.']);
-    exit;
+    testimonialJsonResponse(['success' => true, 'message' => 'Depoimento eliminado com sucesso.']);
+} catch (Throwable $error) {
+    if ($db->inTransaction()) $db->rollBack();
+    error_log('[DELETE TESTIMONIAL] ' . $error->getMessage());
+    testimonialJsonResponse(['success' => false, 'message' => 'Erro ao eliminar o depoimento.'], 500);
 }

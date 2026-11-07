@@ -35,6 +35,17 @@ download/*.pdf
 
 # Base de dados (nunca subir dumps com dados reais)
 database/seeds.sql
+*.sql.gz
+*.sql.zip
+
+# Dependências, caches e ficheiros temporários
+vendor/
+node_modules/
+storage/cache/
+storage/logs/
+*.tmp
+*.bak
+*.backup
 
 # IDE
 .vscode/

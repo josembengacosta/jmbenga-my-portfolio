@@ -42,8 +42,309 @@ if (empty($formData)) {
 }
 ?>
 <!DOCTYPE html>
-<html lang="pt" data-theme="dark" data-base-url="<?= BASE_URL ?>">
+<html lang="pt" data-theme="dark" data-base-url="<?= e(BASE_URL) ?>">
 <?php include __DIR__ . '/../../include/head.php'; ?>
+
+<style>
+.page-top {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    flex-wrap: wrap;
+    gap: 1rem;
+    margin-bottom: 1.5rem
+}
+
+.breadcrumb {
+    display: flex;
+    align-items: center;
+    gap: .5rem;
+    font-size: .78rem;
+    color: var(--text-muted);
+    margin-bottom: .5rem
+}
+
+.breadcrumb a {
+    color: var(--text-dim);
+    text-decoration: none;
+    transition: color .2s
+}
+
+.breadcrumb a:hover {
+    color: var(--accent)
+}
+
+.breadcrumb i {
+    font-size: .6rem
+}
+
+.page-title {
+    font-family: var(--font-head);
+    font-size: 1.5rem;
+    font-weight: 800;
+    letter-spacing: -.02em;
+    margin-bottom: .2rem
+}
+
+.page-sub {
+    font-size: .8rem;
+    color: var(--text-muted)
+}
+
+.alert {
+    padding: 1rem 1.2rem;
+    border-radius: var(--radius);
+    margin-bottom: 1.5rem;
+    display: flex;
+    align-items: flex-start;
+    gap: .75rem;
+    font-size: .85rem
+}
+
+.alert-success {
+    background: rgba(16, 185, 129, .1);
+    border: 1px solid rgba(16, 185, 129, .3);
+    color: #34d399
+}
+
+.alert-danger {
+    background: rgba(239, 68, 68, .1);
+    border: 1px solid rgba(239, 68, 68, .3);
+    color: #f87171
+}
+
+.alert-close {
+    margin-left: auto;
+    background: none;
+    border: none;
+    color: inherit;
+    cursor: pointer;
+    opacity: .6;
+    font-size: .9rem
+}
+
+.alert-close:hover {
+    opacity: 1
+}
+
+.form-section {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    padding: 1.8rem;
+    margin-bottom: 1.2rem;
+    transition: border-color .25s
+}
+
+.form-section:focus-within {
+    border-color: var(--border-acc)
+}
+
+.section-header {
+    display: flex;
+    align-items: flex-start;
+    gap: 1rem;
+    margin-bottom: 1.5rem;
+    padding-bottom: 1.2rem;
+    border-bottom: 1px solid var(--border)
+}
+
+.section-icon {
+    width: 40px;
+    height: 40px;
+    border-radius: 10px;
+    background: var(--accent-glow);
+    border: 1px solid var(--border-acc);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--accent);
+    font-size: .95rem;
+    flex-shrink: 0
+}
+
+.section-header h3 {
+    font-family: var(--font-head);
+    font-size: 1rem;
+    font-weight: 700;
+    margin-bottom: .15rem
+}
+
+.section-header p {
+    font-size: .78rem;
+    color: var(--text-muted)
+}
+
+.form-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1.2rem
+}
+
+.form-grid-3 {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 1.2rem
+}
+
+.form-group.full-width {
+    grid-column: 1/-1
+}
+
+@media(max-width:768px) {
+
+    .form-grid,
+    .form-grid-3 {
+        grid-template-columns: 1fr
+    }
+}
+
+.form-group {
+    display: flex;
+    flex-direction: column;
+    gap: .35rem
+}
+
+.form-label {
+    font-size: .75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: .04em;
+    color: var(--text-dim)
+}
+
+.req {
+    color: var(--danger)
+}
+
+.form-hint {
+    font-size: .72rem;
+    color: var(--text-muted);
+    line-height: 1.45
+}
+
+.form-control {
+    padding: .65rem .85rem;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    color: var(--text);
+    font-family: var(--font-body);
+    font-size: .88rem;
+    outline: none;
+    transition: border-color .2s, box-shadow .2s
+}
+
+.form-control:focus {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px var(--accent-glow)
+}
+
+.textarea-lg {
+    resize: vertical;
+    min-height: 100px;
+    line-height: 1.7
+}
+
+.switch {
+    display: flex;
+    align-items: center;
+    gap: .75rem;
+    cursor: pointer
+}
+
+.switch input {
+    display: none
+}
+
+.switch-slider {
+    width: 42px;
+    height: 24px;
+    border-radius: 12px;
+    background: var(--border);
+    transition: background .25s;
+    position: relative;
+    flex-shrink: 0
+}
+
+.switch-slider::after {
+    content: '';
+    position: absolute;
+    top: 3px;
+    left: 3px;
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    background: #fff;
+    transition: transform .25s
+}
+
+.switch input:checked+.switch-slider {
+    background: var(--accent)
+}
+
+.switch input:checked+.switch-slider::after {
+    transform: translateX(18px)
+}
+
+.switch-label {
+    font-size: .82rem;
+    font-weight: 500
+}
+
+.btn {
+    display: inline-flex;
+    align-items: center;
+    gap: .45rem;
+    padding: .55rem 1.1rem;
+    border-radius: 8px;
+    font-size: .83rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all .2s;
+    text-decoration: none;
+    border: 1px solid var(--border);
+    white-space: nowrap
+}
+
+.btn-primary {
+    background: var(--accent);
+    color: #fff;
+    border-color: var(--accent)
+}
+
+.btn-primary:hover {
+    background: #1d4ed8;
+    transform: translateY(-1px);
+    box-shadow: 0 4px 16px var(--accent-glow)
+}
+
+.btn-secondary {
+    background: transparent;
+    border: 1px solid var(--border);
+    color: var(--text-dim)
+}
+
+.btn-secondary:hover {
+    background: var(--bg-hover);
+    border-color: var(--border-acc);
+    color: var(--text)
+}
+
+.btn-lg {
+    padding: .7rem 1.5rem;
+    font-size: .9rem
+}
+
+.form-actions {
+    display: flex;
+    gap: .75rem;
+    justify-content: flex-end;
+    margin-top: 1.5rem;
+    padding-top: 1.5rem;
+    border-top: 1px solid var(--border)
+}
+</style>
 </head>
 
 <body>
@@ -85,8 +386,8 @@ if (empty($formData)) {
             <?php endif; ?>
 
             <form id="generalForm" novalidate enctype="multipart/form-data"
-                data-api="<?= BASE_URL ?>/jm-panel/settings/general-process">
-                <input type="hidden" name="csrf_token" value="<?= $_SESSION['admin_csrf_token'] ?>">
+                data-api="<?= e(BASE_URL) ?>/jm-panel/settings/general-process">
+                <input type="hidden" name="csrf_token" value="<?= e($_SESSION['admin_csrf_token'] ?? '') ?>">
 
                 <!-- SECÇÃO 1: Identidade do Site -->
                 <div class="form-section">
@@ -100,23 +401,24 @@ if (empty($formData)) {
                     <div class="form-grid">
                         <div class="form-group">
                             <label class="form-label" for="site_name">Nome do Site <span class="req">*</span></label>
-                            <input type="text" id="site_name" name="site_name" class="form-control"
+                            <input type="text" id="site_name" name="site_name" class="form-control" maxlength="120"
                                 value="<?= e($formData['site_name'] ?? 'JMbenga') ?>" required>
                         </div>
                         <div class="form-group">
                             <label class="form-label" for="version">Versão</label>
-                            <input type="text" id="version" name="version" class="form-control"
+                            <input type="text" id="version" name="version" class="form-control" maxlength="10" required
                                 value="<?= e($formData['version'] ?? '1.0') ?>" placeholder="1.0">
                         </div>
                         <div class="form-group full-width">
                             <label class="form-label" for="hero_subtitle">Subtítulo do Hero</label>
                             <input type="text" id="hero_subtitle" name="hero_subtitle" class="form-control"
-                                value="<?= e($formData['hero_subtitle'] ?? '') ?>"
+                                maxlength="300" value="<?= e($formData['hero_subtitle'] ?? '') ?>"
                                 placeholder="Transformando ideias em experiências digitais">
                         </div>
                         <div class="form-group full-width">
                             <label class="form-label" for="about_text">Texto "Sobre Mim"</label>
                             <textarea id="about_text" name="about_text" class="form-control textarea-lg" rows="4"
+                                maxlength="10000"
                                 placeholder="Texto da secção About..."><?= e($formData['about_text'] ?? '') ?></textarea>
                         </div>
                     </div>
@@ -135,17 +437,18 @@ if (empty($formData)) {
                         <div class="form-group">
                             <label class="form-label" for="years_experience">Anos de Experiência</label>
                             <input type="number" id="years_experience" name="years_experience" class="form-control"
-                                value="<?= e($formData['years_experience'] ?? '3') ?>" min="0">
+                                min="0" max="999999" step="1" required
+                                value="<?= e($formData['years_experience'] ?? '3') ?>">
                         </div>
                         <div class="form-group">
                             <label class="form-label" for="projects_count">Número de Projectos</label>
-                            <input type="number" id="projects_count" name="projects_count" class="form-control"
-                                value="<?= e($formData['projects_count'] ?? '50') ?>" min="0">
+                            <input type="number" id="projects_count" name="projects_count" class="form-control" min="0"
+                                max="999999" step="1" required value="<?= e($formData['projects_count'] ?? '50') ?>">
                         </div>
                         <div class="form-group">
                             <label class="form-label" for="clients_count">Número de Clientes</label>
-                            <input type="number" id="clients_count" name="clients_count" class="form-control"
-                                value="<?= e($formData['clients_count'] ?? '100') ?>" min="0">
+                            <input type="number" id="clients_count" name="clients_count" class="form-control" min="0"
+                                max="999999" step="1" required value="<?= e($formData['clients_count'] ?? '100') ?>">
                         </div>
                     </div>
                 </div>
@@ -164,21 +467,25 @@ if (empty($formData)) {
                             <label class="form-label" for="email_contact">Email de Contacto <span
                                     class="req">*</span></label>
                             <input type="email" id="email_contact" name="email_contact" class="form-control"
-                                value="<?= e($formData['email_contact'] ?? '') ?>" required>
+                                maxlength="254" value="<?= e($formData['email_contact'] ?? '') ?>" required>
                         </div>
                         <div class="form-group">
                             <label class="form-label" for="phone_contact">Telefone</label>
                             <input type="text" id="phone_contact" name="phone_contact" class="form-control"
-                                value="<?= e($formData['phone_contact'] ?? '') ?>" placeholder="+244 922 030 116">
+                                maxlength="30" value="<?= e($formData['phone_contact'] ?? '') ?>"
+                                placeholder="+244 922 030 116">
                         </div>
                         <div class="form-group">
                             <label class="form-label" for="location">Localização</label>
-                            <input type="text" id="location" name="location" class="form-control"
+                            <input type="text" id="location" name="location" class="form-control" maxlength="120"
                                 value="<?= e($formData['location'] ?? 'Luanda, Angola') ?>">
                         </div>
                         <div class="form-group">
                             <label class="form-label" for="cv_file">Ficheiro CV (PDF)</label>
-                            <input type="file" id="cv_file" name="cv_file" class="form-control" accept=".pdf">
+                            <input type="file" id="cv_file" name="cv_file" class="form-control"
+                                accept=".pdf,application/pdf">
+                            <span class="form-hint">PDF válido, até 5 MB. O CV actual só será substituído depois de a
+                                gravação ser confirmada.</span>
                             <?php if (!empty($configs['cv_file'])): ?>
                             <small style="color:var(--text-muted)">
                                 Actual: <strong><?= e($configs['cv_file']) ?></strong>
@@ -231,374 +538,128 @@ if (empty($formData)) {
     </div>
     <?php include __DIR__ . '/../../include/modal_logout.php'; ?>
 
-    <style>
-    .page-top {
-        display: flex;
-        justify-content: space-between;
-        align-items: flex-start;
-        flex-wrap: wrap;
-        gap: 1rem;
-        margin-bottom: 1.5rem
-    }
-
-    .breadcrumb {
-        display: flex;
-        align-items: center;
-        gap: .5rem;
-        font-size: .78rem;
-        color: var(--text-muted);
-        margin-bottom: .5rem
-    }
-
-    .breadcrumb a {
-        color: var(--text-dim);
-        text-decoration: none;
-        transition: color .2s
-    }
-
-    .breadcrumb a:hover {
-        color: var(--accent)
-    }
-
-    .breadcrumb i {
-        font-size: .6rem
-    }
-
-    .page-title {
-        font-family: var(--font-head);
-        font-size: 1.5rem;
-        font-weight: 800;
-        letter-spacing: -.02em;
-        margin-bottom: .2rem
-    }
-
-    .page-sub {
-        font-size: .8rem;
-        color: var(--text-muted)
-    }
-
-    .alert {
-        padding: 1rem 1.2rem;
-        border-radius: var(--radius);
-        margin-bottom: 1.5rem;
-        display: flex;
-        align-items: flex-start;
-        gap: .75rem;
-        font-size: .85rem
-    }
-
-    .alert-success {
-        background: rgba(16, 185, 129, .1);
-        border: 1px solid rgba(16, 185, 129, .3);
-        color: #34d399
-    }
-
-    .alert-danger {
-        background: rgba(239, 68, 68, .1);
-        border: 1px solid rgba(239, 68, 68, .3);
-        color: #f87171
-    }
-
-    .alert-close {
-        margin-left: auto;
-        background: none;
-        border: none;
-        color: inherit;
-        cursor: pointer;
-        opacity: .6;
-        font-size: .9rem
-    }
-
-    .alert-close:hover {
-        opacity: 1
-    }
-
-    .form-section {
-        background: var(--bg-card);
-        border: 1px solid var(--border);
-        border-radius: var(--radius-lg);
-        padding: 1.8rem;
-        margin-bottom: 1.2rem;
-        transition: border-color .25s
-    }
-
-    .form-section:focus-within {
-        border-color: var(--border-acc)
-    }
-
-    .section-header {
-        display: flex;
-        align-items: flex-start;
-        gap: 1rem;
-        margin-bottom: 1.5rem;
-        padding-bottom: 1.2rem;
-        border-bottom: 1px solid var(--border)
-    }
-
-    .section-icon {
-        width: 40px;
-        height: 40px;
-        border-radius: 10px;
-        background: var(--accent-glow);
-        border: 1px solid var(--border-acc);
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        color: var(--accent);
-        font-size: .95rem;
-        flex-shrink: 0
-    }
-
-    .section-header h3 {
-        font-family: var(--font-head);
-        font-size: 1rem;
-        font-weight: 700;
-        margin-bottom: .15rem
-    }
-
-    .section-header p {
-        font-size: .78rem;
-        color: var(--text-muted)
-    }
-
-    .form-grid {
-        display: grid;
-        grid-template-columns: 1fr 1fr;
-        gap: 1.2rem
-    }
-
-    .form-grid-3 {
-        display: grid;
-        grid-template-columns: repeat(3, 1fr);
-        gap: 1.2rem
-    }
-
-    .form-group.full-width {
-        grid-column: 1/-1
-    }
-
-    @media(max-width:768px) {
-
-        .form-grid,
-        .form-grid-3 {
-            grid-template-columns: 1fr
-        }
-    }
-
-    .form-group {
-        display: flex;
-        flex-direction: column;
-        gap: .35rem
-    }
-
-    .form-label {
-        font-size: .75rem;
-        font-weight: 600;
-        text-transform: uppercase;
-        letter-spacing: .04em;
-        color: var(--text-dim)
-    }
-
-    .req {
-        color: var(--danger)
-    }
-
-    .form-control {
-        padding: .65rem .85rem;
-        background: var(--bg);
-        border: 1px solid var(--border);
-        border-radius: 8px;
-        color: var(--text);
-        font-family: var(--font-body);
-        font-size: .88rem;
-        outline: none;
-        transition: border-color .2s, box-shadow .2s
-    }
-
-    .form-control:focus {
-        border-color: var(--accent);
-        box-shadow: 0 0 0 3px var(--accent-glow)
-    }
-
-    .textarea-lg {
-        resize: vertical;
-        min-height: 100px;
-        line-height: 1.7
-    }
-
-    .switch {
-        display: flex;
-        align-items: center;
-        gap: .75rem;
-        cursor: pointer
-    }
-
-    .switch input {
-        display: none
-    }
-
-    .switch-slider {
-        width: 42px;
-        height: 24px;
-        border-radius: 12px;
-        background: var(--border);
-        transition: background .25s;
-        position: relative;
-        flex-shrink: 0
-    }
-
-    .switch-slider::after {
-        content: '';
-        position: absolute;
-        top: 3px;
-        left: 3px;
-        width: 18px;
-        height: 18px;
-        border-radius: 50%;
-        background: #fff;
-        transition: transform .25s
-    }
-
-    .switch input:checked+.switch-slider {
-        background: var(--accent)
-    }
-
-    .switch input:checked+.switch-slider::after {
-        transform: translateX(18px)
-    }
-
-    .switch-label {
-        font-size: .82rem;
-        font-weight: 500
-    }
-
-    .btn {
-        display: inline-flex;
-        align-items: center;
-        gap: .45rem;
-        padding: .55rem 1.1rem;
-        border-radius: 8px;
-        font-size: .83rem;
-        font-weight: 500;
-        cursor: pointer;
-        transition: all .2s;
-        text-decoration: none;
-        border: 1px solid var(--border);
-        white-space: nowrap
-    }
-
-    .btn-primary {
-        background: var(--accent);
-        color: #fff;
-        border-color: var(--accent)
-    }
-
-    .btn-primary:hover {
-        background: #1d4ed8;
-        transform: translateY(-1px);
-        box-shadow: 0 4px 16px var(--accent-glow)
-    }
-
-    .btn-secondary {
-        background: transparent;
-        border: 1px solid var(--border);
-        color: var(--text-dim)
-    }
-
-    .btn-secondary:hover {
-        background: var(--bg-hover);
-        border-color: var(--border-acc);
-        color: var(--text)
-    }
-
-    .btn-lg {
-        padding: .7rem 1.5rem;
-        font-size: .9rem
-    }
-
-    .form-actions {
-        display: flex;
-        gap: .75rem;
-        justify-content: flex-end;
-        margin-top: 1.5rem;
-        padding-top: 1.5rem;
-        border-top: 1px solid var(--border)
-    }
-    </style>
 
     <script>
-    const form = document.getElementById('generalForm');
-    const submitBtn = document.getElementById('submitBtn');
+    (() => {
+        const form = document.getElementById('generalForm');
+        const submitBtn = document.getElementById('submitBtn');
+        const cvInput = document.getElementById('cv_file');
+        if (!form || !submitBtn) return;
 
-    function showToast(m, t = 'success') {
-        const c = document.getElementById('toast-container') || (() => {
-            const d = document.createElement('div');
-            d.id = 'toast-container';
-            d.style.cssText =
-                'position:fixed;top:1rem;right:1rem;z-index:9999;display:flex;flex-direction:column;gap:.5rem';
-            document.body.appendChild(d);
-            return d;
-        })();
-        const toast = document.createElement('div');
-        toast.className = `toast toast-${t}`;
-        toast.innerHTML = `<i class="fas fa-${t === 'success' ? 'check-circle' : 'times-circle'}"></i> ${m}`;
-        c.appendChild(toast);
-        setTimeout(() => {
-            toast.style.opacity = '0';
-            toast.style.transform = 'translateX(20px)';
-            setTimeout(() => toast.remove(), 300);
-        }, 4000);
-    }
+        function showToast(message, type = 'success') {
+            let container = document.getElementById('toast-container');
+            if (!container) {
+                container = document.createElement('div');
+                container.id = 'toast-container';
+                container.style.cssText =
+                    'position:fixed;top:1rem;right:1rem;z-index:9999;display:flex;flex-direction:column;gap:.5rem';
+                document.body.appendChild(container);
+            }
 
-    // Labels dos switches
-    document.querySelectorAll('.switch input').forEach(chk => {
-        chk.addEventListener('change', function() {
-            const label = this.parentElement.querySelector('.switch-label');
-            label.textContent = this.checked ? 'Aberto' : 'Fechado';
-        });
-    });
+            const toast = document.createElement('div');
+            toast.className = `toast toast-${type}`;
+            const icon = document.createElement('i');
+            icon.className = `fas fa-${type === 'success' ? 'check-circle' : 'times-circle'}`;
+            icon.setAttribute('aria-hidden', 'true');
+            const text = document.createElement('span');
+            text.textContent = String(message ?? '');
+            toast.append(icon, text);
+            container.appendChild(toast);
 
-    form.addEventListener('submit', async function(e) {
-        e.preventDefault();
-        let valid = true;
-        form.querySelectorAll('[required]').forEach(f => {
-            if (!f.value.trim()) {
-                f.classList.add('error');
-                valid = false;
-            } else f.classList.remove('error');
-        });
-        if (!valid) {
-            showToast('Preenche os campos obrigatórios.', 'error');
-            return;
+            window.setTimeout(() => {
+                toast.style.opacity = '0';
+                toast.style.transform = 'translateX(20px)';
+                window.setTimeout(() => toast.remove(), 300);
+            }, 4500);
         }
 
-        submitBtn.disabled = true;
-        submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> A guardar…';
-        try {
-            const fd = new FormData(form);
-            const res = await fetch(form.dataset.api, {
-                method: 'POST',
-                body: fd,
-                headers: {
-                    'X-Requested-With': 'XMLHttpRequest',
-                    'X-CSRF-Token': document.querySelector('[name="csrf_token"]').value
+        document.querySelectorAll('.switch input').forEach((checkbox) => {
+            checkbox.addEventListener('change', function() {
+                const label = this.parentElement.querySelector('.switch-label');
+                if (label) label.textContent = this.checked ? 'Aberto' : 'Fechado';
+            });
+        });
+
+        if (cvInput) {
+            cvInput.addEventListener('change', () => {
+                const file = cvInput.files && cvInput.files[0];
+                if (!file) return;
+                if (file.size > 5 * 1024 * 1024) {
+                    cvInput.value = '';
+                    showToast('O CV não pode exceder 5 MB.', 'error');
+                    return;
+                }
+                if (!/\.pdf$/i.test(file.name)) {
+                    cvInput.value = '';
+                    showToast('Selecciona um ficheiro com extensão PDF.', 'error');
                 }
             });
-            const data = await res.json();
-            if (data.success) {
-                showToast(data.message || 'Configurações guardadas!', 'success');
-                setTimeout(() => location.reload(), 1000);
-            } else {
-                if (data.errors) data.errors.forEach(err => showToast(err, 'error'));
-                else showToast(data.message || 'Erro.', 'error');
-            }
-        } catch (err) {
-            showToast('Erro de rede.', 'error');
-        } finally {
-            submitBtn.disabled = false;
-            submitBtn.innerHTML = '<i class="fas fa-save"></i> Guardar Todas as Alterações';
         }
-    });
+
+        form.addEventListener('submit', async (event) => {
+            event.preventDefault();
+
+            if (!form.checkValidity()) {
+                form.reportValidity();
+                showToast('Verifica os campos obrigatórios e os valores introduzidos.', 'error');
+                return;
+            }
+
+            const apiUrl = form.dataset.api;
+            const csrfInput = form.querySelector('[name="csrf_token"]');
+            if (!apiUrl || !csrfInput || !csrfInput.value) {
+                showToast('Não foi possível validar o formulário. Actualiza a página.', 'error');
+                return;
+            }
+
+            submitBtn.disabled = true;
+            submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> A guardar…';
+            let saved = false;
+
+            try {
+                const response = await fetch(apiUrl, {
+                    method: 'POST',
+                    body: new FormData(form),
+                    headers: {
+                        'X-Requested-With': 'XMLHttpRequest',
+                        'X-CSRF-Token': csrfInput.value
+                    },
+                    credentials: 'same-origin'
+                });
+
+                const rawResponse = await response.text();
+                let data;
+                try {
+                    data = JSON.parse(rawResponse);
+                } catch (parseError) {
+                    throw new Error(`Resposta inválida do servidor (HTTP ${response.status}).`);
+                }
+
+                if (!response.ok || !data || data.success !== true) {
+                    const errors = Array.isArray(data && data.errors) ? data.errors : [];
+                    if (errors.length) {
+                        errors.forEach((error) => showToast(error, 'error'));
+                    } else {
+                        showToast((data && data.message) ||
+                            `Não foi possível guardar (HTTP ${response.status}).`, 'error');
+                    }
+                    return;
+                }
+
+                saved = true;
+                showToast(data.message || 'Configurações guardadas com sucesso.', 'success');
+                window.setTimeout(() => window.location.reload(), 900);
+            } catch (error) {
+                showToast(error instanceof Error ? error.message :
+                    'Falha de comunicação com o servidor.', 'error');
+            } finally {
+                if (!saved) {
+                    submitBtn.disabled = false;
+                    submitBtn.innerHTML = '<i class="fas fa-save"></i> Guardar Todas as Alterações';
+                }
+            }
+        });
+    })();
     </script>
 </body>
 

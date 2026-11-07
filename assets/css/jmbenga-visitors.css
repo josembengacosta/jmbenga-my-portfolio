@@ -1,0 +1,129 @@
+/* ══════════════════════════════════════════════════════════════
+   JMbenga Portfolio — Visitantes
+   Componentes adicionais da gestão de visitantes
+   ══════════════════════════════════════════════════════════════ */
+
+.visitors-list-page .bulk-selection-toolbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: .85rem;
+    margin-bottom: 1rem;
+    padding: .85rem 1rem;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+}
+
+.visitors-list-page .bulk-selection-copy {
+    display: flex;
+    flex-direction: column;
+    gap: .2rem;
+    min-width: 0;
+}
+
+.visitors-list-page .bulk-selection-copy strong {
+    color: var(--text);
+    font-size: .84rem;
+    font-weight: 700;
+}
+
+.visitors-list-page .bulk-selection-copy span {
+    color: var(--text-muted);
+    font-size: .72rem;
+    line-height: 1.45;
+}
+
+.visitors-list-page .bulk-delete-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: .5rem;
+    padding: .55rem .9rem;
+    border: 1px solid var(--danger);
+    border-radius: 8px;
+    background: var(--danger);
+    color: #fff;
+    font-size: .8rem;
+    font-weight: 600;
+    white-space: nowrap;
+    cursor: pointer;
+    transition: opacity .2s, transform .2s, background .2s;
+}
+
+.visitors-list-page .bulk-delete-btn:hover:not(:disabled) {
+    background: #dc2626;
+    border-color: #dc2626;
+    transform: translateY(-1px);
+}
+
+.visitors-list-page .bulk-delete-btn:disabled {
+    opacity: .42;
+    cursor: not-allowed;
+    transform: none;
+}
+
+.visitors-list-page .visitor-select-col {
+    width: 42px;
+    min-width: 42px;
+    text-align: center !important;
+}
+
+.visitors-list-page .visitor-select,
+.visitors-list-page #selectPageVisitors {
+    width: 16px;
+    height: 16px;
+    margin: 0;
+    vertical-align: middle;
+    accent-color: var(--accent);
+    cursor: pointer;
+}
+
+.visitors-list-page .visitor-select:disabled {
+    opacity: .35;
+    cursor: not-allowed;
+}
+
+.visitors-list-page #selectPageVisitors:disabled {
+    opacity: .35;
+    cursor: not-allowed;
+}
+
+.visitors-list-page .visitor-select:focus-visible,
+.visitors-list-page #selectPageVisitors:focus-visible,
+.visitors-list-page .bulk-delete-btn:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 3px;
+}
+
+.visitors-online-page .online-live-status {
+    display: inline-flex;
+    align-items: center;
+    gap: .35rem;
+    color: var(--success);
+}
+
+.visitors-online-page .online-live-status .fa-circle {
+    font-size: .45rem;
+}
+
+@media (max-width: 640px) {
+    .visitors-list-page .bulk-selection-toolbar {
+        align-items: stretch;
+    }
+
+    .visitors-list-page .bulk-delete-btn {
+        width: 100%;
+    }
+
+    .visitors-list-page .table-card {
+        padding: .8rem;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .visitors-list-page .bulk-delete-btn {
+        transition: none;
+    }
+}

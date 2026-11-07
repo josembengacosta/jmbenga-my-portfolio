@@ -31,353 +31,11 @@ $totalDevices = array_sum(array_column($devices, 'total'));
 <!DOCTYPE html>
 <html lang="pt" data-theme="dark" data-base-url="<?= BASE_URL ?>">
 <?php include __DIR__ . '/../../include/head.php'; ?>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link
-    href="https://fonts.googleapis.com/css2?family=Syne:wght@600;700;800&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap"
-    rel="stylesheet">
+<link rel="stylesheet" href="<?= BASE_URL ?>/assets/css/jmbenga-analytics.css?v=20261030">
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
-<style>
-:root {
-    --an-card: #0d1117;
-    --an-border: rgba(148, 163, 184, .09);
-    --an-border-h: rgba(148, 163, 184, .2);
-    --an-radius: 13px;
-    --an-text: #e2e8f0;
-    --an-dim: #94a3b8;
-    --an-muted: #475569;
-    --c-blue: #5b8dee;
-    --c-teal: #2dd4bf;
-    --c-amber: #fbbf24;
-    --c-purple: #a78bfa;
-    --c-rose: #f87171;
-    --c-green: #34d399;
-    --fh: 'Syne', var(--font-head, sans-serif);
-    --fb: 'IBM Plex Sans', var(--font-body, sans-serif);
-    --fm: 'IBM Plex Mono', monospace;
-}
 
-.page-top {
-    display: flex;
-    justify-content: space-between;
-    align-items: flex-start;
-    flex-wrap: wrap;
-    gap: 1rem;
-    margin-bottom: 1.2rem
-}
-
-.breadcrumb {
-    display: flex;
-    align-items: center;
-    gap: .4rem;
-    font-size: .73rem;
-    color: var(--an-muted);
-    margin-bottom: .4rem;
-    font-family: var(--fb)
-}
-
-.breadcrumb a {
-    color: var(--an-dim);
-    text-decoration: none;
-    transition: color .18s
-}
-
-.breadcrumb a:hover {
-    color: var(--c-blue)
-}
-
-.breadcrumb .sep {
-    font-size: .5rem;
-    opacity: .45
-}
-
-.page-title {
-    font-family: var(--fh);
-    font-size: 1.6rem;
-    font-weight: 800;
-    letter-spacing: -.03em;
-    color: var(--an-text);
-    margin-bottom: .2rem;
-    line-height: 1.1
-}
-
-.page-sub {
-    font-size: .77rem;
-    color: var(--an-muted);
-    font-family: var(--fb)
-}
-
-.an-nav {
-    display: flex;
-    gap: .2rem;
-    padding: .3rem;
-    background: var(--an-card);
-    border: 1px solid var(--an-border);
-    border-radius: 11px;
-    margin-bottom: 1.5rem;
-    width: fit-content;
-    flex-wrap: wrap
-}
-
-.an-nav-item {
-    display: inline-flex;
-    align-items: center;
-    gap: .38rem;
-    padding: .42rem .9rem;
-    border-radius: 8px;
-    font-size: .76rem;
-    font-weight: 600;
-    color: var(--an-dim);
-    text-decoration: none;
-    transition: all .18s;
-    font-family: var(--fb);
-    white-space: nowrap
-}
-
-.an-nav-item:hover {
-    color: var(--an-text);
-    background: rgba(255, 255, 255, .05)
-}
-
-.an-nav-item.active {
-    background: var(--c-blue);
-    color: #fff;
-    box-shadow: 0 2px 14px rgba(91, 141, 238, .35)
-}
-
-.chart-card,
-.table-card {
-    background: var(--an-card);
-    border: 1px solid var(--an-border);
-    border-radius: var(--an-radius);
-    padding: 1.4rem 1.5rem;
-    transition: border-color .2s
-}
-
-.chart-card:hover,
-.table-card:hover {
-    border-color: var(--an-border-h)
-}
-
-.card-hd {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: 1.1rem
-}
-
-.card-hd h3 {
-    font-family: var(--fh);
-    font-size: .9rem;
-    font-weight: 700;
-    color: var(--an-text);
-    letter-spacing: -.01em
-}
-
-.card-hd .card-badge {
-    font-family: var(--fm);
-    font-size: .7rem;
-    color: var(--an-muted)
-}
-
-.chart-wrap {
-    position: relative;
-    width: 100%
-}
-
-.g11 {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 1rem;
-    margin-bottom: 1rem
-}
-
-@media(max-width:1200px) {
-    .g11 {
-        grid-template-columns: 1fr
-    }
-}
-
-.mini-table {
-    width: 100%;
-    border-collapse: collapse
-}
-
-.mini-table th {
-    padding: .4rem .5rem;
-    text-align: left;
-    font-size: .62rem;
-    font-weight: 700;
-    text-transform: uppercase;
-    letter-spacing: .07em;
-    color: var(--an-muted);
-    border-bottom: 1px solid var(--an-border);
-    font-family: var(--fb);
-    white-space: nowrap
-}
-
-.mini-table td {
-    padding: .55rem .5rem;
-    font-size: .79rem;
-    border-bottom: 1px solid var(--an-border);
-    color: var(--an-text);
-    font-family: var(--fb)
-}
-
-.mini-table tbody tr:last-child td {
-    border-bottom: none
-}
-
-.mini-table tbody tr:hover td {
-    background: rgba(255, 255, 255, .025)
-}
-
-.pg-wrap {
-    display: flex;
-    align-items: center;
-    gap: .5rem
-}
-
-.pg-bar {
-    flex: 1;
-    height: 3px;
-    background: rgba(255, 255, 255, .07);
-    border-radius: 4px;
-    overflow: hidden
-}
-
-.pg-fill {
-    height: 100%;
-    border-radius: 4px;
-    background: var(--pf, var(--c-blue));
-    width: 0;
-    transition: width .7s cubic-bezier(.4, 0, .2, 1)
-}
-
-.pg-num {
-    font-family: var(--fm);
-    font-size: .72rem;
-    color: var(--an-dim);
-    min-width: 26px;
-    text-align: right
-}
-
-.pg-pct {
-    font-family: var(--fm);
-    font-size: .65rem;
-    color: var(--an-muted);
-    min-width: 34px;
-    text-align: right
-}
-
-.btn {
-    display: inline-flex;
-    align-items: center;
-    gap: .4rem;
-    padding: .5rem 1rem;
-    border-radius: 9px;
-    font-size: .78rem;
-    font-weight: 600;
-    cursor: pointer;
-    transition: all .18s;
-    text-decoration: none;
-    border: 1px solid var(--an-border);
-    font-family: var(--fb);
-    white-space: nowrap
-}
-
-.btn-ghost {
-    background: transparent;
-    color: var(--an-dim)
-}
-
-.btn-ghost:hover {
-    background: rgba(255, 255, 255, .055);
-    border-color: var(--an-border-h);
-    color: var(--an-text)
-}
-
-/* Device type stat pills */
-.dev-pills {
-    display: flex;
-    flex-wrap: wrap;
-    gap: .5rem;
-    margin-bottom: 1.2rem
-}
-
-.dev-pill {
-    display: flex;
-    align-items: center;
-    gap: .5rem;
-    padding: .5rem .9rem;
-    border-radius: 8px;
-    background: rgba(255, 255, 255, .04);
-    border: 1px solid var(--an-border);
-    flex: 1;
-    min-width: 100px
-}
-
-.dev-pill-dot {
-    width: 8px;
-    height: 8px;
-    border-radius: 50%;
-    flex-shrink: 0
-}
-
-.dev-pill-name {
-    font-size: .75rem;
-    font-family: var(--fb);
-    color: var(--an-dim);
-    flex: 1
-}
-
-.dev-pill-val {
-    font-family: var(--fm);
-    font-size: .82rem;
-    color: var(--an-text);
-    font-weight: 500
-}
-
-.dev-pill-pct {
-    font-family: var(--fm);
-    font-size: .68rem;
-    color: var(--an-muted)
-}
-
-@keyframes fadeUp {
-    from {
-        opacity: 0;
-        transform: translateY(10px)
-    }
-
-    to {
-        opacity: 1;
-        transform: translateY(0)
-    }
-}
-
-.an-a {
-    animation: fadeUp .38s ease both
-}
-
-.d1 {
-    animation-delay: .04s
-}
-
-.d2 {
-    animation-delay: .08s
-}
-
-.d3 {
-    animation-delay: .12s
-}
-
-.d4 {
-    animation-delay: .16s
-}
-</style>
-
-<body>
+<body class="analytics-page">
     <?php include __DIR__ . '/../../include/sidebar.php'; ?>
     <div class="main">
         <?php include __DIR__ . '/../../include/header.php'; ?>
@@ -395,7 +53,7 @@ $totalDevices = array_sum(array_column($devices, 'total'));
                     <h1 class="page-title">Dispositivos</h1>
                     <p class="page-sub"><?= number_format($totalDevices) ?> visitantes analisados</p>
                 </div>
-                <a href="<?= BASE_URL ?>/jm-panel/analytics" class="btn btn-ghost">
+                <a href="<?= BASE_URL ?>/jm-panel/analytics" class="btn btn-secondary">
                     <i class="fas fa-arrow-left"></i> Analytics
                 </a>
             </div>
@@ -418,12 +76,12 @@ $totalDevices = array_sum(array_column($devices, 'total'));
 
             <!-- Device type summary pills -->
             <?php
-    $devColors = ['desktop'=>'#5b8dee','mobile'=>'#2dd4bf','tablet'=>'#fbbf24','bot'=>'#f87171','unknown'=>'#64748b'];
+    $devColors = ['desktop'=>'var(--c-blue)','mobile'=>'var(--c-teal)','tablet'=>'var(--c-amber)','bot'=>'var(--c-rose)','unknown'=>'var(--an-muted)'];
     $devIcons  = ['desktop'=>'fa-desktop','mobile'=>'fa-mobile-alt','tablet'=>'fa-tablet-alt','bot'=>'fa-robot','unknown'=>'fa-question-circle'];
     ?>
             <div class="dev-pills an-a d1">
                 <?php foreach ($devices as $d): ?>
-                <?php $clr = $devColors[$d['device_type']] ?? '#64748b'; $pct = $totalDevices > 0 ? round($d['total']/$totalDevices*100) : 0; ?>
+                <?php $clr = $devColors[$d['device_type']] ?? 'var(--an-muted)'; $pct = $totalDevices > 0 ? round($d['total']/$totalDevices*100) : 0; ?>
                 <div class="dev-pill">
                     <div class="dev-pill-dot" style="background:<?= $clr ?>"></div>
                     <i class="fas <?= $devIcons[$d['device_type']] ?? 'fa-question' ?>"
@@ -533,13 +191,41 @@ $totalDevices = array_sum(array_column($devices, 'total'));
     <?php include __DIR__ . '/../../include/modal_logout.php'; ?>
 
     <script>
-    Chart.defaults.font.family = "'IBM Plex Sans', sans-serif";
+    const anRoot = getComputedStyle(document.documentElement);
+    const anVar = (name, fallback) => anRoot.getPropertyValue(name).trim() || fallback;
+    const anTheme = {
+        accent: anVar('--accent', '#2563eb'),
+        teal: anVar('--teal', '#14b8a6'),
+        warning: anVar('--warning', '#f59e0b'),
+        purple: anVar('--purple', '#8b5cf6'),
+        danger: anVar('--danger', '#ef4444'),
+        success: anVar('--success', '#10b981'),
+        text: anVar('--text', '#e2e8f4'),
+        dim: anVar('--text-dim', '#8896aa'),
+        muted: anVar('--text-muted', '#4a5568'),
+        card: anVar('--bg-card', '#101624'),
+        border: anVar('--border', 'rgba(255,255,255,.07)')
+    };
+    const anRgba = (color, alpha) => {
+        let hex = String(color).trim().replace('#', '');
+        if (hex.length === 3) hex = hex.split('').map(ch => ch + ch).join('');
+        if (!/^[0-9a-f]{6}$/i.test(hex)) return `rgba(37,99,235,${alpha})`;
+        const value = parseInt(hex, 16);
+        return `rgba(${(value >> 16) & 255},${(value >> 8) & 255},${value & 255},${alpha})`;
+    };
+    if (window.Chart) {
+        Chart.defaults.font.family = getComputedStyle(document.body).fontFamily || 'sans-serif';
+        Chart.defaults.color = anTheme.muted;
+    }
+
+
+    Chart.defaults.font.family = getComputedStyle(document.body).fontFamily || 'sans-serif';
     const tooltipOpts = {
-        backgroundColor: '#0d1117',
-        borderColor: 'rgba(148,163,184,.15)',
+        backgroundColor: anTheme.card,
+        borderColor: anTheme.border,
         borderWidth: 1,
-        titleColor: '#e2e8f0',
-        bodyColor: '#94a3b8',
+        titleColor: anTheme.text,
+        bodyColor: anTheme.dim,
         padding: 10,
         cornerRadius: 8,
         displayColors: false
@@ -551,14 +237,16 @@ $totalDevices = array_sum(array_column($devices, 'total'));
     }, 300);
 
     // Doughnut
-    const devData = <?= json_encode($devices) ?>;
+    const devData = <?= json_encode($devices, JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP) ?>;
     new Chart(document.getElementById('deviceChart'), {
         type: 'doughnut',
         data: {
             labels: devData.map(d => d.device_type.charAt(0).toUpperCase() + d.device_type.slice(1)),
             datasets: [{
                 data: devData.map(d => d.total),
-                backgroundColor: ['#5b8dee', '#2dd4bf', '#fbbf24', '#a78bfa', '#f87171'],
+                backgroundColor: [anTheme.accent, anTheme.teal, anTheme.warning, anTheme.purple, anTheme
+                    .danger
+                ],
                 borderWidth: 0,
                 hoverOffset: 8
             }]
@@ -571,7 +259,7 @@ $totalDevices = array_sum(array_column($devices, 'total'));
                 legend: {
                     position: 'bottom',
                     labels: {
-                        color: '#94a3b8',
+                        color: anTheme.dim,
                         padding: 16,
                         usePointStyle: true,
                         font: {
@@ -585,11 +273,11 @@ $totalDevices = array_sum(array_column($devices, 'total'));
     });
 
     // OS bar
-    const osData = <?= json_encode($osData) ?>;
+    const osData = <?= json_encode($osData, JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP) ?>;
     const osCtx = document.getElementById('osChart').getContext('2d');
     const osGrad = osCtx.createLinearGradient(0, 0, 400, 0);
-    osGrad.addColorStop(0, '#2dd4bf');
-    osGrad.addColorStop(1, '#5b8dee');
+    osGrad.addColorStop(0, anTheme.teal);
+    osGrad.addColorStop(1, anTheme.accent);
     new Chart(osCtx, {
         type: 'bar',
         data: {
@@ -615,10 +303,10 @@ $totalDevices = array_sum(array_column($devices, 'total'));
                 x: {
                     beginAtZero: true,
                     grid: {
-                        color: 'rgba(255,255,255,.05)'
+                        color: anTheme.border
                     },
                     ticks: {
-                        color: '#475569'
+                        color: anTheme.muted
                     }
                 },
                 y: {
@@ -626,7 +314,7 @@ $totalDevices = array_sum(array_column($devices, 'total'));
                         display: false
                     },
                     ticks: {
-                        color: '#94a3b8'
+                        color: anTheme.dim
                     }
                 }
             }

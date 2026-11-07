@@ -22,7 +22,7 @@ $loginTime   = $_SESSION['admin_login_time'] ?? time();
 $sessionMins = floor((time() - $loginTime) / 60);
 
 // ── Carregar todas as configurações do site ──────────────────
-$configs = $db->query("SELECT * FROM _site_config ORDER BY config_group, config_key")->fetchAll();
+$configs = $db->query("SELECT config_key, config_value, config_group FROM _site_config ORDER BY config_group, config_key")->fetchAll(PDO::FETCH_ASSOC);
 
 // Agrupar por grupo
 $grouped = [];
@@ -31,7 +31,7 @@ foreach ($configs as $c) {
 }
 
 // ── Estado da plataforma ────────────────────────────────────
-$platform = $db->query("SELECT * FROM _platform WHERE id_platform = 1")->fetch();
+$platform = $db->query("SELECT status, version, maintenance_msg, maintenance_end, allow_contact, allow_feedback FROM _platform WHERE id_platform = 1 LIMIT 1")->fetch(PDO::FETCH_ASSOC);
 $siteStatus      = $platform['status'] ?? 'active';
 $siteVersion     = $platform['version'] ?? '1.0';
 $maintenanceMsg  = $platform['maintenance_msg'] ?? '';
@@ -42,7 +42,6 @@ $allowFeedback   = $platform['allow_feedback'] ?? 1;
 <!DOCTYPE html>
 <html lang="pt" data-theme="dark" data-base-url="<?= BASE_URL ?>">
 <?php include __DIR__ . '/../../include/head.php'; ?>
-</head>
 <style>
 .page-top {
     display: flex;
@@ -91,7 +90,7 @@ $allowFeedback   = $platform['allow_feedback'] ?? 1;
 
 .settings-nav {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 320px), 1fr));
     gap: 1rem
 }
 
@@ -295,6 +294,8 @@ $allowFeedback   = $platform['allow_feedback'] ?? 1;
     color: var(--text)
 }
 </style>
+</head>
+
 
 <body>
     <?php include __DIR__ . '/../../include/sidebar.php'; ?>
@@ -345,7 +346,7 @@ $allowFeedback   = $platform['allow_feedback'] ?? 1;
                             class="fas fa-palette"></i></div>
                     <div>
                         <h3>Aparência</h3>
-                        <p>Cor de destaque, modo escuro padrão, logo</p>
+                        <p>Cores, tema, tipografia e imagens do site</p>
                     </div>
                     <i class="fas fa-chevron-right arrow"></i>
                 </a>

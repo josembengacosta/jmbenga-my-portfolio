@@ -119,6 +119,11 @@ try {
     // A sessão actual continua activa; só se remove o token/cookie de acesso persistente.
     clearAdminRememberCookie($adminId);
 
+    // Renovar o identificador após a alteração da credencial, sem invalidar a sessão actual.
+    if (!session_regenerate_id(true)) {
+        error_log('[CHANGE PASSWORD] Não foi possível regenerar o ID da sessão após a alteração da senha.');
+    }
+
     // Rodar o CSRF após a operação sensível e devolver o novo token para o formulário.
     regenerateAdminCsrf();
 

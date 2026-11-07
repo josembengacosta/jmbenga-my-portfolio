@@ -1,10 +1,12 @@
 <?php
 // ══════════════════════════════════════════════════════════════
-// JMbenga Portfolio — Desbloquear Visitante
+// JMbenga Portfolio — Desbloquear Visitante (AJAX)
 // ══════════════════════════════════════════════════════════════
+
 require_once __DIR__ . '/../../include/functions_admin.php';
 
 startAdminSession();
+checkAdminRememberMe();
 requireAdminLogin();
 requireNoLockscreen();
 
@@ -12,40 +14,93 @@ header('Content-Type: application/json; charset=utf-8');
 
 $db = $GLOBALS['pdo'];
 
-if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
-    http_response_code(405);
-    echo json_encode(['success' => false, 'message' => 'Método não permitido.']);
+function visitorStatusJson(array $payload, int $statusCode = 200): void
+{
+    http_response_code($statusCode);
+    echo json_encode($payload, JSON_UNESCAPED_UNICODE | JSON_INVALID_UTF8_SUBSTITUTE);
     exit;
 }
 
-$token = $_SERVER['HTTP_X_CSRF_TOKEN'] ?? '';
-if (!validateAdminCsrf($token)) {
-    http_response_code(403);
-    echo json_encode(['success' => false, 'message' => 'Token inválido.']);
-    exit;
+if (($_SERVER['REQUEST_METHOD'] ?? '') !== 'POST') {
+    header('Allow: POST');
+    visitorStatusJson(['success' => false, 'message' => 'Método não permitido.'], 405);
 }
 
-$id = (int)($_GET['id'] ?? 0);
-if ($id <= 0) {
-    http_response_code(400);
-    echo json_encode(['success' => false, 'message' => 'ID inválido.']);
-    exit;
+$token = $_SERVER['HTTP_X_CSRF_TOKEN'] ?? $_POST['csrf_token'] ?? '';
+if (!is_string($token) || !validateAdminCsrf($token)) {
+    visitorStatusJson(['success' => false, 'message' => 'Token de segurança inválido.'], 403);
 }
 
-$stmt = $db->prepare("SELECT * FROM _visitor WHERE id_visitor = ?");
-$stmt->execute([$id]);
-$visitor = $stmt->fetch();
-
-if (!$visitor) {
-    http_response_code(404);
-    echo json_encode(['success' => false, 'message' => 'Visitante não encontrado.']);
-    exit;
+$id = filter_var($_GET['id'] ?? null, FILTER_VALIDATE_INT, ['options' => ['min_range' => 1]]);
+if (!$id) {
+    visitorStatusJson(['success' => false, 'message' => 'ID de visitante inválido.'], 400);
 }
 
-$db->prepare("UPDATE _visitor SET status_visitor = 'active', block_type = NULL, block_reason = NULL, block_until = NULL, blocked_by = NULL, blocked_at = NULL WHERE id_visitor = ?")
-   ->execute([$id]);
+try {
+    $db->beginTransaction();
 
-logAudit((int)$_SESSION['admin_id'], null, 'visitor.unblock', '_visitor', $id, ['status' => $visitor['status_visitor']], ['status' => 'active']);
+    $stmt = $db->prepare("
+        SELECT id_visitor, status_visitor
+        FROM _visitor
+        WHERE id_visitor = ?
+        FOR UPDATE
+    ");
+    $stmt->execute([$id]);
+    $visitor = $stmt->fetch(PDO::FETCH_ASSOC);
 
-echo json_encode(['success' => true, 'message' => 'Visitante desbloqueado com sucesso.']);
-exit;
+    if (!$visitor) {
+        $db->rollBack();
+        visitorStatusJson(['success' => false, 'message' => 'Visitante não encontrado.'], 404);
+    }
+
+    if ($visitor['status_visitor'] === 'active') {
+        $db->commit();
+        visitorStatusJson([
+            'success' => true,
+            'message' => 'O visitante já se encontra desbloqueado.',
+            'status_visitor' => 'active'
+        ]);
+    }
+
+    $update = $db->prepare("UPDATE _visitor
+            SET status_visitor = 'active',
+                block_type = NULL,
+                block_reason = NULL,
+                block_until = NULL,
+                blocked_by = NULL,
+                blocked_at = NULL
+            WHERE id_visitor = ?");
+    $update->execute([$id]);
+
+    $db->commit();
+
+    try {
+        logAudit(
+            (int)$_SESSION['admin_id'],
+            null,
+            'visitor.unblock',
+            '_visitor',
+            (int)$id,
+            ['status' => $visitor['status_visitor']],
+            ['status' => 'active']
+        );
+    } catch (Throwable $auditError) {
+        error_log('[VISITOR STATUS AUDIT] ' . $auditError->getMessage());
+    }
+
+    visitorStatusJson([
+        'success' => true,
+        'message' => 'Visitante desbloqueado com sucesso.',
+        'status_visitor' => 'active'
+    ]);
+} catch (Throwable $error) {
+    if ($db->inTransaction()) {
+        $db->rollBack();
+    }
+
+    error_log('[VISITOR STATUS] ' . $error->getMessage());
+    visitorStatusJson([
+        'success' => false,
+        'message' => 'Não foi possível actualizar o estado do visitante.'
+    ], 500);
+}

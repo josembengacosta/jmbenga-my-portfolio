@@ -50,410 +50,11 @@ $todayDelta = $totalYesterday > 0 ? round(($totalToday - $totalYesterday) / $tot
 <!DOCTYPE html>
 <html lang="pt" data-theme="dark" data-base-url="<?= BASE_URL ?>">
 <?php include __DIR__ . '/../../include/head.php'; ?>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link
-    href="https://fonts.googleapis.com/css2?family=Syne:wght@600;700;800&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap"
-    rel="stylesheet">
+<link rel="stylesheet" href="<?= BASE_URL ?>/assets/css/jmbenga-analytics.css?v=20261030">
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
-<style>
-:root {
-    --an-card: #0d1117;
-    --an-border: rgba(148, 163, 184, .09);
-    --an-border-h: rgba(148, 163, 184, .2);
-    --an-radius: 13px;
-    --an-text: #e2e8f0;
-    --an-dim: #94a3b8;
-    --an-muted: #475569;
-    --c-blue: #5b8dee;
-    --c-teal: #2dd4bf;
-    --c-amber: #fbbf24;
-    --c-purple: #a78bfa;
-    --c-rose: #f87171;
-    --c-green: #34d399;
-    --fh: 'Syne', var(--font-head, sans-serif);
-    --fb: 'IBM Plex Sans', var(--font-body, sans-serif);
-    --fm: 'IBM Plex Mono', monospace;
-}
 
-.page-top {
-    display: flex;
-    justify-content: space-between;
-    align-items: flex-start;
-    flex-wrap: wrap;
-    gap: 1rem;
-    margin-bottom: 1.2rem
-}
-
-.breadcrumb {
-    display: flex;
-    align-items: center;
-    gap: .4rem;
-    font-size: .73rem;
-    color: var(--an-muted);
-    margin-bottom: .4rem;
-    font-family: var(--fb)
-}
-
-.breadcrumb a {
-    color: var(--an-dim);
-    text-decoration: none;
-    transition: color .18s
-}
-
-.breadcrumb a:hover {
-    color: var(--c-blue)
-}
-
-.breadcrumb .sep {
-    font-size: .5rem;
-    opacity: .45
-}
-
-.page-title {
-    font-family: var(--fh);
-    font-size: 1.6rem;
-    font-weight: 800;
-    letter-spacing: -.03em;
-    color: var(--an-text);
-    margin-bottom: .2rem;
-    line-height: 1.1
-}
-
-.page-sub {
-    font-size: .77rem;
-    color: var(--an-muted);
-    font-family: var(--fb)
-}
-
-.an-nav {
-    display: flex;
-    gap: .2rem;
-    padding: .3rem;
-    background: var(--an-card);
-    border: 1px solid var(--an-border);
-    border-radius: 11px;
-    margin-bottom: 1.5rem;
-    width: fit-content;
-    flex-wrap: wrap
-}
-
-.an-nav-item {
-    display: inline-flex;
-    align-items: center;
-    gap: .38rem;
-    padding: .42rem .9rem;
-    border-radius: 8px;
-    font-size: .76rem;
-    font-weight: 600;
-    color: var(--an-dim);
-    text-decoration: none;
-    transition: all .18s;
-    font-family: var(--fb);
-    white-space: nowrap
-}
-
-.an-nav-item:hover {
-    color: var(--an-text);
-    background: rgba(255, 255, 255, .05)
-}
-
-.an-nav-item.active {
-    background: var(--c-blue);
-    color: #fff;
-    box-shadow: 0 2px 14px rgba(91, 141, 238, .35)
-}
-
-/* KPI */
-.kpi-row {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-    gap: .7rem;
-    margin-bottom: 1.3rem
-}
-
-.kpi-card {
-    background: var(--an-card);
-    border: 1px solid var(--an-border);
-    border-radius: var(--an-radius);
-    padding: 1.1rem 1.2rem;
-    position: relative;
-    overflow: hidden;
-    transition: border-color .2s, box-shadow .2s, transform .2s;
-    cursor: default
-}
-
-.kpi-card::after {
-    content: '';
-    position: absolute;
-    top: 0;
-    left: 0;
-    right: 0;
-    height: 2px;
-    background: var(--kc, var(--c-blue));
-    opacity: 0;
-    transition: opacity .2s
-}
-
-.kpi-card:hover {
-    border-color: var(--an-border-h);
-    transform: translateY(-2px);
-    box-shadow: 0 8px 28px rgba(0, 0, 0, .3)
-}
-
-.kpi-card:hover::after {
-    opacity: 1
-}
-
-.kpi-top {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    margin-bottom: .7rem
-}
-
-.kpi-icon {
-    width: 32px;
-    height: 32px;
-    border-radius: 8px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: .8rem;
-    background: rgba(255, 255, 255, .06);
-    color: var(--kc, var(--c-blue))
-}
-
-.kpi-val {
-    font-family: var(--fm);
-    font-size: 1.65rem;
-    font-weight: 500;
-    letter-spacing: -.03em;
-    color: var(--an-text);
-    line-height: 1;
-    margin-bottom: 3px
-}
-
-.kpi-lbl {
-    font-size: .63rem;
-    color: var(--an-muted);
-    font-family: var(--fb);
-    font-weight: 700;
-    text-transform: uppercase;
-    letter-spacing: .07em
-}
-
-.kpi-delta {
-    font-size: .68rem;
-    font-family: var(--fb);
-    margin-top: .3rem
-}
-
-.kpi-delta.up {
-    color: var(--c-green)
-}
-
-.kpi-delta.down {
-    color: var(--c-rose)
-}
-
-/* Cards */
-.chart-card,
-.table-card {
-    background: var(--an-card);
-    border: 1px solid var(--an-border);
-    border-radius: var(--an-radius);
-    padding: 1.4rem 1.5rem;
-    transition: border-color .2s
-}
-
-.chart-card:hover,
-.table-card:hover {
-    border-color: var(--an-border-h)
-}
-
-.card-hd {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: 1.1rem
-}
-
-.card-hd h3 {
-    font-family: var(--fh);
-    font-size: .9rem;
-    font-weight: 700;
-    color: var(--an-text);
-    letter-spacing: -.01em
-}
-
-.card-hd .card-meta {
-    font-family: var(--fm);
-    font-size: .7rem;
-    color: var(--an-muted)
-}
-
-.chart-wrap {
-    position: relative;
-    width: 100%
-}
-
-.g21 {
-    display: grid;
-    grid-template-columns: 2fr 1fr;
-    gap: 1rem;
-    margin-bottom: 1rem
-}
-
-@media(max-width:1200px) {
-    .g21 {
-        grid-template-columns: 1fr
-    }
-}
-
-/* Table */
-.mini-table {
-    width: 100%;
-    border-collapse: collapse
-}
-
-.mini-table th {
-    padding: .4rem .5rem;
-    text-align: left;
-    font-size: .62rem;
-    font-weight: 700;
-    text-transform: uppercase;
-    letter-spacing: .07em;
-    color: var(--an-muted);
-    border-bottom: 1px solid var(--an-border);
-    font-family: var(--fb);
-    white-space: nowrap
-}
-
-.mini-table td {
-    padding: .55rem .5rem;
-    font-size: .79rem;
-    border-bottom: 1px solid var(--an-border);
-    color: var(--an-text);
-    font-family: var(--fb)
-}
-
-.mini-table tbody tr:last-child td {
-    border-bottom: none
-}
-
-.mini-table tbody tr:hover td {
-    background: rgba(255, 255, 255, .025)
-}
-
-.pg-wrap {
-    display: flex;
-    align-items: center;
-    gap: .5rem
-}
-
-.pg-bar {
-    flex: 1;
-    height: 3px;
-    background: rgba(255, 255, 255, .07);
-    border-radius: 4px;
-    overflow: hidden
-}
-
-.pg-fill {
-    height: 100%;
-    border-radius: 4px;
-    background: var(--pf, var(--c-blue));
-    width: 0;
-    transition: width .7s cubic-bezier(.4, 0, .2, 1)
-}
-
-.pg-num {
-    font-family: var(--fm);
-    font-size: .72rem;
-    color: var(--an-dim);
-    min-width: 28px;
-    text-align: right
-}
-
-.url-cell {
-    max-width: 260px;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-    font-family: var(--fm);
-    font-size: .73rem;
-    color: var(--an-dim)
-}
-
-/* Avg line marker */
-.avg-line-label {
-    font-family: var(--fm);
-    font-size: .68rem;
-    color: var(--c-amber)
-}
-
-.btn {
-    display: inline-flex;
-    align-items: center;
-    gap: .4rem;
-    padding: .5rem 1rem;
-    border-radius: 9px;
-    font-size: .78rem;
-    font-weight: 600;
-    cursor: pointer;
-    transition: all .18s;
-    text-decoration: none;
-    border: 1px solid var(--an-border);
-    font-family: var(--fb);
-    white-space: nowrap
-}
-
-.btn-ghost {
-    background: transparent;
-    color: var(--an-dim)
-}
-
-.btn-ghost:hover {
-    background: rgba(255, 255, 255, .055);
-    border-color: var(--an-border-h);
-    color: var(--an-text)
-}
-
-@keyframes fadeUp {
-    from {
-        opacity: 0;
-        transform: translateY(10px)
-    }
-
-    to {
-        opacity: 1;
-        transform: translateY(0)
-    }
-}
-
-.an-a {
-    animation: fadeUp .38s ease both
-}
-
-.d1 {
-    animation-delay: .04s
-}
-
-.d2 {
-    animation-delay: .08s
-}
-
-.d3 {
-    animation-delay: .12s
-}
-
-.d4 {
-    animation-delay: .16s
-}
-</style>
-
-<body>
+<body class="analytics-page">
     <?php include __DIR__ . '/../../include/sidebar.php'; ?>
     <div class="main">
         <?php include __DIR__ . '/../../include/header.php'; ?>
@@ -475,7 +76,7 @@ $todayDelta = $totalYesterday > 0 ? round(($totalToday - $totalYesterday) / $tot
                         dias)
                     </p>
                 </div>
-                <a href="<?= BASE_URL ?>/jm-panel/analytics" class="btn btn-ghost">
+                <a href="<?= BASE_URL ?>/jm-panel/analytics" class="btn btn-secondary">
                     <i class="fas fa-arrow-left"></i> Analytics
                 </a>
             </div>
@@ -598,6 +199,34 @@ $todayDelta = $totalYesterday > 0 ? round(($totalToday - $totalYesterday) / $tot
     <?php include __DIR__ . '/../../include/modal_logout.php'; ?>
 
     <script>
+    const anRoot = getComputedStyle(document.documentElement);
+    const anVar = (name, fallback) => anRoot.getPropertyValue(name).trim() || fallback;
+    const anTheme = {
+        accent: anVar('--accent', '#2563eb'),
+        teal: anVar('--teal', '#14b8a6'),
+        warning: anVar('--warning', '#f59e0b'),
+        purple: anVar('--purple', '#8b5cf6'),
+        danger: anVar('--danger', '#ef4444'),
+        success: anVar('--success', '#10b981'),
+        text: anVar('--text', '#e2e8f4'),
+        dim: anVar('--text-dim', '#8896aa'),
+        muted: anVar('--text-muted', '#4a5568'),
+        card: anVar('--bg-card', '#101624'),
+        border: anVar('--border', 'rgba(255,255,255,.07)')
+    };
+    const anRgba = (color, alpha) => {
+        let hex = String(color).trim().replace('#', '');
+        if (hex.length === 3) hex = hex.split('').map(ch => ch + ch).join('');
+        if (!/^[0-9a-f]{6}$/i.test(hex)) return `rgba(37,99,235,${alpha})`;
+        const value = parseInt(hex, 16);
+        return `rgba(${(value >> 16) & 255},${(value >> 8) & 255},${value & 255},${alpha})`;
+    };
+    if (window.Chart) {
+        Chart.defaults.font.family = getComputedStyle(document.body).fontFamily || 'sans-serif';
+        Chart.defaults.color = anTheme.muted;
+    }
+
+
     // Count-up
     document.querySelectorAll('[data-count]').forEach(el => {
         const target = parseFloat(el.dataset.count);
@@ -621,13 +250,13 @@ $todayDelta = $totalYesterday > 0 ? round(($totalToday - $totalYesterday) / $tot
         document.querySelectorAll('.pg-fill[data-w]').forEach(el => el.style.width = el.dataset.w + '%');
     }, 300);
 
-    Chart.defaults.font.family = "'IBM Plex Sans', sans-serif";
+    Chart.defaults.font.family = getComputedStyle(document.body).fontFamily || 'sans-serif';
     const tooltipOpts = {
-        backgroundColor: '#0d1117',
-        borderColor: 'rgba(148,163,184,.15)',
+        backgroundColor: anTheme.card,
+        borderColor: anTheme.border,
         borderWidth: 1,
-        titleColor: '#e2e8f0',
-        bodyColor: '#94a3b8',
+        titleColor: anTheme.text,
+        bodyColor: anTheme.dim,
         padding: 10,
         cornerRadius: 8,
         displayColors: false
@@ -636,29 +265,30 @@ $todayDelta = $totalYesterday > 0 ? round(($totalToday - $totalYesterday) / $tot
     // Daily chart with gradient
     const ctx = document.getElementById('dailyChart').getContext('2d');
     const grad = ctx.createLinearGradient(0, 0, 0, 300);
-    grad.addColorStop(0, 'rgba(91,141,238,.3)');
-    grad.addColorStop(.65, 'rgba(91,141,238,.06)');
-    grad.addColorStop(1, 'rgba(91,141,238,0)');
+    grad.addColorStop(0, anRgba(anTheme.accent, .3));
+    grad.addColorStop(.65, anRgba(anTheme.accent, .06));
+    grad.addColorStop(1, anRgba(anTheme.accent, 0));
 
     const avgVal = <?= $avgChartVal ?>;
 
     new Chart(ctx, {
         type: 'bar',
         data: {
-            labels: <?= json_encode($chartLabels) ?>,
+            labels: <?= json_encode($chartLabels, JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP) ?>,
             datasets: [{
                     type: 'bar',
-                    data: <?= json_encode($chartData) ?>,
-                    backgroundColor: <?= json_encode($chartData) ?>.map(v => v >= avgVal ? '#5b8dee' :
-                        '#1e2a3a'),
+                    data: <?= json_encode($chartData, JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP) ?>,
+                    backgroundColor: <?= json_encode($chartData, JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP) ?>
+                        .map(v => v >= avgVal ? anTheme.accent :
+                            anTheme.border),
                     borderRadius: 4,
                     borderSkipped: false,
                     order: 2,
                 },
                 {
                     type: 'line',
-                    data: <?= json_encode(array_fill(0, count($chartData), $avgChartVal)) ?>,
-                    borderColor: 'rgba(251,191,36,.6)',
+                    data: <?= json_encode(array_fill(0, count($chartData), $avgChartVal), JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP) ?>,
+                    borderColor: anRgba(anTheme.warning, .6),
                     borderWidth: 1.5,
                     borderDash: [4, 4],
                     pointRadius: 0,
@@ -691,10 +321,10 @@ $todayDelta = $totalYesterday > 0 ? round(($totalToday - $totalYesterday) / $tot
                 y: {
                     beginAtZero: true,
                     grid: {
-                        color: 'rgba(255,255,255,.05)'
+                        color: anTheme.border
                     },
                     ticks: {
-                        color: '#475569'
+                        color: anTheme.muted
                     }
                 },
                 x: {
@@ -702,7 +332,7 @@ $todayDelta = $totalYesterday > 0 ? round(($totalToday - $totalYesterday) / $tot
                         display: false
                     },
                     ticks: {
-                        color: '#475569',
+                        color: anTheme.muted,
                         maxRotation: 0,
                         maxTicksLimit: 10
                     }

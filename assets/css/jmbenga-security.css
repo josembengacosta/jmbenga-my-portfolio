@@ -1,0 +1,891 @@
+/* security.php */
+body.security-hub-page .page-top {
+display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    flex-wrap: wrap;
+    gap: 1rem;
+    margin-bottom: 1.5rem
+}
+
+body.security-hub-page .breadcrumb {
+display: flex;
+    align-items: center;
+    gap: .5rem;
+    font-size: .78rem;
+    color: var(--text-muted);
+    margin-bottom: .5rem
+}
+
+body.security-hub-page .breadcrumb a {
+color: var(--text-dim);
+    text-decoration: none;
+    transition: color .2s
+}
+
+body.security-hub-page .breadcrumb a:hover {
+color: var(--accent)
+}
+
+body.security-hub-page .breadcrumb i {
+font-size: .6rem
+}
+
+body.security-hub-page .page-title {
+font-family: var(--font-head);
+    font-size: 1.5rem;
+    font-weight: 800;
+    letter-spacing: -.02em;
+    margin-bottom: .2rem
+}
+
+body.security-hub-page .page-sub {
+font-size: .8rem;
+    color: var(--text-muted)
+}
+
+body.security-hub-page .kpi-row {
+display: flex;
+    gap: .75rem;
+    flex-wrap: wrap;
+    margin-bottom: 1.5rem
+}
+
+body.security-hub-page .kpi-card {
+flex: 1;
+    min-width: 120px;
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: .85rem 1rem;
+    display: flex;
+    align-items: center;
+    gap: .75rem;
+    transition: all .22s
+}
+
+body.security-hub-page .kpi-card:hover {
+transform: translateY(-2px);
+    border-color: var(--border-acc);
+    box-shadow: 0 6px 24px rgba(0, 0, 0, .25)
+}
+
+body.security-hub-page .kpi-icon {
+width: 36px;
+    height: 36px;
+    border-radius: 9px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: .9rem;
+    flex-shrink: 0
+}
+
+body.security-hub-page .kpi-val {
+font-family: var(--font-head);
+    font-size: 1.35rem;
+    font-weight: 800;
+    letter-spacing: -.02em;
+    line-height: 1
+}
+
+body.security-hub-page .kpi-lbl {
+font-size: .68rem;
+    color: var(--text-muted);
+    margin-top: 2px;
+    white-space: nowrap
+}
+
+body.security-hub-page .charts-row {
+display: grid;
+    grid-template-columns: 2fr 1fr;
+    gap: 1.2rem;
+    margin-bottom: 1.5rem
+}
+
+@media (max-width:1200px) {
+body.security-hub-page .charts-row {
+grid-template-columns: 1fr
+}
+}
+
+body.security-hub-page .chart-card,
+body.security-hub-page .table-card {
+background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 1.5rem
+}
+
+body.security-hub-page .card-header {
+display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1rem
+}
+
+body.security-hub-page .card-header h3 {
+font-family: var(--font-head);
+    font-size: 1rem;
+    font-weight: 700
+}
+
+body.security-hub-page .chart-container {
+position: relative;
+    height: 280px;
+    width: 100%
+}
+
+body.security-hub-page .mini-table {
+width: 100%;
+    border-collapse: collapse
+}
+
+body.security-hub-page .mini-table th,
+body.security-hub-page .mini-table td {
+padding: .5rem .6rem;
+    text-align: left;
+    border-bottom: 1px solid var(--border);
+    font-size: .8rem
+}
+
+body.security-hub-page .mini-table th {
+color: var(--text-dim);
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: .04em;
+    font-size: .68rem
+}
+
+body.security-hub-page table.dataTable {
+width: 100% !important;
+    border-collapse: collapse
+}
+
+body.security-hub-page table.dataTable th,
+body.security-hub-page table.dataTable td {
+padding: .7rem .8rem;
+    text-align: left;
+    border-bottom: 1px solid var(--border);
+    font-size: .85rem
+}
+
+body.security-hub-page table.dataTable th {
+color: var(--text-dim);
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: .04em;
+    font-size: .7rem
+}
+
+body.security-hub-page .btn {
+display: inline-flex;
+    align-items: center;
+    gap: .45rem;
+    padding: .55rem 1.1rem;
+    border-radius: 8px;
+    font-size: .83rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all .2s;
+    text-decoration: none;
+    border: 1px solid var(--border);
+    white-space: nowrap
+}
+
+body.security-hub-page .btn-secondary {
+background: transparent;
+    border: 1px solid var(--border);
+    color: var(--text-dim)
+}
+
+body.security-hub-page .btn-secondary:hover {
+background: var(--bg-hover);
+    border-color: var(--border-acc);
+    color: var(--text)
+}
+
+/* access-log.php */
+body.access-log-page .page-top {
+display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        flex-wrap: wrap;
+        gap: 1rem;
+        margin-bottom: 1.5rem
+}
+
+body.access-log-page .breadcrumb {
+display: flex;
+        align-items: center;
+        gap: .5rem;
+        font-size: .78rem;
+        color: var(--text-muted);
+        margin-bottom: .5rem
+}
+
+body.access-log-page .breadcrumb a {
+color: var(--text-dim);
+        text-decoration: none;
+        transition: color .2s
+}
+
+body.access-log-page .breadcrumb a:hover {
+color: var(--accent)
+}
+
+body.access-log-page .breadcrumb i {
+font-size: .6rem
+}
+
+body.access-log-page .page-title {
+font-family: var(--font-head);
+        font-size: 1.5rem;
+        font-weight: 800;
+        letter-spacing: -.02em;
+        margin-bottom: .2rem
+}
+
+body.access-log-page .page-sub {
+font-size: .8rem;
+        color: var(--text-muted)
+}
+
+body.access-log-page .filter-bar {
+display: flex;
+        align-items: center;
+        gap: .6rem;
+        flex-wrap: wrap;
+        margin-bottom: 1.25rem;
+        background: var(--bg-card);
+        border: 1px solid var(--border);
+        border-radius: var(--radius);
+        padding: .85rem 1rem
+}
+
+body.access-log-page .filter-search {
+display: flex;
+        align-items: center;
+        gap: .5rem;
+        background: var(--bg);
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        padding: .4rem .75rem;
+        flex: 1;
+        min-width: 180px
+}
+
+body.access-log-page .filter-search input {
+background: none;
+        border: none;
+        outline: none;
+        color: var(--text);
+        font-size: .84rem;
+        flex: 1
+}
+
+body.access-log-page .filter-clear {
+color: var(--text-muted);
+        text-decoration: none;
+        font-size: .8rem
+}
+
+body.access-log-page .filter-select {
+background: var(--bg);
+        border: 1px solid var(--border);
+        color: var(--text);
+        padding: .42rem .75rem;
+        border-radius: 8px;
+        font-size: .82rem;
+        outline: none
+}
+
+body.access-log-page .filter-result {
+font-size: .78rem;
+        color: var(--text-muted);
+        display: flex;
+        align-items: center;
+        gap: .35rem;
+        margin-left: auto
+}
+
+body.access-log-page .table-card {
+background: var(--bg-card);
+        border: 1px solid var(--border);
+        border-radius: var(--radius);
+        padding: 1.5rem
+}
+
+body.access-log-page table.dataTable {
+width: 100% !important;
+        border-collapse: collapse
+}
+
+body.access-log-page table.dataTable th,
+body.access-log-page table.dataTable td {
+padding: .7rem .8rem;
+        border-bottom: 1px solid var(--border);
+        font-size: .85rem
+}
+
+body.access-log-page table.dataTable th {
+color: var(--text-dim);
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: .04em;
+        font-size: .7rem
+}
+
+body.access-log-page .badge-status {
+display: inline-flex;
+        align-items: center;
+        gap: 4px;
+        padding: 3px 10px;
+        border-radius: 999px;
+        font-size: .7rem;
+        font-weight: 600
+}
+
+body.access-log-page .badge-archived {
+background: rgba(239, 68, 68, .1);
+        color: var(--danger)
+}
+
+body.access-log-page .btn {
+display: inline-flex;
+        align-items: center;
+        gap: .45rem;
+        padding: .55rem 1.1rem;
+        border-radius: 8px;
+        font-size: .83rem;
+        font-weight: 500;
+        cursor: pointer;
+        transition: all .2s;
+        text-decoration: none;
+        border: 1px solid var(--border);
+        white-space: nowrap
+}
+
+body.access-log-page .btn-primary {
+background: var(--accent);
+        color: #fff;
+        border-color: var(--accent)
+}
+
+body.access-log-page .btn-primary:hover {
+background: #1d4ed8
+}
+
+body.access-log-page .btn-secondary {
+background: transparent;
+        border: 1px solid var(--border);
+        color: var(--text-dim)
+}
+
+body.access-log-page .btn-secondary:hover {
+background: var(--bg-hover);
+        border-color: var(--border-acc);
+        color: var(--text)
+}
+
+body.access-log-page .empty-state {
+padding: 3rem 2rem;
+        text-align: center
+}
+
+body.access-log-page .empty-icon {
+font-size: 2rem;
+        color: var(--text-muted);
+        margin-bottom: .5rem
+}
+
+/* audit.php */
+body.audit-page .page-top {
+display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:1rem;margin-bottom:1.5rem
+}
+
+body.audit-page .breadcrumb {
+display:flex;align-items:center;gap:.5rem;font-size:.78rem;color:var(--text-muted);margin-bottom:.5rem
+}
+
+body.audit-page .breadcrumb a {
+color:var(--text-dim);text-decoration:none;transition:color .2s
+}
+
+body.audit-page .breadcrumb a:hover {
+color:var(--accent)
+}
+
+body.audit-page .breadcrumb i {
+font-size:.6rem
+}
+
+body.audit-page .page-title {
+font-family:var(--font-head);font-size:1.5rem;font-weight:800;letter-spacing:-.02em;margin-bottom:.2rem
+}
+
+body.audit-page .page-sub {
+font-size:.8rem;color:var(--text-muted)
+}
+
+body.audit-page .filter-bar {
+display:flex;align-items:center;gap:.6rem;flex-wrap:wrap;margin-bottom:1.25rem;background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius);padding:.85rem 1rem
+}
+
+body.audit-page .filter-search {
+display:flex;align-items:center;gap:.5rem;background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:.4rem .75rem;flex:1;min-width:160px
+}
+
+body.audit-page .filter-search input {
+background:none;border:none;outline:none;color:var(--text);font-size:.84rem;flex:1
+}
+
+body.audit-page .filter-clear {
+color:var(--text-muted);text-decoration:none;font-size:.8rem
+}
+
+body.audit-page .filter-select {
+background:var(--bg);border:1px solid var(--border);color:var(--text);padding:.42rem .75rem;border-radius:8px;font-size:.82rem;outline:none
+}
+
+body.audit-page .filter-date {
+background:var(--bg);border:1px solid var(--border);color:var(--text);padding:.42rem .75rem;border-radius:8px;font-size:.82rem;outline:none
+}
+
+body.audit-page .filter-result {
+font-size:.78rem;color:var(--text-muted);display:flex;align-items:center;gap:.35rem;margin-left:auto
+}
+
+body.audit-page .table-card {
+background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius);padding:1.5rem
+}
+
+body.audit-page table.dataTable {
+width:100%!important;border-collapse:collapse
+}
+
+body.audit-page table.dataTable th,
+body.audit-page table.dataTable td {
+padding:.7rem .8rem;border-bottom:1px solid var(--border);font-size:.85rem
+}
+
+body.audit-page table.dataTable th {
+color:var(--text-dim);font-weight:600;text-transform:uppercase;letter-spacing:.04em;font-size:.7rem
+}
+
+body.audit-page .btn-icon {
+width:30px;height:30px;border-radius:6px;display:inline-flex;align-items:center;justify-content:center;background:transparent;border:1px solid var(--border);color:var(--text-dim);cursor:pointer;transition:all .2s;font-size:.8rem
+}
+
+body.audit-page .btn-icon:hover {
+background:var(--accent);color:#fff;border-color:var(--accent)
+}
+
+body.audit-page .btn {
+display:inline-flex;align-items:center;gap:.45rem;padding:.55rem 1.1rem;border-radius:8px;font-size:.83rem;font-weight:500;cursor:pointer;transition:all .2s;text-decoration:none;border:1px solid var(--border);white-space:nowrap
+}
+
+body.audit-page .btn-primary {
+background:var(--accent);color:#fff;border-color:var(--accent)
+}
+
+body.audit-page .btn-primary:hover {
+background:#1d4ed8
+}
+
+body.audit-page .btn-secondary {
+background:transparent;border:1px solid var(--border);color:var(--text-dim)
+}
+
+body.audit-page .btn-secondary:hover {
+background:var(--bg-hover);border-color:var(--border-acc);color:var(--text)
+}
+
+body.audit-page .empty-state {
+padding:3rem 2rem;text-align:center
+}
+
+body.audit-page .empty-icon {
+font-size:2rem;color:var(--text-muted);margin-bottom:.5rem
+}
+
+/* ip-whitelist.php */
+body.ip-whitelist-page .page-top {
+display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        flex-wrap: wrap;
+        gap: 1rem;
+        margin-bottom: 1.5rem
+}
+
+body.ip-whitelist-page .breadcrumb {
+display: flex;
+        align-items: center;
+        gap: .5rem;
+        font-size: .78rem;
+        color: var(--text-muted);
+        margin-bottom: .5rem
+}
+
+body.ip-whitelist-page .breadcrumb a {
+color: var(--text-dim);
+        text-decoration: none;
+        transition: color .2s
+}
+
+body.ip-whitelist-page .breadcrumb a:hover {
+color: var(--accent)
+}
+
+body.ip-whitelist-page .breadcrumb i {
+font-size: .6rem
+}
+
+body.ip-whitelist-page .page-title {
+font-family: var(--font-head);
+        font-size: 1.5rem;
+        font-weight: 800;
+        letter-spacing: -.02em;
+        margin-bottom: .2rem
+}
+
+body.ip-whitelist-page .page-sub {
+font-size: .8rem;
+        color: var(--text-muted)
+}
+
+body.ip-whitelist-page .form-section {
+background: var(--bg-card);
+        border: 1px solid var(--border);
+        border-radius: var(--radius-lg);
+        padding: 1.8rem
+}
+
+body.ip-whitelist-page .section-header {
+display: flex;
+        align-items: center;
+        gap: .75rem;
+        margin-bottom: 1rem
+}
+
+body.ip-whitelist-page .section-icon {
+width: 34px;
+        height: 34px;
+        border-radius: 8px;
+        background: var(--accent-glow);
+        border: 1px solid var(--border-acc);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: var(--accent);
+        font-size: .85rem;
+        flex-shrink: 0
+}
+
+body.ip-whitelist-page .section-header h3 {
+font-family: var(--font-head);
+        font-size: .95rem;
+        font-weight: 700
+}
+
+body.ip-whitelist-page .form-grid-3 {
+display: grid;
+        grid-template-columns: 1fr 1fr auto;
+        gap: 1rem;
+        align-items: end
+}
+
+@media (max-width:768px) {
+body.ip-whitelist-page .form-grid-3 {
+grid-template-columns: 1fr
+}
+}
+
+body.ip-whitelist-page .form-group {
+display: flex;
+        flex-direction: column;
+        gap: .35rem
+}
+
+body.ip-whitelist-page .form-label {
+font-size: .75rem;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: .04em;
+        color: var(--text-dim)
+}
+
+body.ip-whitelist-page .req {
+color: var(--danger)
+}
+
+body.ip-whitelist-page .form-control {
+padding: .65rem .85rem;
+        background: var(--bg);
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        color: var(--text);
+        font-family: var(--font-body);
+        font-size: .88rem;
+        outline: none;
+        transition: border-color .2s, box-shadow .2s
+}
+
+body.ip-whitelist-page .form-control:focus {
+border-color: var(--accent);
+        box-shadow: 0 0 0 3px var(--accent-glow)
+}
+
+body.ip-whitelist-page .table-card {
+background: var(--bg-card);
+        border: 1px solid var(--border);
+        border-radius: var(--radius);
+        padding: 1.5rem
+}
+
+body.ip-whitelist-page table.dataTable {
+width: 100% !important;
+        border-collapse: collapse
+}
+
+body.ip-whitelist-page table.dataTable th,
+body.ip-whitelist-page table.dataTable td {
+padding: .7rem .8rem;
+        text-align: left;
+        border-bottom: 1px solid var(--border);
+        font-size: .85rem
+}
+
+body.ip-whitelist-page table.dataTable th {
+color: var(--text-dim);
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: .04em;
+        font-size: .7rem
+}
+
+body.ip-whitelist-page .badge-status {
+display: inline-flex;
+        align-items: center;
+        gap: 4px;
+        padding: 3px 10px;
+        border-radius: 999px;
+        font-size: .7rem;
+        font-weight: 600
+}
+
+body.ip-whitelist-page .badge-published {
+background: rgba(16, 185, 129, .1);
+        color: var(--success)
+}
+
+body.ip-whitelist-page .badge-archived {
+background: rgba(148, 163, 184, .1);
+        color: var(--text-muted)
+}
+
+body.ip-whitelist-page .row-actions {
+display: flex;
+        gap: .3rem
+}
+
+body.ip-whitelist-page .btn-icon {
+width: 30px;
+        height: 30px;
+        border-radius: 6px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        background: transparent;
+        border: 1px solid var(--border);
+        color: var(--text-dim);
+        cursor: pointer;
+        transition: all .2s;
+        font-size: .8rem
+}
+
+body.ip-whitelist-page .btn-icon:hover {
+background: var(--accent);
+        color: #fff;
+        border-color: var(--accent)
+}
+
+body.ip-whitelist-page .btn-icon-danger:hover {
+background: var(--danger);
+        border-color: var(--danger)
+}
+
+body.ip-whitelist-page .btn {
+display: inline-flex;
+        align-items: center;
+        gap: .45rem;
+        padding: .55rem 1.1rem;
+        border-radius: 8px;
+        font-size: .83rem;
+        font-weight: 500;
+        cursor: pointer;
+        transition: all .2s;
+        text-decoration: none;
+        border: 1px solid var(--border);
+        white-space: nowrap
+}
+
+body.ip-whitelist-page .btn-primary {
+background: var(--accent);
+        color: #fff;
+        border-color: var(--accent)
+}
+
+body.ip-whitelist-page .btn-primary:hover {
+background: #1d4ed8
+}
+
+body.ip-whitelist-page .empty-state {
+padding: 3rem 2rem;
+        text-align: center
+}
+
+body.ip-whitelist-page .empty-icon {
+font-size: 2rem;
+        color: var(--text-muted);
+        margin-bottom: .5rem
+}
+
+/* Ajustes de acessibilidade e interacção do módulo Security */
+body.ip-whitelist-page #addIpForm[hidden] {
+    display: none !important;
+}
+
+body.ip-whitelist-page .form-control:focus-visible,
+body.ip-whitelist-page .btn:focus-visible,
+body.ip-whitelist-page .btn-icon:focus-visible,
+body.ip-whitelist-page #addIpBtn:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+}
+
+body.ip-whitelist-page .security-toast-container {
+    position: fixed;
+    top: 1rem;
+    right: 1rem;
+    z-index: 9999;
+    display: flex;
+    flex-direction: column;
+    gap: .5rem;
+    max-width: min(420px, calc(100vw - 2rem));
+}
+
+body.ip-whitelist-page .toast {
+    display: flex;
+    align-items: center;
+    gap: .55rem;
+    padding: .8rem 1rem;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    background: var(--bg-card);
+    color: var(--text);
+    box-shadow: 0 8px 28px rgba(0, 0, 0, .24);
+    transition: opacity .25s ease, transform .25s ease;
+    overflow-wrap: anywhere;
+}
+
+body.ip-whitelist-page .toast-success {
+    border-color: rgba(16, 185, 129, .35);
+}
+
+body.ip-whitelist-page .toast-error {
+    border-color: rgba(239, 68, 68, .4);
+}
+
+body.ip-whitelist-page .toast-warning {
+    border-color: rgba(245, 158, 11, .4);
+}
+
+body.ip-whitelist-page .toast.is-leaving {
+    opacity: 0;
+    transform: translateX(16px);
+}
+
+body.audit-page .filter-validation {
+    display: flex;
+    align-items: flex-start;
+    gap: .55rem;
+    margin-bottom: .8rem;
+    padding: .75rem .9rem;
+    border: 1px solid rgba(245, 158, 11, .35);
+    border-radius: var(--radius);
+    background: rgba(245, 158, 11, .08);
+    color: var(--warning);
+    font-size: .82rem;
+}
+
+body.audit-page .audit-detail-content {
+    text-align: left;
+    font-size: .82rem;
+}
+
+body.audit-page .audit-detail-content pre {
+    margin: .45rem 0 1rem;
+    padding: .65rem;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    background: var(--bg);
+    color: var(--text);
+    max-height: 180px;
+    overflow: auto;
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+}
+
+body.access-log-page code,
+body.audit-page code,
+body.ip-whitelist-page code {
+    overflow-wrap: anywhere;
+}
+
+@media (max-width: 640px) {
+    body.security-hub-page .kpi-card {
+        min-width: calc(50% - .5rem);
+    }
+
+    body.access-log-page .table-card,
+    body.audit-page .table-card,
+    body.ip-whitelist-page .table-card {
+        padding: .85rem;
+        overflow-x: auto;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    body.security-hub-page *,
+    body.access-log-page *,
+    body.audit-page *,
+    body.ip-whitelist-page * {
+        scroll-behavior: auto !important;
+        transition-duration: .01ms !important;
+        animation-duration: .01ms !important;
+        animation-iteration-count: 1 !important;
+    }
+}
+
+
+body.ip-whitelist-page .security-note {
+    display: flex;
+    align-items: flex-start;
+    gap: .6rem;
+    margin: 0 0 1rem;
+    padding: .8rem .95rem;
+    border: 1px solid rgba(245, 158, 11, .32);
+    border-radius: var(--radius);
+    background: rgba(245, 158, 11, .07);
+    color: var(--text-dim);
+    font-size: .8rem;
+    line-height: 1.5;
+}
+
+body.ip-whitelist-page .security-note i {
+    color: var(--warning);
+    margin-top: .1rem;
+    flex: 0 0 auto;
+}

@@ -6,7 +6,8 @@ class PWAInstallManager {
   constructor() {
     this.deferredPrompt = null;
     this.isInstalled = false;
-    this.isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) ||
+    this.isIOS =
+      /iPad|iPhone|iPod/.test(navigator.userAgent) ||
       (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
     this.isAndroid = /Android/.test(navigator.userAgent);
     this.isDesktop = !this.isIOS && !this.isAndroid;
@@ -43,7 +44,7 @@ class PWAInstallManager {
   async checkInstallation() {
     // Método 1: Display mode
     const isStandalone = window.matchMedia(
-      "(display-mode: standalone)"
+      "(display-mode: standalone)",
     ).matches;
 
     // Método 2: Navigator standalone (iOS)
@@ -88,7 +89,7 @@ class PWAInstallManager {
     // Evento beforeinstallprompt (Chrome/Edge)
     window.addEventListener(
       "beforeinstallprompt",
-      this.handleBeforeInstallPrompt.bind(this)
+      this.handleBeforeInstallPrompt.bind(this),
     );
 
     // Quando o app é instalado
@@ -164,7 +165,7 @@ class PWAInstallManager {
     // Mostrar confirmação
     this.showNotification(
       "Aplicativo instalado com sucesso! Encontre-o na sua tela inicial ou dock.",
-      "success"
+      "success",
     );
   }
 
@@ -184,13 +185,14 @@ class PWAInstallManager {
     installBtn.setAttribute("aria-label", "Instalar aplicativo");
 
     // No iOS não há prompt de instalação programático: o botão abre instruções.
-    installBtn.innerHTML = this.isIOS && !this.deferredPrompt
-      ? `
+    installBtn.innerHTML =
+      this.isIOS && !this.deferredPrompt
+        ? `
         <i class="fas fa-mobile-alt" aria-hidden="true"></i>
         <span class="btn-text">Como instalar</span>
         <span class="btn-subtext">Adicionar ao ecrã inicial</span>
       `
-      : `
+        : `
         <i class="fas fa-download" aria-hidden="true"></i>
         <span class="btn-text">Instalar App</span>
         <span class="btn-subtext">Offline &amp; Mais Rápido</span>
@@ -273,7 +275,7 @@ class PWAInstallManager {
         console.log(" Instalação recusada");
         this.showNotification(
           "Instalação cancelada. Você pode instalar depois pelo botão ou menu do navegador.",
-          "info"
+          "info",
         );
       }
 
@@ -407,14 +409,14 @@ class PWAInstallManager {
     console.log("=== PWA DEBUG INFO ===");
     console.log(
       "Platform:",
-      this.isIOS ? "iOS" : this.isAndroid ? "Android" : "Desktop"
+      this.isIOS ? "iOS" : this.isAndroid ? "Android" : "Desktop",
     );
     console.log("Installed:", this.isInstalled);
     console.log("Supports PWA:", this.supportsPWA);
     console.log("Deferred Prompt:", !!this.deferredPrompt);
     console.log(
       "Manifest:",
-      document.querySelector('link[rel="manifest"]')?.href
+      document.querySelector('link[rel="manifest"]')?.href,
     );
     console.log("Service Worker:", "serviceWorker" in navigator);
     console.log("=====================");
@@ -471,18 +473,27 @@ document.addEventListener("DOMContentLoaded", () => {
 });
 
 // ========== SERVICE WORKER REGISTRATION ==========
-if ("serviceWorker" in navigator) {
+if ("serviceWorker" in navigator && window.isSecureContext) {
   window.addEventListener("load", () => {
-    const baseUrl = document.documentElement.dataset.baseUrl || "";
-    const swUrl = baseUrl + "/sw.js";
-    navigator.serviceWorker
-      .register(swUrl)
-      .then((registration) => {
-        console.log(" Service Worker registrado:", registration.scope);
+    const configuredBase = String(
+      document.documentElement.dataset.baseUrl || window.location.origin,
+    ).replace(/\/+$/, "");
+    const swUrl = new URL(`${configuredBase}/sw.js`, window.location.href);
+    const swScope = new URL(`${configuredBase}/`, window.location.href).pathname;
 
-        // Verificar atualizações
+    navigator.serviceWorker
+      .register(swUrl.href, {
+        scope: swScope,
+        updateViaCache: "none",
+      })
+      .then((registration) => {
+        console.log("Service Worker registado:", registration.scope);
+
+        // Verificar atualizações do Service Worker sem depender da cache HTTP.
         registration.addEventListener("updatefound", () => {
           const newWorker = registration.installing;
+          if (!newWorker) return;
+
           newWorker.addEventListener("statechange", () => {
             if (
               newWorker.state === "installed" &&
@@ -492,14 +503,14 @@ if ("serviceWorker" in navigator) {
                 window.showToast(
                   "Nova versão disponível. Actualize a página para carregar a versão mais recente.",
                   "info",
-                  6000
+                  6000,
                 );
             }
           });
         });
       })
       .catch((error) => {
-        console.error(" Erro no Service Worker:", error);
+        console.error("Erro no registo do Service Worker:", error);
       });
   });
 }
@@ -520,7 +531,7 @@ const fallbackStyles = `
     bottom: 100px;
     right: 20px;
     z-index: 9999;
-    background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%);
+    background: linear-gradient(135deg, var(--accent), color-mix(in srgb, var(--accent) 78%, #000));
     color: white;
     border: none;
     padding: 12px 20px;
@@ -531,7 +542,7 @@ const fallbackStyles = `
     flex-direction: column;
     align-items: center;
     gap: 4px;
-    box-shadow: 0 8px 25px rgba(37, 99, 235, 0.4);
+    box-shadow: 0 8px 25px var(--accent-glow);
     transition: all 0.3s ease;
     opacity: 0;
     transform: translateY(20px);
@@ -544,7 +555,7 @@ const fallbackStyles = `
   
   .pwa-install-btn.hover {
     transform: translateY(-2px);
-    box-shadow: 0 12px 30px rgba(37, 99, 235, 0.6);
+    box-shadow: 0 12px 30px var(--accent-glow);
   }
   
   .pwa-install-btn.active {
@@ -564,14 +575,14 @@ const fallbackStyles = `
     position: fixed;
     top: 20px;
     right: 20px;
-    background: #2563eb;
+    background: var(--accent);
     color: white;
     padding: 15px 20px;
     border-radius: 10px;
     z-index: 10000;
     box-shadow: 0 8px 25px rgba(0,0,0,0.2);
     max-width: 350px;
-    border-left: 4px solid #1d4ed8;
+    border-left: 4px solid color-mix(in srgb, var(--accent) 78%, #000);
     opacity: 0;
     transform: translateX(100%);
     transition: all 0.3s ease;

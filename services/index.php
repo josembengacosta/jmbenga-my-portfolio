@@ -1,4 +1,5 @@
 <?php
+
 /**
  * services/index.php — Catálogo geral de serviços JMbenga Portfolio
  * Rota pública prevista: /servicos
@@ -158,6 +159,19 @@ $carePackages = [
     --nav-h: 70px;
     --grad: linear-gradient(135deg, var(--accent) 0%, #7c3aed 100%);
     --grad-text: linear-gradient(135deg, var(--accent), #a78bfa);
+}
+
+[data-theme="light"] {
+    --bg: #f0f4fb;
+    --bg-2: #e4eaf6;
+    --bg-card: #ffffff;
+    --bg-glass: rgba(255, 255, 255, .85);
+    --border: rgba(0, 0, 0, .07);
+    --border-acc: rgba(<?=hexdec(substr($accent, 1, 2)) ?>, <?=hexdec(substr($accent, 3, 2)) ?>, <?=hexdec(substr($accent, 5, 2)) ?>, .25);
+    --text: #0f172a;
+    --text-dim: #475569;
+    --text-muted: #94a3b8;
+    --shadow: 0 8px 40px rgba(0, 0, 0, .12);
 }
 
 .catalog-hero {
@@ -770,11 +784,11 @@ $carePackages = [
     </main>
 
     <?php
-$inline_js = '';
-$page_scripts = [];
-include __DIR__ . '/../includes/footer.php';
-include __DIR__ . '/../includes/bottom-nav.php';
-?>
+    $inline_js = '';
+    $page_scripts = [];
+    include __DIR__ . '/../includes/footer.php';
+    include __DIR__ . '/../includes/bottom-nav.php';
+    ?>
 </body>
 
 </html>

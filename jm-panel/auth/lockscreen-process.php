@@ -96,24 +96,28 @@ if (empty($row['lockscreen'])) {
 }
 
 $storedCode = is_string($row['access_code'] ?? null) ? $row['access_code'] : '';
-if (!preg_match('/\A[0-9]{6}\z/', $storedCode)) {
+if ($storedCode === '' || (!preg_match('/\A[0-9]{6}\z/', $storedCode) && !isAdminLockscreenPinHash($storedCode))) {
     error_log('[ADMIN LOCKSCREEN] PIN ausente ou inválido para o administrador ' . $adminId . '.');
     lockscreenJsonResponse(false, 'O código de segurança não está configurado corretamente. Contacta o administrador do sistema.');
 }
 
-if (!hash_equals($storedCode, $code)) {
+if (!verifyAdminLockscreenPin($code, $storedCode)) {
     recordFailedLockscreenAttempt($adminId);
     logAudit($adminId, null, 'auth.lockscreen_fail', 'employees', $adminId);
     lockscreenJsonResponse(false, 'Código incorrecto.');
 }
 
 try {
+    // PINs legados em texto simples são convertidos para bcrypt no primeiro desbloqueio.
+    $replacementPin = adminLockscreenPinNeedsRehash($storedCode)
+        ? hashAdminLockscreenPin($code)
+        : $storedCode;
     $update = $db->prepare(
         'UPDATE _employees_security
-         SET lockscreen = 0
+         SET lockscreen = 0, access_code = ?
          WHERE id_employees = ? AND lockscreen = 1 AND access_code = ?'
     );
-    $update->execute([$adminId, $storedCode]);
+    $update->execute([$replacementPin, $adminId, $storedCode]);
 
     if ($update->rowCount() !== 1) {
         // Evita declarar sucesso se o registo tiver mudado entre SELECT e UPDATE.

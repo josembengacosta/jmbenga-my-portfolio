@@ -1,67 +1,96 @@
 # 🎯 JMbenga Portfolio
 
-<<<<<<< HEAD
-> 🌐 **Acede ao projeto online:** [jmbenga.free.dev.app](https://www.jmbenga.free.dev.app)
-=======
-> 🌐 **Acede ao projeto online:** [jmbenga.freedev.app]((https://jmbenga.freedev.app/))
->>>>>>> origin/main
+> 🌐 **Acede ao projecto online:** [jmbenga.freedev.app](https://jmbenga.freedev.app/)
 
-Portfólio profissional Full Stack desenvolvido para apresentar os meus projetos, competências e gerir conteúdos em tempo real através de um painel de administração integrado.
+Portefólio profissional Full Stack desenvolvido para apresentar os meus projectos, competências e gerir conteúdos em tempo real através de um painel de administração integrado.
 
 ---
 
-## ✨ Funcionalidades Principais (O que avaliar)
+## ✨ Funcionalidades Principais
 
-- **Acesso ao Painel Admin:** Disponível em `https://dev.app/jm-panel/` (Controlo total de projetos e mensagens).
-- **Suporte PWA:** O site é instalável no mobile e desktop, funcionando em modo offline.
-- **URLs Amigáveis:** Navegação limpa gerida pelo Apache `mod_rewrite`.
-- **Segurança Nativa:** Proteção integrada contra SQL Injection, CSRF e XSS.
+- **Painel Administrativo:** gestão de projectos, mensagens, testemunhos, visitantes e configurações.
+- **Suporte PWA:** aplicação instalável em dispositivos móveis e computadores, com funcionalidades de utilização offline.
+- **URLs Amigáveis:** navegação limpa gerida pelo Apache `mod_rewrite`.
+- **Segurança Aplicacional:** protecções contra SQL Injection, CSRF e XSS, controlo de sessões e autenticação administrativa.
+- **Gestão Dinâmica:** conteúdos e configurações administráveis através do painel.
+- **Interface Responsiva:** experiência adaptada a diferentes dimensões de ecrã.
 
 ---
 
-## 🛠️ Tecnologias & Stack
+## 🛠️ Tecnologias e Stack
 
-- **Backend:** PHP 8.2 (Arquitetura modular)
+- **Backend:** PHP 8.2+
 - **Base de Dados:** MySQL / MariaDB
-- **Frontend:** HTML5, CSS3, JavaScript (Vanilla)
-- **Servidor:** Apache
+- **Frontend:** HTML5, CSS3 e JavaScript (Vanilla)
+- **Framework CSS:** Bootstrap
+- **Servidor Web:** Apache
+- **Arquitectura:** PHP modular, PDO e Progressive Web App (PWA).
 
 ---
 
-## 📁 Estrutura do Projeto
+## 📁 Estrutura do Projecto
 
 ```text
 portfolio/
-├── includes/       ← Núcleo PHP (config, db, helpers) [config.php protegido]
-├── api/            ← Endpoints JSON para consumo dinâmico
-├── assets/         ← Recursos estáticos (CSS, JS, Imagens)
-├── database/       ← Scripts de criação e população do banco de dados
-└── jm-panel/       ← Painel de Administração (Auth e Gestão de Conteúdo)
+├── api/                ← Endpoints e serviços JSON
+├── assets/              ← CSS, JavaScript, imagens e ícones
+├── database/            ← Scripts e recursos relacionados com a BD
+├── includes/            ← Configuração, ligação à BD e funções centrais
+├── jm-panel/            ← Painel administrativo
+├── services/            ← Páginas de serviços
+├── status/              ← Páginas de estado e indisponibilidade
+├── manifest.json        ← Manifesto PWA
+├── manifest.php         ← Manifesto dinâmico
+└── sw.js                ← Service Worker
 ```
 
 ---
 
-## 🔐 Segurança do Repositório (GitHub Seguro)
+## 🔐 Segurança do Repositório
 
-O ficheiro `.gitignore` está configurado para garantir boas práticas de segurança em ambiente de equipa:
-- O ficheiro real `includes/config.php` (com as senhas do banco de dados) está estritamente bloqueado e não é enviado para o GitHub.
-- Para consulta de estrutura, existe o modelo `includes/config.example.php`.
+O repositório segue boas práticas de protecção de informação e configuração por ambiente.
+
+- O ficheiro `includes/config.php` gere a configuração global e carrega as variáveis de ambiente.
+- As credenciais e chaves privadas devem ser mantidas em `.env` ou `.env.production`, nunca directamente no código.
+- O ficheiro `env.example` disponibiliza um modelo de configuração sem credenciais reais.
+- Os ficheiros `.env`, `.env.production`, dependências, caches e backups locais são excluídos através do `.gitignore`.
+- As sessões públicas e administrativas utilizam contextos separados.
+- As operações administrativas utilizam autenticação, autorização e protecção CSRF.
 
 ---
 
-## 💻 Instalação Local (Apenas para Avaliação Técnica)
+## 💻 Instalação Local
 
-Se fores um Tech Lead ou Recrutador e desejares testar o projeto no teu ambiente local (XAMPP/Laragon):
+Para testar o projecto num ambiente local com XAMPP ou Laragon:
 
-1. **Clona o projeto:** `git clone https://github.com`
-2. **Configura o Ambiente:** Na pasta `includes/`, duplica o `config.example.php` para `config.php` e insere as tuas credenciais locais.
-3. **Base de Dados:** Cria a base de dados e importa o ficheiro `database/schema.sql`.
-4. **Cria o Admin:** Executa o script `php database/seed_admin.php` no terminal para gerar o acesso inicial ao painel.
+1. **Clonar o repositório:**
+
+   ```bash
+   git clone https://github.com/josembengacosta/jmbenga-my-portfolio.git
+   ```
+
+2. **Configurar o ambiente:**
+
+   Copia `env.example` para `.env` e preenche as variáveis com as configurações do teu ambiente local.
+
+3. **Configurar a base de dados:**
+
+   Cria uma base de dados MySQL/MariaDB e importa o esquema SQL actualizado correspondente à versão do projecto. Confirma a versão do script antes de executar a importação.
+
+4. **Configurar o acesso administrativo:**
+
+   O script `database/seed_admin.php` encontra-se desactivado. O provisionamento do primeiro administrador deve seguir o procedimento seguro de criação de contas do projecto.
+
+5. **Executar o projecto:**
+
+   Inicia Apache e MySQL no XAMPP ou Laragon e acede ao endereço local configurado em `BASE_URL`.
 
 ---
 
 ## 📄 Licença
 
-Este projeto está sob a licença MIT. Veja o ficheiro [LICENSE](LICENSE) para mais detalhes.
+Este projecto está sob a licença MIT. Consulta o ficheiro [LICENSE](LICENSE) para mais detalhes.
 
-Desenvolvido por **José Mbenga** © 2026
+---
+
+Desenvolvido por **José Mbenga** © 2026.

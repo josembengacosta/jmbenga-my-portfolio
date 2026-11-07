@@ -182,11 +182,17 @@ function handleUpdateProfile(PDO $db, int $adminId): never
 function handleToggleLockscreen(PDO $db, int $adminId): never
 {
     $raw = $_POST['enabled'] ?? '0';
-    if (!in_array((string) $raw, ['0', '1'], true)) jsonError('Valor inválido para lockscreen.', 422);
+    if (!is_string($raw) || !in_array($raw, ['0', '1'], true)) jsonError('Valor inválido para lockscreen.', 422);
     $enabled = (int) $raw;
-    $check = $db->prepare('SELECT lockscreen FROM _employees_security WHERE id_employees = ? LIMIT 1');
+    $check = $db->prepare('SELECT access_code FROM _employees_security WHERE id_employees = ? LIMIT 1');
     $check->execute([$adminId]);
-    if ($check->fetchColumn() === false) jsonError('Não existe registo de segurança para esta conta.', 409);
+    $storedPin = $check->fetchColumn();
+    if ($storedPin === false) jsonError('Não existe registo de segurança para esta conta.', 409);
+    $storedPin = is_string($storedPin) ? $storedPin : '';
+    $pinConfigured = preg_match('/\A[0-9]{6}\z/', $storedPin) === 1 || isAdminLockscreenPinHash($storedPin);
+    if ($enabled === 1 && !$pinConfigured) {
+        jsonError('Define primeiro um PIN de seis dígitos antes de activar a lockscreen.', 409);
+    }
 
     try {
         $db->beginTransaction();
@@ -203,16 +209,17 @@ function handleToggleLockscreen(PDO $db, int $adminId): never
 
 function handleChangePin(PDO $db, int $adminId): never
 {
-    $newPin = trim((string) ($_POST['new_pin'] ?? ''));
-    if (!preg_match('/^\d{6}$/', $newPin)) jsonError('O PIN deve conter exactamente 6 dígitos numéricos.', 422);
+    $pinInput = $_POST['new_pin'] ?? null;
+    $newPin = is_string($pinInput) ? trim($pinInput) : '';
+    if (!preg_match('/\A[0-9]{6}\z/', $newPin)) jsonError('O PIN deve conter exactamente 6 dígitos numéricos.', 422);
     $check = $db->prepare('SELECT access_code FROM _employees_security WHERE id_employees = ? LIMIT 1');
     $check->execute([$adminId]);
     if ($check->fetchColumn() === false) jsonError('Não existe registo de segurança para esta conta.', 409);
 
     try {
+        $pinHash = hashAdminLockscreenPin($newPin);
         $db->beginTransaction();
-        // Mantém o formato actual de access_code para não quebrar o validador existente do lockscreen.
-        $db->prepare('UPDATE _employees_security SET access_code = ?, lockscreen = 1 WHERE id_employees = ?')->execute([$newPin, $adminId]);
+        $db->prepare('UPDATE _employees_security SET access_code = ?, lockscreen = 1 WHERE id_employees = ?')->execute([$pinHash, $adminId]);
         logAudit($adminId, null, 'security.pin_changed', '_employees_security', $adminId, null, ['pin_length' => strlen($newPin)]);
         $db->commit();
     } catch (Throwable $e) {

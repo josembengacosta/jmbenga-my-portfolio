@@ -472,7 +472,7 @@ $profileCssVersion = is_file($profileCssPath) ? (string) filemtime($profileCssPa
                                 <div style="font-size:.82rem;color:var(--text-dim);margin-bottom:.6rem">
                                     <i class="fas fa-hashtag" style="color:var(--accent)"></i>
                                     PIN actual: <code
-                                        style="background:var(--bg);padding:2px 7px;border-radius:5px;font-family:var(--font-mono)"><?= $admin['access_code'] ? str_repeat('●', strlen($admin['access_code'])) : '—' ?></code>
+                                        style="background:var(--bg);padding:2px 7px;border-radius:5px;font-family:var(--font-mono)"><?= !empty($admin['access_code']) ? str_repeat('●', 6) : '—' ?></code>
                                 </div>
                                 <div style="font-size:.78rem;color:var(--text-muted);margin-bottom:.8rem">
                                     Altera o PIN de 6 dígitos abaixo:

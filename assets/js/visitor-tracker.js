@@ -143,10 +143,10 @@
   // Quando a ligação voltar, tenta enviar os eventos pendentes.
   window.addEventListener('online', flushPending);
 
-  // ── Pageview inicial ────────────────────────────────────────
+  // A pageview inicial já é registada no servidor por includes/visitor.php.
+  // O JavaScript envia apenas eventos complementares, evitando duplicar pageviews.
   const startTime = Date.now();
   flushPending();
-  send({ event: 'pageview' });
 
   // ── Scroll depth ────────────────────────────────────────────
   let maxScroll = 0;

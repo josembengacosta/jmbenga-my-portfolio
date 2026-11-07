@@ -1,20 +1,36 @@
 <?php
 // JMbenga Portfolio — Página 503 (Serviço Temporariamente Indisponível)
-http_response_code(503);
-header('Retry-After: 3600'); // Recomenda uma nova tentativa após 1 hora.
+// Independente da base de dados e do layout normal da aplicação.
 
-// Esta página foi concebida para funcionar mesmo quando a base de dados ou
-// os ficheiros de configuração da aplicação estão indisponíveis.
+$jm503IsDatabaseOutage = !empty($GLOBALS['jmbenga_db_unavailable']);
+$jm503ShowDiagnostics = $jm503IsDatabaseOutage && !empty($GLOBALS['jmbenga_show_db_diagnostics']);
+$jm503Diagnostic = $jm503ShowDiagnostics && is_array($GLOBALS['jmbenga_db_diagnostic'] ?? null)
+    ? $GLOBALS['jmbenga_db_diagnostic']
+    : [];
+$jm503RetryAfter = max(30, min(3600, (int) ($GLOBALS['jmbenga_503_retry_after'] ?? 3600)));
+
+http_response_code(503);
+header('Retry-After: ' . $jm503RetryAfter);
+header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
+header('Pragma: no-cache');
+
 $site_name = 'JMbenga';
 
-// Calcula o prefixo da aplicação a partir do caminho do próprio script:
-// /status/503.php -> "" (produção na raiz)
-// /portfolio-jmbenga/status/503.php -> "/portfolio-jmbenga" (XAMPP local)
-$script_name = str_replace('\\', '/', (string) ($_SERVER['SCRIPT_NAME'] ?? '/status/503.php'));
-$parent_path = dirname(dirname($script_name));
-$base_url = ($parent_path === '/' || $parent_path === '.' || $parent_path === '\\')
-    ? ''
-    : '/' . trim($parent_path, '/');
+// Quando incluída por includes/db.php, BASE_URL é a fonte correcta para
+// determinar o prefixo da aplicação (ex.: /portfolio-jmbenga no XAMPP).
+// Quando aberta directamente, usa o caminho de /status/503.php como fallback.
+$base_url = '';
+if (defined('BASE_URL') && is_string(BASE_URL) && BASE_URL !== '') {
+    $configuredPath = parse_url(BASE_URL, PHP_URL_PATH);
+    if (is_string($configuredPath)) {
+        $base_url = rtrim($configuredPath, '/');
+    }
+} else {
+    $script_name = str_replace('\\', '/', (string) ($_SERVER['SCRIPT_NAME'] ?? '/status/503.php'));
+    if (preg_match('~^(.*?)/status/503\.php$~i', $script_name, $matches)) {
+        $base_url = rtrim((string) $matches[1], '/');
+    }
+}
 
 $buildUrl = static function (string $path) use ($base_url): string {
     return $base_url . '/' . ltrim($path, '/');
@@ -28,6 +44,9 @@ $about_url = $buildUrl('about');
 $services_url = $buildUrl('servicos');
 $contact_url = $buildUrl('contact');
 $icon_url = $buildUrl('assets/img/icons/favicon.ico');
+$page_title = $jm503IsDatabaseOutage
+    ? '503 — Ligação Temporariamente Indisponível | ' . $site_name
+    : '503 — Serviço Indisponível | ' . $site_name;
 ?>
 <!DOCTYPE html>
 <html lang="pt" data-theme="dark">
@@ -37,7 +56,7 @@ $icon_url = $buildUrl('assets/img/icons/favicon.ico');
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="robots" content="noindex, nofollow">
     <meta name="theme-color" content="#0a0d14">
-    <title>503 — Serviço Indisponível | <?= $e($site_name) ?></title>
+    <title><?= $e($page_title) ?></title>
     <link rel="shortcut icon" href="<?= $e($icon_url) ?>">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -205,6 +224,73 @@ $icon_url = $buildUrl('assets/img/icons/favicon.ico');
 
     .countdown strong {
         font-variant-numeric: tabular-nums;
+    }
+
+    .diagnostic-panel {
+        width: min(100%, 560px);
+        margin: 0 auto 1.4rem;
+        padding: 1rem 1.1rem;
+        border: 1px solid rgba(234, 179, 8, .28);
+        border-radius: var(--radius);
+        background: rgba(234, 179, 8, .055);
+        text-align: left;
+    }
+
+    .diagnostic-heading {
+        display: flex;
+        align-items: center;
+        gap: .55rem;
+        margin-bottom: .85rem;
+        color: var(--accent);
+        font-size: .82rem;
+    }
+
+    .diagnostic-heading span {
+        margin-left: auto;
+        padding: .18rem .45rem;
+        border: 1px solid rgba(234, 179, 8, .3);
+        border-radius: 5px;
+        font-size: .62rem;
+        letter-spacing: .08em;
+    }
+
+    .diagnostic-panel dl {
+        display: grid;
+        grid-template-columns: 105px minmax(0, 1fr);
+        gap: .45rem .75rem;
+        font-size: .76rem;
+    }
+
+    .diagnostic-panel dt {
+        color: var(--text-muted);
+    }
+
+    .diagnostic-panel dd {
+        min-width: 0;
+        color: var(--text);
+        font-family: var(--font-body);
+        overflow-wrap: anywhere;
+    }
+
+    .diagnostic-panel .diagnostic-message {
+        grid-column: 1 / -1;
+    }
+
+    .diagnostic-panel .diagnostic-message dd {
+        margin-top: .25rem;
+        padding: .65rem;
+        border-radius: 7px;
+        background: rgba(0, 0, 0, .18);
+        color: #fbbf24;
+        font-family: var(--font-body);
+        line-height: 1.55;
+    }
+
+    .diagnostic-panel>p {
+        margin-top: .75rem;
+        color: var(--text-muted);
+        font-size: .68rem;
+        line-height: 1.5;
     }
 
     .action-row {
@@ -383,16 +469,47 @@ $icon_url = $buildUrl('assets/img/icons/favicon.ico');
     </button>
     <main class="page-wrap">
         <div class="fade-in error-code" aria-label="Erro 503">503</div>
-        <div class="fade-in error-badge"><i class="fas fa-tools" aria-hidden="true"></i> Manutenção</div>
-        <h1 class="fade-in error-title">Serviço <span>Temporariamente</span> Indisponível</h1>
+        <div class="fade-in error-badge"><i class="fas <?= $jm503IsDatabaseOutage ? 'fa-database' : 'fa-tools' ?>"
+                aria-hidden="true"></i>
+            <?= $jm503IsDatabaseOutage ? 'Indisponibilidade técnica' : 'Manutenção' ?></div>
+        <h1 class="fade-in error-title">
+            <?= $jm503IsDatabaseOutage ? 'Ligação <span>Indisponível</span>' : 'Serviço <span>Temporariamente</span> Indisponível' ?>
+        </h1>
         <p class="fade-in error-desc">
-            Estamos a realizar manutenção ou melhorias. O serviço deverá voltar a estar disponível mais tarde.
-            Podes tentar novamente manualmente a qualquer momento.
+            <?= $jm503IsDatabaseOutage
+                ? 'Não foi possível estabelecer ligação com um serviço necessário para carregar o portfólio. A equipa técnica foi informada e o sistema tentará novamente.'
+                : 'Estamos a realizar manutenção ou melhorias. O serviço deverá voltar a estar disponível mais tarde. Podes tentar novamente manualmente a qualquer momento.' ?>
         </p>
+        <?php if ($jm503ShowDiagnostics): ?>
+        <section class="fade-in diagnostic-panel" aria-labelledby="diagnostic-title">
+            <div class="diagnostic-heading"><i class="fas fa-bug" aria-hidden="true"></i><strong
+                    id="diagnostic-title">Diagnóstico de desenvolvimento</strong><span>LOCAL</span></div>
+            <dl>
+                <div>
+                    <dt>Ambiente</dt>
+                    <dd><?= $e($jm503Diagnostic['environment'] ?? 'development') ?></dd>
+                </div>
+                <div>
+                    <dt>Tipo</dt>
+                    <dd><?= $e($jm503Diagnostic['exception'] ?? 'PDOException') ?></dd>
+                </div>
+                <div>
+                    <dt>SQLSTATE</dt>
+                    <dd><?= $e($jm503Diagnostic['sql_state'] ?? '—') ?></dd>
+                </div>
+                <div class="diagnostic-message">
+                    <dt>Mensagem técnica</dt>
+                    <dd><?= $e($jm503Diagnostic['message'] ?? 'Sem mensagem adicional.') ?></dd>
+                </div>
+            </dl>
+            <p>Este diagnóstico só é apresentado em development através de um endereço local ou privado. Em produção,
+                estes detalhes nunca são enviados ao navegador.</p>
+        </section>
+        <?php endif; ?>
         <div class="fade-in countdown" role="status" aria-live="polite">
             <i class="fas fa-clock" aria-hidden="true"></i>
             <span>Nova tentativa automática em</span>
-            <strong id="countdown">60:00</strong>
+            <strong id="countdown"></strong>
         </div>
         <div class="fade-in action-row">
             <button class="btn btn-primary" id="retryButton" type="button" onclick="location.reload()">
@@ -412,8 +529,8 @@ $icon_url = $buildUrl('assets/img/icons/favicon.ico');
     (function() {
         'use strict';
 
-        // Retry-After é de 3600 segundos; a tentativa automática respeita a mesma janela.
-        var remaining = 3600;
+        // A contagem acompanha o Retry-After enviado pelo servidor.
+        var remaining = <?= (int) $jm503RetryAfter ?>;
         var countdown = document.getElementById('countdown');
         var intervalId = null;
 

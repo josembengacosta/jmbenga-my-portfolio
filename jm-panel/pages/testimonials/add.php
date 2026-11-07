@@ -38,9 +38,11 @@ unset($_SESSION['form_data'], $_SESSION['form_errors']);
 <!DOCTYPE html>
 <html lang="pt" data-theme="dark" data-base-url="<?= BASE_URL ?>">
 <?php include __DIR__ . '/../../include/head.php'; ?>
+<link rel="stylesheet"
+    href="<?= BASE_URL ?>/assets/css/jmbenga-testimonials.css?v=<?= is_file(ROOT_PATH . '/assets/css/jmbenga-testimonials.css') ? filemtime(ROOT_PATH . '/assets/css/jmbenga-testimonials.css') : '1.0.0' ?>">
 </head>
 
-<body>
+<body class="testimonial-form-page">
 
     <?php include __DIR__ . '/../../include/sidebar.php'; ?>
 
@@ -91,7 +93,7 @@ unset($_SESSION['form_data'], $_SESSION['form_errors']);
 
             <!-- ═══ FORMULÁRIO ════════════════════════════════════════════ -->
             <form id="testimonialForm" novalidate data-api="<?= BASE_URL ?>/jm-panel/testimonials/add-process"
-                enctype="multipart/form-data">
+                data-mode="add" data-max-upload-size="<?= (int) MAX_UPLOAD_SIZE ?>" enctype="multipart/form-data">
 
                 <input type="hidden" name="csrf_token" id="csrf_token" value="<?= $_SESSION['admin_csrf_token'] ?>">
 
@@ -187,7 +189,8 @@ unset($_SESSION['form_data'], $_SESSION['form_errors']);
                                 Depoimento <span class="required">*</span>
                             </label>
                             <textarea id="body_testimonial" name="body_testimonial" class="form-control textarea-lg"
-                                rows="5" placeholder="Escreve o depoimento do cliente…"
+                                rows="5" maxlength="2000" maxlength="2000"
+                                placeholder="Escreve o depoimento do cliente…"
                                 required><?= e($formData['body_testimonial'] ?? '') ?></textarea>
                             <span class="form-hint" id="bodyCount">0/2000 caracteres</span>
                         </div>
@@ -231,380 +234,30 @@ unset($_SESSION['form_data'], $_SESSION['form_errors']);
 
     <?php include __DIR__ . '/../../include/modal_logout.php'; ?>
 
-    <style>
-    .breadcrumb {
-        display: flex;
-        align-items: center;
-        gap: .5rem;
-        font-size: .78rem;
-        color: var(--text-muted);
-        margin-bottom: .5rem
-    }
-
-    .breadcrumb a {
-        color: var(--text-dim);
-        text-decoration: none;
-        transition: color .2s
-    }
-
-    .breadcrumb a:hover {
-        color: var(--accent)
-    }
-
-    .breadcrumb i {
-        font-size: .6rem
-    }
-
-    .page-top {
-        display: flex;
-        justify-content: space-between;
-        align-items: flex-start;
-        flex-wrap: wrap;
-        gap: 1rem;
-        margin-bottom: 1.5rem
-    }
-
-    .page-title {
-        font-family: var(--font-head);
-        font-size: 1.5rem;
-        font-weight: 800;
-        letter-spacing: -.02em;
-        margin-bottom: .2rem
-    }
-
-    .page-sub {
-        font-size: .8rem;
-        color: var(--text-muted)
-    }
-
-    .alert {
-        padding: 1rem 1.2rem;
-        border-radius: var(--radius);
-        margin-bottom: 1.5rem;
-        display: flex;
-        align-items: flex-start;
-        gap: .75rem;
-        font-size: .85rem
-    }
-
-    .alert-danger {
-        background: rgba(239, 68, 68, .1);
-        border: 1px solid rgba(239, 68, 68, .3);
-        color: #f87171
-    }
-
-    .alert-close {
-        margin-left: auto;
-        background: none;
-        border: none;
-        color: inherit;
-        cursor: pointer;
-        opacity: .6;
-        font-size: .9rem
-    }
-
-    .alert-close:hover {
-        opacity: 1
-    }
-
-    .form-section {
-        background: var(--bg-card);
-        border: 1px solid var(--border);
-        border-radius: var(--radius-lg);
-        padding: 1.8rem;
-        margin-bottom: 1.2rem;
-        transition: border-color .25s
-    }
-
-    .form-section:focus-within {
-        border-color: var(--border-acc)
-    }
-
-    .section-header {
-        display: flex;
-        align-items: flex-start;
-        gap: 1rem;
-        margin-bottom: 1.5rem;
-        padding-bottom: 1.2rem;
-        border-bottom: 1px solid var(--border)
-    }
-
-    .section-icon {
-        width: 40px;
-        height: 40px;
-        border-radius: 10px;
-        background: var(--accent-glow);
-        border: 1px solid var(--border-acc);
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        color: var(--accent);
-        font-size: .95rem;
-        flex-shrink: 0
-    }
-
-    .section-header h3 {
-        font-family: var(--font-head);
-        font-size: 1rem;
-        font-weight: 700;
-        margin-bottom: .15rem
-    }
-
-    .section-header p {
-        font-size: .78rem;
-        color: var(--text-muted)
-    }
-
-    .form-grid {
-        display: grid;
-        grid-template-columns: 1fr 1fr;
-        gap: 1.2rem
-    }
-
-    .form-group.full-width {
-        grid-column: 1/-1
-    }
-
-    @media(max-width:768px) {
-        .form-grid {
-            grid-template-columns: 1fr
-        }
-    }
-
-    .form-group {
-        display: flex;
-        flex-direction: column;
-        gap: .35rem
-    }
-
-    .form-label {
-        font-size: .75rem;
-        font-weight: 600;
-        text-transform: uppercase;
-        letter-spacing: .04em;
-        color: var(--text-dim)
-    }
-
-    .required {
-        color: var(--danger)
-    }
-
-    .form-control {
-        padding: .65rem .85rem;
-        background: var(--bg);
-        border: 1px solid var(--border);
-        border-radius: 8px;
-        color: var(--text);
-        font-family: var(--font-body);
-        font-size: .88rem;
-        outline: none;
-        transition: border-color .2s, box-shadow .2s
-    }
-
-    .form-control:focus {
-        border-color: var(--accent);
-        box-shadow: 0 0 0 3px var(--accent-glow)
-    }
-
-    .form-control::placeholder {
-        color: var(--text-muted)
-    }
-
-    .form-hint {
-        font-size: .7rem;
-        color: var(--text-muted);
-        margin-top: .15rem
-    }
-
-    .textarea-lg {
-        resize: vertical;
-        min-height: 120px;
-        line-height: 1.7
-    }
-
-    .star-rating {
-        display: flex;
-        align-items: center;
-        gap: .3rem
-    }
-
-    .star-btn {
-        background: none;
-        border: none;
-        font-size: 1.3rem;
-        color: var(--border);
-        cursor: pointer;
-        transition: color .15s;
-        padding: 0
-    }
-
-    .star-btn.active,
-    .star-btn:hover {
-        color: var(--warning)
-    }
-
-    .rating-text {
-        font-family: var(--font-mono);
-        font-size: .85rem;
-        color: var(--text-dim);
-        margin-left: .5rem
-    }
-
-    .switch {
-        display: flex;
-        align-items: center;
-        gap: .75rem;
-        cursor: pointer
-    }
-
-    .switch input {
-        display: none
-    }
-
-    .switch-slider {
-        width: 42px;
-        height: 24px;
-        border-radius: 12px;
-        background: var(--border);
-        transition: background .25s;
-        position: relative;
-        flex-shrink: 0
-    }
-
-    .switch-slider::after {
-        content: '';
-        position: absolute;
-        top: 3px;
-        left: 3px;
-        width: 18px;
-        height: 18px;
-        border-radius: 50%;
-        background: #fff;
-        transition: transform .25s
-    }
-
-    .switch input:checked+.switch-slider {
-        background: var(--accent)
-    }
-
-    .switch input:checked+.switch-slider::after {
-        transform: translateX(18px)
-    }
-
-    .switch-label {
-        font-size: .82rem;
-        font-weight: 500
-    }
-
-    .number-input {
-        display: flex;
-        align-items: center;
-        gap: .3rem
-    }
-
-    .num-btn {
-        width: 32px;
-        height: 32px;
-        border-radius: 6px;
-        background: var(--bg);
-        border: 1px solid var(--border);
-        color: var(--text-dim);
-        cursor: pointer;
-        font-size: .9rem;
-        transition: all .15s;
-        display: flex;
-        align-items: center;
-        justify-content: center
-    }
-
-    .num-btn:hover {
-        border-color: var(--accent);
-        color: var(--accent)
-    }
-
-    .num-field {
-        width: 70px;
-        text-align: center;
-        -moz-appearance: textfield
-    }
-
-    .num-field::-webkit-outer-spin-button,
-    .num-field::-webkit-inner-spin-button {
-        -webkit-appearance: none;
-        margin: 0
-    }
-
-    .btn {
-        display: inline-flex;
-        align-items: center;
-        gap: .45rem;
-        padding: .55rem 1.1rem;
-        border-radius: 8px;
-        font-family: var(--font-body);
-        font-size: .83rem;
-        font-weight: 500;
-        cursor: pointer;
-        transition: all .2s;
-        text-decoration: none;
-        border: 1px solid var(--border);
-        white-space: nowrap
-    }
-
-    .btn-primary {
-        background: var(--accent);
-        color: #fff;
-        border-color: var(--accent)
-    }
-
-    .btn-primary:hover {
-        background: #1d4ed8;
-        transform: translateY(-1px);
-        box-shadow: 0 4px 16px var(--accent-glow)
-    }
-
-    .btn-secondary {
-        background: transparent;
-        border: 1px solid var(--border);
-        color: var(--text-dim)
-    }
-
-    .btn-secondary:hover {
-        background: var(--bg-hover);
-        border-color: var(--border-acc);
-        color: var(--text)
-    }
-
-    .btn-lg {
-        padding: .7rem 1.5rem;
-        font-size: .9rem
-    }
-
-    .form-actions {
-        display: flex;
-        gap: .75rem;
-        justify-content: flex-end;
-        margin-top: 1.5rem;
-        padding-top: 1.5rem;
-        border-top: 1px solid var(--border)
-    }
-    </style>
 
     <script>
-    const BASE_URL = '<?= BASE_URL ?>';
+    const BASE_URL =
+        <?= json_encode(BASE_URL, JSON_UNESCAPED_SLASHES | JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_AMP | JSON_HEX_QUOT) ?>;
     const form = document.getElementById('testimonialForm');
-    const submitBtns = document.querySelectorAll('#submitBtn, #submitBtn2');
+    const submitBtns = Array.from(document.querySelectorAll('#submitBtn, #submitBtn2'));
+    const photoInput = document.getElementById('photo_testimonial');
+    const maxUploadSize = Number(form?.dataset.maxUploadSize || 0);
 
     function showToast(message, type = 'success') {
         const container = document.getElementById('toast-container') || createToastContainer();
         const toast = document.createElement('div');
         toast.className = `toast toast-${type}`;
-        toast.innerHTML =
-            `<i class="fas fa-${type === 'success' ? 'check-circle' : type === 'error' ? 'times-circle' : 'info-circle'}"></i> ${message}`;
+        const icon = document.createElement('i');
+        icon.className =
+            `fas fa-${type === 'success' ? 'check-circle' : type === 'error' ? 'times-circle' : 'info-circle'}`;
+        const text = document.createElement('span');
+        text.textContent = String(message);
+        toast.append(icon, text);
         container.appendChild(toast);
-        setTimeout(() => {
+        window.setTimeout(() => {
             toast.style.opacity = '0';
             toast.style.transform = 'translateX(20px)';
-            setTimeout(() => toast.remove(), 300);
+            window.setTimeout(() => toast.remove(), 300);
         }, 4000);
     }
 
@@ -617,107 +270,138 @@ unset($_SESSION['form_data'], $_SESSION['form_errors']);
         return container;
     }
 
-    // ── Avaliação por estrelas ───────────────────────────────────
+    async function readJsonResponse(response) {
+        const raw = await response.text();
+        try {
+            return JSON.parse(raw);
+        } catch (_) {
+            throw new Error('O servidor devolveu uma resposta inesperada. Verifica a sessão e tenta novamente.');
+        }
+    }
+
+    function setSubmitting(isSubmitting) {
+        submitBtns.forEach(button => {
+            if (!button.dataset.originalHtml) button.dataset.originalHtml = button.innerHTML;
+            button.disabled = isSubmitting;
+            button.innerHTML = isSubmitting ?
+                '<i class="fas fa-spinner fa-spin"></i> A guardar…' :
+                button.dataset.originalHtml;
+        });
+    }
+
+    // Rating selector: synchronize hidden value, visual state and accessible state.
     const starBtns = document.querySelectorAll('.star-btn');
     const ratingValue = document.getElementById('ratingValue');
     const ratingText = document.getElementById('ratingText');
     starBtns.forEach(btn => {
-        btn.addEventListener('click', function() {
-            const val = parseInt(this.dataset.value);
-            ratingValue.value = val;
-            ratingText.textContent = val + '/5';
-            starBtns.forEach((b, i) => b.classList.toggle('active', i < val));
+        btn.addEventListener('click', () => {
+            const value = Number.parseInt(btn.dataset.value, 10);
+            if (!Number.isInteger(value) || value < 1 || value > 5) return;
+            ratingValue.value = String(value);
+            ratingText.textContent = `${value}/5`;
+            starBtns.forEach((star, index) => {
+                const active = index < value;
+                star.classList.toggle('active', active);
+                star.setAttribute('aria-pressed', active ? 'true' : 'false');
+            });
         });
     });
 
-    // ── Contador de caracteres ──────────────────────────────────
+    // Character counter counts Unicode code points, matching PHP mb_strlen more closely.
     const bodyInput = document.getElementById('body_testimonial');
     const bodyCount = document.getElementById('bodyCount');
-    if (bodyInput && bodyCount) {
-        bodyInput.addEventListener('input', function() {
-            const len = this.value.length;
-            bodyCount.textContent = len + '/2000 caracteres';
-            bodyCount.style.color = len > 1900 ? 'var(--danger)' : 'var(--text-muted)';
-        });
+
+    function updateBodyCount() {
+        if (!bodyInput || !bodyCount) return;
+        const length = Array.from(bodyInput.value).length;
+        bodyCount.textContent = `${length}/2000 caracteres`;
+        bodyCount.style.color = length > 1900 ? 'var(--danger)' : 'var(--text-muted)';
+    }
+    if (bodyInput) {
+        bodyInput.addEventListener('input', updateBodyCount);
+        updateBodyCount();
     }
 
-    // ── Ordem +/− ──────────────────────────────────────────────
     function changeOrder(delta) {
         const field = document.getElementById('display_order');
-        let val = parseInt(field.value) || 0;
-        val = Math.max(0, val + delta);
-        field.value = val;
+        if (!field) return;
+        const value = Number.parseInt(field.value, 10) || 0;
+        field.value = String(Math.max(0, value + delta));
     }
+    window.changeOrder = changeOrder;
 
-    // ── Switch label ─────────────────────────────────────────────
     const statusCheckbox = document.querySelector('input[name="status_testimonial"]');
     const switchLabel = document.querySelector('.switch-label');
-    statusCheckbox.addEventListener('change', function() {
-        switchLabel.textContent = this.checked ? 'Visível' : 'Oculto';
-    });
+    if (statusCheckbox && switchLabel) {
+        statusCheckbox.addEventListener('change', () => {
+            switchLabel.textContent = statusCheckbox.checked ? 'Visível' : 'Oculto';
+        });
+    }
 
-    // ── Submissão AJAX ───────────────────────────────────────────
-    form.addEventListener('submit', async function(e) {
-        e.preventDefault();
-
-        let clientValid = true;
-        form.querySelectorAll('[required]').forEach(field => {
-            if (!field.value.trim()) {
-                field.classList.add('error');
-                clientValid = false;
-            } else {
-                field.classList.remove('error');
+    if (photoInput) {
+        photoInput.addEventListener('change', () => {
+            const file = photoInput.files?. [0];
+            if (!file) return;
+            const allowed = ['image/jpeg', 'image/png', 'image/webp'];
+            if (!allowed.includes(file.type)) {
+                photoInput.value = '';
+                showToast('Formato de foto não permitido. Usa JPEG, PNG ou WebP.', 'error');
+            } else if (maxUploadSize > 0 && file.size > maxUploadSize) {
+                photoInput.value = '';
+                showToast(`A foto excede o limite de ${(maxUploadSize / 1024 / 1024).toFixed(1)} MB.`, 'error');
             }
         });
-        if (!clientValid) {
-            showToast('Preenche todos os campos obrigatórios.', 'error');
-            return;
-        }
+    }
 
-        submitBtns.forEach(btn => {
-            btn.disabled = true;
-            btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> A guardar…';
-        });
+    if (form) {
+        form.addEventListener('submit', async event => {
+            event.preventDefault();
+            if (form.dataset.submitting === '1') return;
 
-        try {
-            const formData = new FormData(form);
-            const res = await fetch(form.dataset.api, {
-                method: 'POST',
-                body: formData,
-                headers: {
-                    'X-Requested-With': 'XMLHttpRequest',
-                    'X-CSRF-Token': document.getElementById('csrf_token').value
-                }
+            let valid = true;
+            form.querySelectorAll('[required]').forEach(field => {
+                const empty = !String(field.value ?? '').trim();
+                field.classList.toggle('error', empty);
+                if (empty) valid = false;
             });
-
-            const data = await res.json();
-
-            if (!res.ok || !data.success) {
-                if (data.errors) {
-                    data.errors.forEach(err => showToast(err, 'error'));
-                } else {
-                    showToast(data.message || 'Erro ao criar depoimento.', 'error');
-                }
-                submitBtns.forEach(btn => {
-                    btn.disabled = false;
-                    btn.innerHTML = '<i class="fas fa-save"></i> Guardar Depoimento';
-                });
+            if (!valid) {
+                showToast('Preenche todos os campos obrigatórios.', 'error');
                 return;
             }
 
-            showToast('Depoimento criado com sucesso!', 'success');
-            setTimeout(() => {
-                window.location.href = BASE_URL + '/jm-panel/testimonials?msg=created';
-            }, 800);
-
-        } catch (err) {
-            showToast('Erro de rede. Tenta novamente.', 'error');
-            submitBtns.forEach(btn => {
-                btn.disabled = false;
-                btn.innerHTML = '<i class="fas fa-save"></i> Guardar Depoimento';
-            });
-        }
-    });
+            form.dataset.submitting = '1';
+            setSubmitting(true);
+            try {
+                const response = await fetch(form.dataset.api, {
+                    method: 'POST',
+                    body: new FormData(form),
+                    headers: {
+                        'X-Requested-With': 'XMLHttpRequest',
+                        'X-CSRF-Token': document.getElementById('csrf_token')?.value || ''
+                    }
+                });
+                const data = await readJsonResponse(response);
+                if (!response.ok || !data.success) {
+                    const errors = Array.isArray(data.errors) ? data.errors : [data.message ||
+                        'Não foi possível guardar o depoimento.'
+                    ];
+                    errors.forEach(message => showToast(message, 'error'));
+                    form.dataset.submitting = '0';
+                    setSubmitting(false);
+                    return;
+                }
+                showToast(data.message || 'Depoimento guardado com sucesso.', 'success');
+                window.setTimeout(() => {
+                    window.location.href = BASE_URL + '/jm-panel/testimonials?msg=' + (form.dataset
+                        .mode === 'edit' ? 'updated' : 'created');
+                }, 700);
+            } catch (error) {
+                showToast(error.message || 'Erro de rede. Tenta novamente.', 'error');
+                form.dataset.submitting = '0';
+                setSubmitting(false);
+            }
+        });
+    }
     </script>
 </body>
 

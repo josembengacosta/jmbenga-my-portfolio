@@ -68,7 +68,9 @@ body {
   line-height: 1.65;
   overflow-x: hidden;
   -webkit-font-smoothing: antialiased;
-  transition: background 0.35s, color 0.35s;
+  transition:
+    background 0.35s,
+    color 0.35s;
 }
 
 img {
@@ -116,7 +118,9 @@ ul {
   justify-content: center;
   flex-direction: column;
   gap: 20px;
-  transition: opacity 0.5s, visibility 0.5s;
+  transition:
+    opacity 0.5s,
+    visibility 0.5s;
 }
 
 #loading.hidden {
@@ -134,12 +138,12 @@ ul {
   -webkit-text-fill-color: transparent;
   background-clip: text;
 }
-  @media (max-width: 768px) {
-    .loader-logo {
-      font-size: 1.4rem !important;
-      letter-spacing: -0.01em !important;
-    }
+@media (max-width: 768px) {
+  .loader-logo {
+    font-size: 1.4rem !important;
+    letter-spacing: -0.01em !important;
   }
+}
 
 .loader-bar {
   width: 160px;
@@ -321,7 +325,9 @@ ul {
 .reveal {
   opacity: 0;
   transform: translateY(28px);
-  transition: opacity 0.7s var(--ease), transform 0.7s var(--ease);
+  transition:
+    opacity 0.7s var(--ease),
+    transform 0.7s var(--ease);
 }
 
 .reveal.visible {
@@ -339,7 +345,10 @@ ul {
   right: 0;
   z-index: 1000;
   height: var(--nav-h);
-  transition: background 0.4s, border-color 0.4s, backdrop-filter 0.4s;
+  transition:
+    background 0.4s,
+    border-color 0.4s,
+    backdrop-filter 0.4s;
 }
 
 .header.scrolled {
@@ -367,7 +376,7 @@ ul {
   /* letter-spacing: -0.04em; */
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 0;
 }
 
 .logo .logo-icon {
@@ -657,7 +666,9 @@ ul {
   border: 1px solid var(--border);
   border-radius: var(--radius-lg);
   padding: 28px;
-  transition: border-color 0.3s, box-shadow 0.3s;
+  transition:
+    border-color 0.3s,
+    box-shadow 0.3s;
 }
 .card:hover {
   border-color: var(--border-acc);
@@ -688,7 +699,9 @@ ul {
   font-family: var(--font-body);
   font-size: 0.95rem;
   outline: none;
-  transition: border-color 0.25s, box-shadow 0.25s;
+  transition:
+    border-color 0.25s,
+    box-shadow 0.25s;
   width: 100%;
 }
 .form-control:focus {
@@ -796,7 +809,10 @@ select.form-control {
   position: fixed;
   pointer-events: none;
   z-index: 9998;
-  transition: transform 0.35s var(--ease), width 0.3s, height 0.3s;
+  transition:
+    transform 0.35s var(--ease),
+    width 0.3s,
+    height 0.3s;
   mix-blend-mode: difference;
 }
 
@@ -849,7 +865,7 @@ footer {
 
 .footer-bottom {
   display: flex;
-  justify-content: space-between;
+  justify-content: center;
   align-items: center;
   padding-top: 24px;
   border-top: 1px solid var(--border);
@@ -858,52 +874,14 @@ footer {
 }
 
 .footer-copy {
+  width: 100%;
   font-size: 0.8rem;
   color: var(--text-muted);
+  text-align: center;
 }
 
 .footer-copy a {
   color: var(--accent);
-}
-
-.footer-newsletter {
-  display: flex;
-  gap: 8px;
-}
-
-.footer-newsletter input {
-  background: var(--bg-card);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  padding: 9px 14px;
-  color: var(--text);
-  font-family: var(--font-body);
-  font-size: 0.84rem;
-  outline: none;
-  width: 220px;
-  transition: border-color 0.25s;
-}
-
-.footer-newsletter input:focus {
-  border-color: var(--accent);
-}
-
-.footer-newsletter button {
-  background: var(--accent);
-  color: #fff;
-  border: none;
-  border-radius: var(--radius);
-  padding: 9px 18px;
-  font-family: var(--font-body);
-  font-size: 0.84rem;
-  font-weight: 500;
-  cursor: pointer;
-  transition: background 0.25s;
-  white-space: nowrap;
-}
-
-.footer-newsletter button:hover {
-  background: var(--accent-dim);
 }
 
 @media (max-width: 900px) {
@@ -920,7 +898,7 @@ footer {
 
   .footer-bottom {
     flex-direction: column;
-    align-items: flex-start;
+    align-items: center;
   }
 
   .footer-newsletter input {
@@ -1056,7 +1034,9 @@ footer {
   pointer-events: none;
   transform: translateY(16px) scale(0.96);
   transform-origin: right bottom;
-  transition: opacity 0.24s var(--ease), transform 0.24s var(--ease);
+  transition:
+    opacity 0.24s var(--ease),
+    transform 0.24s var(--ease);
 }
 
 .jm-chatbot.is-open .jm-chatbot-panel {
@@ -1108,12 +1088,40 @@ footer {
   font-size: 0.78rem;
 }
 
-.jm-chatbot-header p span {
+.jm-chatbot-header p .jm-chatbot-status-dot {
+  display: inline-block;
+  flex: 0 0 7px;
   width: 7px;
   height: 7px;
   border-radius: 50%;
+  background: #94a3b8;
+  box-shadow: none;
+}
+
+.jm-chatbot-status[data-state="available"] .jm-chatbot-status-dot {
   background: #22c55e;
   box-shadow: 0 0 0 4px rgba(34, 197, 94, 0.16);
+}
+
+.jm-chatbot-status[data-state="busy"] .jm-chatbot-status-dot,
+.jm-chatbot-status[data-state="warning"] .jm-chatbot-status-dot {
+  background: #f59e0b;
+  box-shadow: 0 0 0 4px rgba(245, 158, 11, 0.16);
+}
+
+.jm-chatbot-status[data-state="unavailable"] .jm-chatbot-status-dot,
+.jm-chatbot-status[data-state="offline"] .jm-chatbot-status-dot {
+  background: #ef4444;
+  box-shadow: 0 0 0 4px rgba(239, 68, 68, 0.16);
+}
+
+.jm-chatbot-status .jm-chatbot-status-text {
+  display: inline;
+  width: auto;
+  height: auto;
+  border-radius: 0;
+  background: none;
+  box-shadow: none;
 }
 
 .jm-chatbot-close {
@@ -1231,7 +1239,9 @@ footer {
   border: 0;
   cursor: pointer;
   flex: 0 0 auto;
-  transition: transform 0.2s var(--ease), box-shadow 0.2s var(--ease),
+  transition:
+    transform 0.2s var(--ease),
+    box-shadow 0.2s var(--ease),
     opacity 0.2s;
 }
 
@@ -1270,7 +1280,7 @@ footer {
   width: 10px;
   height: 10px;
   border-radius: 50%;
-  background: #22c55e;
+  background: var(--accent);
   border: 2px solid #fff;
 }
 
@@ -1615,7 +1625,9 @@ footer {
   color: var(--accent);
   font-size: 0.95rem;
   flex-shrink: 0;
-  transition: background 0.25s, border-color 0.25s;
+  transition:
+    background 0.25s,
+    border-color 0.25s;
 }
 
 .contact-link:hover .contact-link-icon {
@@ -1664,7 +1676,9 @@ footer {
   font-family: var(--font-body);
   font-size: 0.92rem;
   outline: none;
-  transition: border-color 0.25s, box-shadow 0.25s;
+  transition:
+    border-color 0.25s,
+    box-shadow 0.25s;
   width: 100%;
 }
 
@@ -1719,7 +1733,11 @@ textarea.form-control {
   bottom: 100px;
   right: 20px;
   z-index: 9999;
-  background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%);
+  background: linear-gradient(
+    135deg,
+    var(--accent),
+    color-mix(in srgb, var(--accent) 78%, #000)
+  );
   color: white;
   border: none;
   padding: 12px 24px;
@@ -1729,7 +1747,7 @@ textarea.form-control {
   display: flex;
   align-items: center;
   gap: 10px;
-  box-shadow: 0 8px 25px rgba(37, 99, 235, 0.4);
+  box-shadow: 0 8px 25px var(--accent-glow);
   transition: all 0.3s ease;
   opacity: 0;
   transform: translateY(20px);

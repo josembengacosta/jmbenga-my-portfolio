@@ -32,6 +32,12 @@ if (!defined('ADMIN_BLOCK_2_MIN')) {
 if (!defined('ADMIN_BLOCK_3_MIN')) {
     define('ADMIN_BLOCK_3_MIN', 60); // 7+ tentativas → 60 min
 }
+if (!defined('ADMIN_LOGIN_IP_WINDOW_MINUTES')) {
+    define('ADMIN_LOGIN_IP_WINDOW_MINUTES', 15);
+}
+if (!defined('ADMIN_LOGIN_IP_MAX_FAILURES')) {
+    define('ADMIN_LOGIN_IP_MAX_FAILURES', 25);
+}
 
 /** Indica se os cookies administrativos devem ser marcados como Secure. */
 function adminCookieRequiresSecure(): bool
@@ -44,11 +50,21 @@ function adminCookieRequiresSecure(): bool
 
 function getAdminCookiePath(): string
 {
+    // Deve coincidir com o caminho configurado centralmente em config.php.
+    if (defined('APP_ADMIN_COOKIE_PATH')) {
+        return (string) APP_ADMIN_COOKIE_PATH;
+    }
+
+    // Fallback para chamadas isoladas, incluindo o prefixo do XAMPP quando aplicável.
+    $basePath = parse_url((string) BASE_URL, PHP_URL_PATH);
+    $basePath = is_string($basePath) ? rtrim($basePath, '/') : '';
     $configuredPath = parse_url((string) ADMIN_PATH, PHP_URL_PATH);
-    $path = is_string($configuredPath) && $configuredPath !== '' ? $configuredPath : '/';
-    $path = '/' . ltrim($path, '/');
-    $path = preg_replace('#/+#', '/', $path) ?: '/';
-    return rtrim($path, '/') . '/';
+    $adminPath = is_string($configuredPath) && $configuredPath !== ''
+        ? '/' . trim($configuredPath, '/')
+        : '/jm-panel';
+
+    $path = rtrim($basePath . $adminPath, '/');
+    return $path !== '' ? $path : '/';
 }
 
 // ══════════════════════════════════════════════════════════════
@@ -58,6 +74,12 @@ function getAdminCookiePath(): string
 function startAdminSession(): void
 {
     if (session_status() === PHP_SESSION_NONE) {
+        ini_set('session.use_strict_mode', '1');
+        ini_set('session.use_only_cookies', '1');
+        ini_set('session.use_cookies', '1');
+        ini_set('session.use_trans_sid', '0');
+        ini_set('session.cookie_httponly', '1');
+
         session_name(ADMIN_SESSION_NAME);
         session_set_cookie_params([
             'lifetime' => defined('SESSION_LIFETIME') ? (int) SESSION_LIFETIME : 0,
@@ -67,10 +89,21 @@ function startAdminSession(): void
             'httponly' => true,
             'samesite' => 'Strict',
         ]);
-        session_start();
+
+        if (!session_start()) {
+            throw new RuntimeException('Não foi possível iniciar a sessão administrativa.');
+        }
     }
 
-    if (empty($_SESSION['admin_csrf_token'])) {
+    // config.php escolhe a sessão antes de iniciar o PHP session handler.
+    // Se a rota estiver a usar outra sessão, falhar explicitamente é mais seguro
+    // do que misturar a autenticação administrativa com a sessão pública.
+    if (session_status() !== PHP_SESSION_ACTIVE || session_name() !== ADMIN_SESSION_NAME) {
+        error_log('[ADMIN SESSION] Contexto de sessão incompatível com a rota administrativa.');
+        throw new RuntimeException('A sessão administrativa não está correctamente isolada.');
+    }
+
+    if (empty($_SESSION['admin_csrf_token']) || !is_string($_SESSION['admin_csrf_token'])) {
         $_SESSION['admin_csrf_token'] = bin2hex(random_bytes(32));
     }
 
@@ -101,7 +134,105 @@ function isAdminLoggedIn(): bool
     return !empty($_SESSION['admin_id']);
 }
 
-/** Exige sessão autenticada e revalida a conta em cada pedido protegido. */
+/**
+ * Identifica a área do painel solicitada. Considera tanto as rotas amigáveis
+ * como o acesso directo aos ficheiros PHP, para que a autorização não dependa
+ * exclusivamente das regras de rewrite do .htaccess.
+ */
+function getAdminRequestedSection(): string
+{
+    $basePath = parse_url((string) BASE_URL, PHP_URL_PATH);
+    $basePath = is_string($basePath) ? rtrim($basePath, '/') : '';
+    $adminPath = parse_url((string) ADMIN_PATH, PHP_URL_PATH);
+    $adminPath = is_string($adminPath) && $adminPath !== ''
+        ? '/' . trim($adminPath, '/')
+        : '/jm-panel';
+
+    $candidates = [
+        (string) ($_SERVER['REQUEST_URI'] ?? ''),
+        (string) ($_SERVER['SCRIPT_NAME'] ?? ''),
+        (string) ($_SERVER['PHP_SELF'] ?? ''),
+    ];
+
+    foreach ($candidates as $candidate) {
+        if ($candidate === '') {
+            continue;
+        }
+        $path = parse_url($candidate, PHP_URL_PATH);
+        if (!is_string($path) || $path === '') {
+            continue;
+        }
+        $path = '/' . ltrim($path, '/');
+
+        if ($basePath !== '' && ($path === $basePath || str_starts_with($path, $basePath . '/'))) {
+            $path = substr($path, strlen($basePath));
+            $path = $path === '' ? '/' : $path;
+        }
+
+        if ($path !== $adminPath && !str_starts_with($path, $adminPath . '/')) {
+            continue;
+        }
+
+        $relative = trim(substr($path, strlen($adminPath)), '/');
+        $relative = strtolower($relative);
+
+        if ($relative === '' || $relative === 'home' || $relative === 'home.php') {
+            return 'dashboard';
+        }
+        if (preg_match('~^(?:entrar|login|logout|lockscreen|forgot-password|reset-password)(?:/|\.|$)~', $relative)
+            || str_starts_with($relative, 'auth/')) {
+            return 'auth';
+        }
+
+        // A rota amigável profile-process não inclui o segmento /profile/.
+        if ($relative === 'profile-process') {
+            return 'profile';
+        }
+
+        $parts = explode('/', $relative);
+        $section = $parts[0] ?? '';
+        if ($section === 'pages') {
+            $section = $parts[1] ?? '';
+        }
+
+        if (in_array($section, ['projects', 'skills', 'testimonials', 'faq'], true)) {
+            return 'content';
+        }
+        if (in_array($section, ['messages', 'feedback'], true)) {
+            return 'communication';
+        }
+        if (in_array($section, ['visitors', 'analytics'], true)) {
+            return 'analytics';
+        }
+        if (in_array($section, ['settings', 'security'], true)) {
+            return 'system';
+        }
+        if ($section === 'profile') {
+            return 'profile';
+        }
+
+        return 'other';
+    }
+
+    return 'other';
+}
+
+/** Matriz inicial de menor privilégio para os três perfis existentes. */
+function adminRoleCanAccessSection(string $role, string $section): bool
+{
+    $permissions = [
+        'super_admin' => ['dashboard', 'content', 'communication', 'analytics', 'system', 'profile', 'auth', 'other'],
+        'admin'       => ['dashboard', 'content', 'communication', 'analytics', 'profile', 'auth'],
+        'editor'      => ['content', 'profile', 'auth'],
+    ];
+
+    return in_array($section, $permissions[$role] ?? [], true);
+}
+
+/**
+ * Exige sessão autenticada, revalida a conta e aplica a autorização por função.
+ * Editor é encaminhado para Projectos quando tenta abrir o dashboard.
+ */
 function requireAdminLogin(): void
 {
     if (!isAdminLoggedIn()) {
@@ -156,6 +287,25 @@ function requireAdminLogin(): void
         redirect('/jm-panel/entrar');
         return;
     }
+
+    $role = (string) ($_SESSION['admin_role'] ?? '');
+    $section = getAdminRequestedSection();
+    if (!adminRoleCanAccessSection($role, $section)) {
+        if ($role === 'editor' && $section === 'dashboard') {
+            redirect('/jm-panel/projects');
+            return;
+        }
+
+        http_response_code(403);
+        $forbiddenPage = defined('ROOT_PATH') ? ROOT_PATH . '/status/403.php' : '';
+        if ($forbiddenPage !== '' && is_file($forbiddenPage)) {
+            require $forbiddenPage;
+        } else {
+            header('Content-Type: text/plain; charset=utf-8');
+            echo 'Acesso não autorizado para o teu perfil.';
+        }
+        exit;
+    }
 }
 
 function isLockscreenActive(): bool
@@ -180,6 +330,7 @@ function createAdminResetToken(int $id): string
 
     $db = $GLOBALS['pdo'];
     $token = bin2hex(random_bytes(32));
+    $tokenHash = hash('sha256', $token);
 
     $stmt = $db->prepare(
         'SELECT id_sec_emp
@@ -197,7 +348,7 @@ function createAdminResetToken(int $id): string
                  reset_password_expires = DATE_ADD(NOW(), INTERVAL 1 HOUR)
              WHERE id_sec_emp = ?'
         );
-        $stmt->execute([$token, (int) $securityId]);
+        $stmt->execute([$tokenHash, (int) $securityId]);
     } else {
         // recovery_key é obrigatório e tem 60 caracteres no máximo.
         $recoveryKey = bin2hex(random_bytes(30));
@@ -208,7 +359,7 @@ function createAdminResetToken(int $id): string
                  reset_password_token, reset_password_expires)
              VALUES (?, ?, ?, DATE_ADD(NOW(), INTERVAL 1 HOUR))'
         );
-        $stmt->execute([$id, $recoveryKey, $token]);
+        $stmt->execute([$id, $recoveryKey, $tokenHash]);
     }
 
     // Confirma que o token existe e ainda está dentro da validade.
@@ -220,7 +371,7 @@ function createAdminResetToken(int $id): string
            AND reset_password_expires > NOW()
          LIMIT 1'
     );
-    $stmt->execute([$id, $token]);
+    $stmt->execute([$id, $tokenHash]);
 
     if (!$stmt->fetchColumn()) {
         throw new RuntimeException(
@@ -365,7 +516,7 @@ function validateAdminResetToken(string $token): ?int
           AND reset_password_expires > NOW()
         LIMIT 1
     ");
-    $stmt->execute([$token]);
+    $stmt->execute([hash('sha256', $token)]);
     $row = $stmt->fetch();
     return $row ? (int)$row['id_employees'] : null;
 }
@@ -375,22 +526,44 @@ function consumeAdminResetToken(int $id): void
     $GLOBALS['pdo']->prepare("
         UPDATE _employees_security
         SET reset_password_token   = NULL,
-            reset_password_expires = NULL
+            reset_password_expires = NULL,
+            remember_token = NULL
         WHERE id_employees = ?
     ")->execute([$id]);
 }
 
 function updateAdminPassword(int $id, string $newPassword): void
 {
+    if ($id < 1 || strlen($newPassword) > 72) {
+        throw new InvalidArgumentException('Dados inválidos para actualizar a palavra-passe.');
+    }
+
     $hash = password_hash($newPassword, PASSWORD_BCRYPT, ['cost' => 12]);
+    if (!is_string($hash) || $hash === '') {
+        throw new RuntimeException('Não foi possível gerar o hash da palavra-passe.');
+    }
 
-    $GLOBALS['pdo']->prepare("
-        UPDATE _employees
-        SET password_employees = ?
-        WHERE id_employees = ?
-    ")->execute([$hash, $id]);
+    $db = $GLOBALS['pdo'];
+    $db->beginTransaction();
+    try {
+        $update = $db->prepare(
+            'UPDATE _employees SET password_employees = ? WHERE id_employees = ?'
+        );
+        $update->execute([$hash, $id]);
+        if ($update->rowCount() !== 1) {
+            throw new RuntimeException('A conta não foi actualizada.');
+        }
 
-    consumeAdminResetToken($id);
+        // Invalidar tokens antigos de recuperação e Remember Me em todos os dispositivos.
+        consumeAdminResetToken($id);
+        $db->commit();
+    } catch (Throwable $e) {
+        if ($db->inTransaction()) {
+            $db->rollBack();
+        }
+        throw $e;
+    }
+
     logAudit($id, null, 'auth.password_reset', 'employees', $id);
 }
 
@@ -470,6 +643,40 @@ function recordAdminLoginSuccess(int $id): void
     )->execute([$ip, $id]);
 }
 
+/** Conta falhas de autenticação recentes na origem IP actual. */
+function isAdminLoginIpRateLimited(): bool
+{
+    $ip = getRealClientIp();
+    if (!is_string($ip) || filter_var($ip, FILTER_VALIDATE_IP) === false) {
+        // A limitação por conta continua activa quando o servidor não fornece IP válido.
+        return false;
+    }
+
+    $stmt = $GLOBALS['pdo']->prepare(
+        "SELECT COUNT(*)
+         FROM _audit_log
+         WHERE ip_address = ?
+           AND action = 'auth.failed_login'
+           AND creat_log >= DATE_SUB(NOW(), INTERVAL " . (int) ADMIN_LOGIN_IP_WINDOW_MINUTES . " MINUTE)"
+    );
+    $stmt->execute([$ip]);
+    return (int) $stmt->fetchColumn() >= (int) ADMIN_LOGIN_IP_MAX_FAILURES;
+}
+
+/** Regista falhas sem guardar o nome de utilizador ou endereço de email submetido. */
+function recordAdminLoginIpFailure(?int $adminId = null): void
+{
+    logAudit(
+        $adminId,
+        null,
+        'auth.failed_login',
+        'employees',
+        $adminId,
+        null,
+        ['result' => 'invalid_credentials']
+    );
+}
+
 // ══════════════════════════════════════════════════════════════
 // REMEMBER ME
 // ══════════════════════════════════════════════════════════════
@@ -484,9 +691,10 @@ function setAdminRememberCookie(int $id): void
     $token   = bin2hex(random_bytes(32));
     $expires = time() + (ADMIN_COOKIE_DAYS * 24 * 3600);
 
-    // Guardar o token antes de expor o cookie ao navegador.
+    // Guardar apenas o SHA-256; o token em texto original fica apenas no cookie HttpOnly.
+    $tokenHash = hash('sha256', $token);
     $GLOBALS['pdo']->prepare("UPDATE _employees_security SET remember_token = ? WHERE id_employees = ?")
-        ->execute([$token, $id]);
+        ->execute([$tokenHash, $id]);
 
     setcookie(ADMIN_COOKIE_NAME, $token, [
         'expires'  => $expires,
@@ -544,7 +752,7 @@ function checkAdminRememberMe(): void
         WHERE s.remember_token = ? AND e.status_employees = 'active'
         LIMIT 1
     ");
-    $stmt->execute([$token]);
+    $stmt->execute([hash('sha256', $token)]);
     $admin = $stmt->fetch();
 
     if (!$admin) {
@@ -573,8 +781,46 @@ function _populateAdminSession(array $admin): void
 }
 
 // ══════════════════════════════════════════════════════════════
-// LOCKSCREEN
+// LOCKSCREEN — PIN armazenado com hash bcrypt
 // ══════════════════════════════════════════════════════════════
+
+function hashAdminLockscreenPin(string $pin): string
+{
+    if (!preg_match('/\A[0-9]{6}\z/', $pin)) {
+        throw new InvalidArgumentException('O PIN deve conter exactamente seis dígitos.');
+    }
+    $hash = password_hash($pin, PASSWORD_BCRYPT, ['cost' => 12]);
+    if (!is_string($hash) || $hash === '') {
+        throw new RuntimeException('Não foi possível proteger o PIN.');
+    }
+    return $hash;
+}
+
+function isAdminLockscreenPinHash(string $stored): bool
+{
+    return preg_match('/\A\$2[aby]\$[0-9]{2}\$/', $stored) === 1;
+}
+
+/** Aceita temporariamente PIN legado em texto simples e faz upgrade após validação. */
+function verifyAdminLockscreenPin(string $provided, string $stored): bool
+{
+    if (!preg_match('/\A[0-9]{6}\z/', $provided) || $stored === '') {
+        return false;
+    }
+    if (preg_match('/\A[0-9]{6}\z/', $stored)) {
+        return hash_equals($stored, $provided);
+    }
+    return isAdminLockscreenPinHash($stored) && password_verify($provided, $stored);
+}
+
+function adminLockscreenPinNeedsRehash(string $stored): bool
+{
+    if (preg_match('/\A[0-9]{6}\z/', $stored)) {
+        return true;
+    }
+    return isAdminLockscreenPinHash($stored)
+        && password_needs_rehash($stored, PASSWORD_BCRYPT, ['cost' => 12]);
+}
 
 function activateLockscreen(int $id): void
 {
@@ -589,10 +835,11 @@ function activateLockscreen(int $id): void
         return;
     }
 
-    if (empty($code) || !preg_match('/\A\d{6}\z/', (string)$code)) {
-        $code = str_pad((string) random_int(0, 999999), 6, '0', STR_PAD_LEFT);
-        $db->prepare("UPDATE _employees_security SET access_code = ? WHERE id_employees = ?")
-            ->execute([$code, $id]);
+    $storedCode = is_string($code) ? $code : '';
+    $isLegacyPin = preg_match('/\A[0-9]{6}\z/', $storedCode) === 1;
+    if ($storedCode === '' || (!$isLegacyPin && !isAdminLockscreenPinHash($storedCode))) {
+        error_log('[ADMIN LOCKSCREEN] O PIN deve ser definido pelo administrador antes de activar o bloqueio.');
+        return;
     }
 
     $db->prepare("UPDATE _employees_security SET lockscreen = 1 WHERE id_employees = ?")
@@ -613,14 +860,22 @@ function validateAndUnlock(int $id, string $code): bool
 
     $storedCode = is_array($row) ? (string) ($row['access_code'] ?? '') : '';
     $providedCode = trim($code);
-    if (!preg_match('/\A\d{6}\z/', $providedCode)
-        || !preg_match('/\A\d{6}\z/', $storedCode)
-        || !hash_equals($storedCode, $providedCode)) {
+    if (!verifyAdminLockscreenPin($providedCode, $storedCode)) {
         return false;
     }
 
-    $GLOBALS['pdo']->prepare("UPDATE _employees_security SET lockscreen = 0 WHERE id_employees = ?")
-        ->execute([$id]);
+    $replacement = adminLockscreenPinNeedsRehash($storedCode)
+        ? hashAdminLockscreenPin($providedCode)
+        : $storedCode;
+    $update = $GLOBALS['pdo']->prepare(
+        'UPDATE _employees_security
+         SET lockscreen = 0, access_code = ?
+         WHERE id_employees = ? AND lockscreen = 1 AND access_code = ?'
+    );
+    $update->execute([$replacement, $id, $storedCode]);
+    if ($update->rowCount() !== 1) {
+        return false;
+    }
 
     $_SESSION['admin_lockscreen'] = false;
     unset($_SESSION['admin_lockscreen_attempts'], $_SESSION['admin_lockscreen_block_until']);

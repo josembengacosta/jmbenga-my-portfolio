@@ -74,460 +74,11 @@ function flagEmoji(string $code): string {
 <!DOCTYPE html>
 <html lang="pt" data-theme="dark" data-base-url="<?= BASE_URL ?>">
 <?php include __DIR__ . '/../../include/head.php'; ?>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link
-    href="https://fonts.googleapis.com/css2?family=Syne:wght@600;700;800&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap"
-    rel="stylesheet">
+<link rel="stylesheet" href="<?= BASE_URL ?>/assets/css/jmbenga-analytics.css?v=20261030">
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
-<style>
-<?php include __DIR__ . '/an_shared.css.php';
-/* see note below — CSS is inlined */
-?>
 
-/* ─── SHARED ANALYTICS STYLES (inlined) ─── */
-:root {
-    --an-card: #0d1117;
-    --an-border: rgba(148, 163, 184, .09);
-    --an-border-h: rgba(148, 163, 184, .2);
-    --an-radius: 13px;
-    --an-text: #e2e8f0;
-    --an-dim: #94a3b8;
-    --an-muted: #475569;
-    --c-blue: #5b8dee;
-    --c-teal: #2dd4bf;
-    --c-amber: #fbbf24;
-    --c-purple: #a78bfa;
-    --c-rose: #f87171;
-    --c-green: #34d399;
-    --fh: 'Syne', var(--font-head, sans-serif);
-    --fb: 'IBM Plex Sans', var(--font-body, sans-serif);
-    --fm: 'IBM Plex Mono', monospace;
-}
-
-.page-top {
-    display: flex;
-    justify-content: space-between;
-    align-items: flex-start;
-    flex-wrap: wrap;
-    gap: 1rem;
-    margin-bottom: 1.2rem
-}
-
-.breadcrumb {
-    display: flex;
-    align-items: center;
-    gap: .4rem;
-    font-size: .73rem;
-    color: var(--an-muted);
-    margin-bottom: .4rem;
-    font-family: var(--fb)
-}
-
-.breadcrumb a {
-    color: var(--an-dim);
-    text-decoration: none;
-    transition: color .18s
-}
-
-.breadcrumb a:hover {
-    color: var(--c-blue)
-}
-
-.breadcrumb .sep {
-    font-size: .5rem;
-    opacity: .45
-}
-
-.page-title {
-    font-family: var(--fh);
-    font-size: 1.6rem;
-    font-weight: 800;
-    letter-spacing: -.03em;
-    color: var(--an-text);
-    margin-bottom: .2rem;
-    line-height: 1.1
-}
-
-.page-sub {
-    font-size: .77rem;
-    color: var(--an-muted);
-    font-family: var(--fb)
-}
-
-/* Sub-nav */
-.an-nav {
-    display: flex;
-    gap: .2rem;
-    padding: .3rem;
-    background: var(--an-card);
-    border: 1px solid var(--an-border);
-    border-radius: 11px;
-    margin-bottom: 1.5rem;
-    width: fit-content;
-    flex-wrap: wrap
-}
-
-.an-nav-item {
-    display: inline-flex;
-    align-items: center;
-    gap: .38rem;
-    padding: .42rem .9rem;
-    border-radius: 8px;
-    font-size: .76rem;
-    font-weight: 600;
-    color: var(--an-dim);
-    text-decoration: none;
-    transition: all .18s;
-    font-family: var(--fb);
-    white-space: nowrap
-}
-
-.an-nav-item:hover {
-    color: var(--an-text);
-    background: rgba(255, 255, 255, .05)
-}
-
-.an-nav-item.active {
-    background: var(--c-blue);
-    color: #fff;
-    box-shadow: 0 2px 14px rgba(91, 141, 238, .35)
-}
-
-/* KPI */
-.kpi-row {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
-    gap: .7rem;
-    margin-bottom: 1.3rem
-}
-
-.kpi-card {
-    background: var(--an-card);
-    border: 1px solid var(--an-border);
-    border-radius: var(--an-radius);
-    padding: 1rem 1.1rem;
-    position: relative;
-    overflow: hidden;
-    transition: border-color .2s, box-shadow .2s, transform .2s;
-    cursor: default
-}
-
-.kpi-card::after {
-    content: '';
-    position: absolute;
-    top: 0;
-    left: 0;
-    right: 0;
-    height: 2px;
-    background: var(--kc, var(--c-blue));
-    opacity: 0;
-    transition: opacity .2s
-}
-
-.kpi-card:hover {
-    border-color: var(--an-border-h);
-    transform: translateY(-2px);
-    box-shadow: 0 8px 28px rgba(0, 0, 0, .3)
-}
-
-.kpi-card:hover::after {
-    opacity: 1
-}
-
-.kpi-top {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    margin-bottom: .6rem
-}
-
-.kpi-icon {
-    width: 30px;
-    height: 30px;
-    border-radius: 7px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: .78rem;
-    background: rgba(255, 255, 255, .06);
-    color: var(--kc, var(--c-blue))
-}
-
-.kpi-val {
-    font-family: var(--fm);
-    font-size: 1.55rem;
-    font-weight: 500;
-    letter-spacing: -.03em;
-    color: var(--an-text);
-    line-height: 1;
-    margin-bottom: 3px
-}
-
-.kpi-lbl {
-    font-size: .65rem;
-    color: var(--an-muted);
-    font-family: var(--fb);
-    font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: .07em
-}
-
-/* Cards */
-.chart-card,
-.table-card {
-    background: var(--an-card);
-    border: 1px solid var(--an-border);
-    border-radius: var(--an-radius);
-    padding: 1.4rem 1.5rem;
-    transition: border-color .2s
-}
-
-.chart-card:hover,
-.table-card:hover {
-    border-color: var(--an-border-h)
-}
-
-.card-hd {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: 1.1rem
-}
-
-.card-hd h3 {
-    font-family: var(--fh);
-    font-size: .9rem;
-    font-weight: 700;
-    color: var(--an-text);
-    letter-spacing: -.01em
-}
-
-.chart-wrap {
-    position: relative;
-    width: 100%
-}
-
-/* Grids */
-.g21 {
-    display: grid;
-    grid-template-columns: 2fr 1fr;
-    gap: 1rem;
-    margin-bottom: 1rem
-}
-
-.g111 {
-    display: grid;
-    grid-template-columns: 1fr 1fr 1fr;
-    gap: 1rem;
-    margin-bottom: 1rem
-}
-
-.g11 {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 1rem;
-    margin-bottom: 1rem
-}
-
-@media(max-width:1200px) {
-
-    .g21,
-    .g111,
-    .g11 {
-        grid-template-columns: 1fr
-    }
-}
-
-/* Table */
-.mini-table {
-    width: 100%;
-    border-collapse: collapse
-}
-
-.mini-table th {
-    padding: .4rem .5rem;
-    text-align: left;
-    font-size: .62rem;
-    font-weight: 700;
-    text-transform: uppercase;
-    letter-spacing: .07em;
-    color: var(--an-muted);
-    border-bottom: 1px solid var(--an-border);
-    font-family: var(--fb);
-    white-space: nowrap
-}
-
-.mini-table td {
-    padding: .55rem .5rem;
-    font-size: .79rem;
-    border-bottom: 1px solid var(--an-border);
-    color: var(--an-text);
-    font-family: var(--fb)
-}
-
-.mini-table tbody tr:last-child td {
-    border-bottom: none
-}
-
-.mini-table tbody tr:hover td {
-    background: rgba(255, 255, 255, .025)
-}
-
-/* Progress */
-.pg-wrap {
-    display: flex;
-    align-items: center;
-    gap: .5rem
-}
-
-.pg-bar {
-    flex: 1;
-    height: 3px;
-    background: rgba(255, 255, 255, .07);
-    border-radius: 4px;
-    overflow: hidden
-}
-
-.pg-fill {
-    height: 100%;
-    border-radius: 4px;
-    background: var(--pf, var(--c-blue));
-    width: 0;
-    transition: width .7s cubic-bezier(.4, 0, .2, 1)
-}
-
-.pg-num {
-    font-family: var(--fm);
-    font-size: .72rem;
-    color: var(--an-dim);
-    min-width: 26px;
-    text-align: right
-}
-
-/* Live */
-.live-dot {
-    width: 7px;
-    height: 7px;
-    border-radius: 50%;
-    background: var(--c-green);
-    display: inline-block;
-    animation: lpulse 1.8s infinite;
-    box-shadow: 0 0 0 0 rgba(52, 211, 153, .5)
-}
-
-@keyframes lpulse {
-    0% {
-        box-shadow: 0 0 0 0 rgba(52, 211, 153, .5)
-    }
-
-    70% {
-        box-shadow: 0 0 0 7px rgba(52, 211, 153, 0)
-    }
-
-    100% {
-        box-shadow: 0 0 0 0 rgba(52, 211, 153, 0)
-    }
-}
-
-/* Btn */
-.btn {
-    display: inline-flex;
-    align-items: center;
-    gap: .4rem;
-    padding: .5rem 1rem;
-    border-radius: 9px;
-    font-size: .78rem;
-    font-weight: 600;
-    cursor: pointer;
-    transition: all .18s;
-    text-decoration: none;
-    border: 1px solid var(--an-border);
-    font-family: var(--fb);
-    white-space: nowrap
-}
-
-.btn-ghost {
-    background: transparent;
-    color: var(--an-dim)
-}
-
-.btn-ghost:hover {
-    background: rgba(255, 255, 255, .055);
-    border-color: var(--an-border-h);
-    color: var(--an-text)
-}
-
-/* Fade-up */
-@keyframes fadeUp {
-    from {
-        opacity: 0;
-        transform: translateY(10px)
-    }
-
-    to {
-        opacity: 1;
-        transform: translateY(0)
-    }
-}
-
-.an-a {
-    animation: fadeUp .38s ease both
-}
-
-.d1 {
-    animation-delay: .04s
-}
-
-.d2 {
-    animation-delay: .08s
-}
-
-.d3 {
-    animation-delay: .12s
-}
-
-.d4 {
-    animation-delay: .16s
-}
-
-.d5 {
-    animation-delay: .2s
-}
-
-.d6 {
-    animation-delay: .24s
-}
-
-.d7 {
-    animation-delay: .28s
-}
-
-.d8 {
-    animation-delay: .32s
-}
-
-/* Device color dots */
-.dot {
-    width: 8px;
-    height: 8px;
-    border-radius: 50%;
-    display: inline-block;
-    flex-shrink: 0
-}
-
-.url-cell {
-    max-width: 220px;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-    font-family: var(--fm);
-    font-size: .73rem;
-    color: var(--an-dim)
-}
-</style>
-
-<body>
+<body class="analytics-page">
     <?php include __DIR__ . '/../../include/sidebar.php'; ?>
     <div class="main">
         <?php include __DIR__ . '/../../include/header.php'; ?>
@@ -721,6 +272,34 @@ function flagEmoji(string $code): string {
     <?php include __DIR__ . '/../../include/modal_logout.php'; ?>
 
     <script>
+    const anRoot = getComputedStyle(document.documentElement);
+    const anVar = (name, fallback) => anRoot.getPropertyValue(name).trim() || fallback;
+    const anTheme = {
+        accent: anVar('--accent', '#2563eb'),
+        teal: anVar('--teal', '#14b8a6'),
+        warning: anVar('--warning', '#f59e0b'),
+        purple: anVar('--purple', '#8b5cf6'),
+        danger: anVar('--danger', '#ef4444'),
+        success: anVar('--success', '#10b981'),
+        text: anVar('--text', '#e2e8f4'),
+        dim: anVar('--text-dim', '#8896aa'),
+        muted: anVar('--text-muted', '#4a5568'),
+        card: anVar('--bg-card', '#101624'),
+        border: anVar('--border', 'rgba(255,255,255,.07)')
+    };
+    const anRgba = (color, alpha) => {
+        let hex = String(color).trim().replace('#', '');
+        if (hex.length === 3) hex = hex.split('').map(ch => ch + ch).join('');
+        if (!/^[0-9a-f]{6}$/i.test(hex)) return `rgba(37,99,235,${alpha})`;
+        const value = parseInt(hex, 16);
+        return `rgba(${(value >> 16) & 255},${(value >> 8) & 255},${value & 255},${alpha})`;
+    };
+    if (window.Chart) {
+        Chart.defaults.font.family = getComputedStyle(document.body).fontFamily || 'sans-serif';
+        Chart.defaults.color = anTheme.muted;
+    }
+
+
     // ── Count-up animation ────────────────────────────────────
     document.querySelectorAll('[data-count]').forEach(el => {
         const target = parseFloat(el.dataset.count);
@@ -748,15 +327,15 @@ function flagEmoji(string $code): string {
     }, 300);
 
     // ── Chart defaults ────────────────────────────────────────
-    Chart.defaults.font.family = "'IBM Plex Sans', sans-serif";
-    Chart.defaults.color = '#64748b';
+    Chart.defaults.font.family = getComputedStyle(document.body).fontFamily || 'sans-serif';
+    Chart.defaults.color = anTheme.muted;
 
     const tooltipOpts = {
-        backgroundColor: '#0d1117',
-        borderColor: 'rgba(148,163,184,.15)',
+        backgroundColor: anTheme.card,
+        borderColor: anTheme.border,
         borderWidth: 1,
-        titleColor: '#e2e8f0',
-        bodyColor: '#94a3b8',
+        titleColor: anTheme.text,
+        bodyColor: anTheme.dim,
         padding: 10,
         cornerRadius: 8,
         displayColors: false,
@@ -765,23 +344,23 @@ function flagEmoji(string $code): string {
     // ── Main visits chart (area) ──────────────────────────────
     const visCtx = document.getElementById('visitsChart').getContext('2d');
     const grad = visCtx.createLinearGradient(0, 0, 0, 280);
-    grad.addColorStop(0, 'rgba(91,141,238,.28)');
-    grad.addColorStop(.7, 'rgba(91,141,238,.05)');
-    grad.addColorStop(1, 'rgba(91,141,238,0)');
+    grad.addColorStop(0, anRgba(anTheme.accent, .28));
+    grad.addColorStop(.7, anRgba(anTheme.accent, .05));
+    grad.addColorStop(1, anRgba(anTheme.accent, 0));
 
     new Chart(visCtx, {
         type: 'line',
         data: {
-            labels: <?= json_encode($chartLabels) ?>,
+            labels: <?= json_encode($chartLabels, JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP) ?>,
             datasets: [{
-                data: <?= json_encode($chartData) ?>,
-                borderColor: '#5b8dee',
+                data: <?= json_encode($chartData, JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP) ?>,
+                borderColor: anTheme.accent,
                 backgroundColor: grad,
                 borderWidth: 2.5,
                 fill: true,
                 tension: .35,
-                pointBackgroundColor: '#5b8dee',
-                pointBorderColor: '#0d1117',
+                pointBackgroundColor: anTheme.accent,
+                pointBorderColor: anTheme.card,
                 pointBorderWidth: 2,
                 pointRadius: 3,
                 pointHoverRadius: 6,
@@ -800,18 +379,18 @@ function flagEmoji(string $code): string {
                 y: {
                     beginAtZero: true,
                     grid: {
-                        color: 'rgba(255,255,255,.05)'
+                        color: anTheme.border
                     },
                     ticks: {
-                        color: '#475569'
+                        color: anTheme.muted
                     }
                 },
                 x: {
                     grid: {
-                        color: 'rgba(255,255,255,.04)'
+                        color: anTheme.border
                     },
                     ticks: {
-                        color: '#475569',
+                        color: anTheme.muted,
                         maxRotation: 0,
                         maxTicksLimit: 8
                     }
@@ -821,8 +400,8 @@ function flagEmoji(string $code): string {
     });
 
     // ── Devices doughnut ──────────────────────────────────────
-    const devData = <?= json_encode($devices) ?>;
-    const devColors = ['#5b8dee', '#2dd4bf', '#fbbf24', '#a78bfa', '#f87171'];
+    const devData = <?= json_encode($devices, JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP) ?>;
+    const devColors = [anTheme.accent, anTheme.teal, anTheme.warning, anTheme.purple, anTheme.danger];
     new Chart(document.getElementById('devicesChart'), {
         type: 'doughnut',
         data: {
@@ -842,7 +421,7 @@ function flagEmoji(string $code): string {
                 legend: {
                     position: 'bottom',
                     labels: {
-                        color: '#94a3b8',
+                        color: anTheme.dim,
                         padding: 14,
                         usePointStyle: true,
                         font: {
@@ -856,8 +435,8 @@ function flagEmoji(string $code): string {
     });
 
     // ── Browsers bar ──────────────────────────────────────────
-    const brData = <?= json_encode($browsers) ?>;
-    const brColors = ['#5b8dee', '#2dd4bf', '#fbbf24', '#a78bfa', '#f87171', '#fb923c'];
+    const brData = <?= json_encode($browsers, JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP) ?>;
+    const brColors = [anTheme.accent, anTheme.teal, anTheme.warning, anTheme.purple, anTheme.danger, anTheme.warning];
     new Chart(document.getElementById('browsersChart'), {
         type: 'bar',
         data: {
@@ -882,10 +461,10 @@ function flagEmoji(string $code): string {
                 y: {
                     beginAtZero: true,
                     grid: {
-                        color: 'rgba(255,255,255,.05)'
+                        color: anTheme.border
                     },
                     ticks: {
-                        color: '#475569'
+                        color: anTheme.muted
                     }
                 },
                 x: {
@@ -893,7 +472,7 @@ function flagEmoji(string $code): string {
                         display: false
                     },
                     ticks: {
-                        color: '#475569'
+                        color: anTheme.muted
                     }
                 }
             }

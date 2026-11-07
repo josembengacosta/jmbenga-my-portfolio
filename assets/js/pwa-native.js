@@ -5,13 +5,17 @@
 class PWANativeManager {
   constructor() {
     this.isStandalone = window.matchMedia("(display-mode: standalone)").matches;
-    this.isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) ||
+    this.isIOS =
+      /iPad|iPhone|iPod/.test(navigator.userAgent) ||
       (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
     this.isAndroid = /Android/.test(navigator.userAgent);
     this.isPWA = Boolean(window.navigator.standalone || this.isStandalone);
     this.hasHaptic = typeof navigator.vibrate === "function";
     this.hasShare = typeof navigator.share === "function";
-    this.hasClipboard = Boolean(navigator.clipboard && typeof navigator.clipboard.writeText === "function");
+    this.hasClipboard = Boolean(
+      navigator.clipboard &&
+      typeof navigator.clipboard.writeText === "function",
+    );
     this.hasBadge = typeof navigator.setAppBadge === "function";
 
     this.touchStart = { x: 0, y: 0, time: 0 };
@@ -129,7 +133,7 @@ class PWANativeManager {
     const logo = splash.querySelector(".splash-logo i");
     logo.style.cssText = `
       font-size: 3rem;
-      color: #2563eb;
+      color: var(--accent);
       margin-bottom: 1rem;
       animation: splashPulse 1.5s ease infinite;
     `;
@@ -184,7 +188,7 @@ class PWANativeManager {
           }
           lastTouchEnd = now;
         },
-        { passive: false }
+        { passive: false },
       );
     }
 
@@ -200,7 +204,7 @@ class PWANativeManager {
             e.preventDefault();
           }
         },
-        { passive: false }
+        { passive: false },
       );
     }
 
@@ -231,7 +235,7 @@ class PWANativeManager {
           touchStartTime = Date.now();
         }
       },
-      { passive: true }
+      { passive: true },
     );
 
     document.addEventListener(
@@ -265,7 +269,7 @@ class PWANativeManager {
         touchStartY = 0;
         touchStartTime = 0;
       },
-      { passive: true }
+      { passive: true },
     );
   }
 
@@ -319,7 +323,7 @@ class PWANativeManager {
 
     // Adicionar feedback tátil em interações
     const elements = document.querySelectorAll(
-      "button, .btn, .nav-link, .tech-item"
+      "button, .btn, .nav-link, .tech-item",
     );
 
     elements.forEach((element) => {
@@ -357,14 +361,14 @@ class PWANativeManager {
         right: 20px;
         width: 56px;
         height: 56px;
-        background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+        background: linear-gradient(135deg, var(--accent), color-mix(in srgb, var(--accent) 78%, #000));
         color: white;
         border: none;
         border-radius: 50%;
         font-size: 1.25rem;
         cursor: pointer;
         z-index: 999;
-        box-shadow: 0 4px 20px rgba(16, 185, 129, 0.4);
+        box-shadow: 0 4px 20px var(--accent-glow);
         display: flex;
         align-items: center;
         justify-content: center;
@@ -407,7 +411,7 @@ class PWANativeManager {
     // Nunca interceptar links mailto: o clique deve abrir o cliente de email.
     // A cópia é activada apenas em elementos que declarem explicitamente o destino.
     const copyElements = document.querySelectorAll(
-      "[data-copy-email], [data-copy-to-clipboard]"
+      "[data-copy-email], [data-copy-to-clipboard]",
     );
 
     copyElements.forEach((element) => {
@@ -415,7 +419,8 @@ class PWANativeManager {
       element.dataset.clipboardBound = "true";
 
       element.addEventListener("click", async (event) => {
-        const value = element.dataset.copyEmail || element.dataset.copyToClipboard || "";
+        const value =
+          element.dataset.copyEmail || element.dataset.copyToClipboard || "";
         if (!value) return;
 
         event.preventDefault();
@@ -423,7 +428,10 @@ class PWANativeManager {
           await navigator.clipboard.writeText(value);
           this.showToast("Copiado para a área de transferência.", "success");
         } catch (_) {
-          this.showToast("Não foi possível copiar. Copie o texto manualmente.", "warning");
+          this.showToast(
+            "Não foi possível copiar. Copie o texto manualmente.",
+            "warning",
+          );
         }
       });
     });
@@ -459,29 +467,93 @@ class PWANativeManager {
   }
 
   setupNetworkStatus() {
+    // navigator.onLine é apenas um indício do estado da interface de rede.
+    // A confirmação é feita através do endpoint PHP leve do próprio site.
+    let lastKnownState = null;
+    let activeProbe = null;
+
+    const probeServer = async () => {
+      if (activeProbe) return activeProbe;
+
+      activeProbe = (async () => {
+        const controller = new AbortController();
+        const timeoutId = window.setTimeout(() => controller.abort(), 5000);
+
+        try {
+          const configuredBase = String(
+            document.documentElement.dataset.baseUrl || window.location.origin,
+          ).replace(/\/+$/, "");
+          const probeUrl = new URL(`${configuredBase}/manifest.php`, window.location.href);
+          probeUrl.searchParams.set("__pwa_probe", String(Date.now()));
+
+          const response = await fetch(probeUrl.href, {
+            method: "GET",
+            cache: "no-store",
+            credentials: "same-origin",
+            headers: {
+              Accept: "application/manifest+json",
+              "Cache-Control": "no-cache",
+            },
+            signal: controller.signal,
+          });
+
+          const contentType = response.headers.get("Content-Type") || "";
+          return response.ok && contentType.toLowerCase().includes("application/manifest+json");
+        } catch (error) {
+          return false;
+        } finally {
+          window.clearTimeout(timeoutId);
+        }
+      })().finally(() => {
+        activeProbe = null;
+      });
+
+      return activeProbe;
+    };
+
+    const refreshNetworkState = async (announceChange = false) => {
+      const serverReachable = await probeServer();
+      const nextState = serverReachable ? "online" : "unavailable";
+      const previousState = lastKnownState;
+      lastKnownState = nextState;
+
+      document.documentElement.dataset.networkState = nextState;
+
+      // Não apresentar toast no primeiro teste; apenas em transições confirmadas.
+      if (!announceChange || previousState === null || previousState === nextState) {
+        return serverReachable;
+      }
+
+      if (serverReachable) {
+        this.showToast("Ligação ao JMbenga restabelecida.", "success");
+        this.vibrate(100);
+      } else {
+        this.showToast(
+          "Não foi possível contactar o JMbenga. A Internet ou o servidor pode estar temporariamente indisponível.",
+          "warning",
+          5000,
+        );
+        this.vibrate([100, 50, 100]);
+      }
+
+      return serverReachable;
+    };
+
+    // O evento apenas desencadeia uma verificação; não define o estado sozinho.
     window.addEventListener("online", () => {
-      this.showToast("Conectado à internet", "success");
-      this.vibrate(100);
+      window.setTimeout(() => refreshNetworkState(true), 500);
     });
 
     window.addEventListener("offline", () => {
-      this.showToast(
-        '<i class="fas fa-wifi-slash"></i> Modo offline ativado',
-        "warning"
-      );
-      this.vibrate([100, 50, 100]);
+      window.setTimeout(() => refreshNetworkState(true), 500);
     });
 
-    // Verificar status inicial
-    if (!navigator.onLine) {
-      setTimeout(() => {
-        this.showToast(
-          '<i class="fas fa-wifi-slash"></i> Você está offline. Alguns recursos podem não estar disponíveis.',
-          "warning",
-          5000
-        );
-      }, 1000);
-    }
+    // Ao regressar à aplicação, volta a confirmar a disponibilidade do servidor.
+    document.addEventListener("visibilitychange", () => {
+      if (!document.hidden) refreshNetworkState(false);
+    });
+
+    refreshNetworkState(false);
   }
 
   setupFullscreen() {
@@ -644,7 +716,7 @@ const nativeStyles = `
     position: fixed;
     left: 50%;
     transform: translateX(-50%);
-    background: #2563eb;
+    background: var(--accent);
     color: white;
     padding: 12px 24px;
     border-radius: 50px;
@@ -673,7 +745,7 @@ const nativeStyles = `
   }
   
   .native-toast.info {
-    background: #2563eb;
+    background: var(--accent);
   }
   
   .native-toast.hiding {

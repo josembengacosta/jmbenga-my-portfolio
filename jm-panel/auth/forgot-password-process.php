@@ -74,7 +74,7 @@ try {
                    AND reset_password_expires > NOW()
                  LIMIT 1'
             );
-            $verifyToken->execute(['admin_id' => $adminId, 'token' => $resetToken]);
+            $verifyToken->execute(['admin_id' => $adminId, 'token' => hash('sha256', $resetToken)]);
             if (!$verifyToken->fetchColumn()) {
                 throw new RuntimeException('O token de recuperação não foi persistido na tabela de segurança.');
             }

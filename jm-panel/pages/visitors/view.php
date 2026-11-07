@@ -53,6 +53,8 @@ $csrfToken   = $_SESSION['admin_csrf_token'];
 <!DOCTYPE html>
 <html lang="pt" data-theme="dark" data-base-url="<?= BASE_URL ?>">
 <?php include __DIR__ . '/../../include/head.php'; ?>
+<link rel="stylesheet"
+    href="<?= BASE_URL ?>/assets/css/jmbenga-visitors.css?v=<?= file_exists(ROOT_PATH . '/assets/css/jmbenga-visitors.css') ? filemtime(ROOT_PATH . '/assets/css/jmbenga-visitors.css') : '1' ?>">
 </head>
 <style>
 .page-top {
@@ -326,7 +328,7 @@ $csrfToken   = $_SESSION['admin_csrf_token'];
 }
 </style>
 
-<body>
+<body class="visitor-view-page">
     <?php include __DIR__ . '/../../include/sidebar.php'; ?>
     <div class="main">
         <?php include __DIR__ . '/../../include/header.php'; ?>
@@ -549,9 +551,9 @@ $csrfToken   = $_SESSION['admin_csrf_token'];
 
 
     <script>
-    const BASE = '<?= BASE_URL ?>';
-    const CSRF = '<?= $csrfToken ?>';
-    const VISITOR_ID = <?= $id ?>;
+    const BASE = <?= json_encode(BASE_URL, JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_AMP | JSON_HEX_QUOT) ?>;
+    const CSRF = <?= json_encode($csrfToken, JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_AMP | JSON_HEX_QUOT) ?>;
+    const VISITOR_ID = <?= (int)$id ?>;
 
     function showToast(message, type = 'success') {
         const container = document.getElementById('toast-container') || createToastContainer();
@@ -565,7 +567,11 @@ $csrfToken   = $_SESSION['admin_csrf_token'];
         } else {
             iconClass = 'fa-info-circle';
         }
-        toast.innerHTML = `<i class="fas fa-${iconClass}"></i> ${message}`;
+        const icon = document.createElement('i');
+        const text = document.createElement('span');
+        icon.className = `fas ${iconClass}`;
+        text.textContent = String(message ?? '');
+        toast.append(icon, text);
         container.appendChild(toast);
         setTimeout(() => {
             toast.style.opacity = '0';
@@ -596,15 +602,21 @@ $csrfToken   = $_SESSION['admin_csrf_token'];
                     'X-CSRF-Token': CSRF
                 }
             });
-            const data = await res.json();
-            if (data.success) {
+            const raw = await res.text();
+            let data;
+            try {
+                data = JSON.parse(raw);
+            } catch {
+                throw new Error('O servidor devolveu uma resposta inválida.');
+            }
+            if (res.ok && data.success) {
                 showToast(data.message, 'success');
                 setTimeout(() => location.reload(), 600);
             } else {
-                showToast(data.message || 'Erro', 'error');
+                showToast(data.message || 'Erro ao actualizar o estado.', 'error');
             }
         } catch (err) {
-            showToast('Erro de rede.', 'error');
+            showToast(err.message || 'Erro de rede.', 'error');
         }
     }
 

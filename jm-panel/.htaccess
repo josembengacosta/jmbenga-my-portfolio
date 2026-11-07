@@ -42,6 +42,9 @@ RewriteRule ^profile/change-password(-process)?/?$ pages/profile/change-password
 # ── Categorias com páginas de listagem ───────────────────────────
 RewriteRule ^(projects|skills|testimonials|faq|feedback|visitors)/?$ pages/$1/all-$1.php [L,QSA]
 
+# ── Depoimentos: rotas explícitas para evitar ambiguidades no rewrite ──
+RewriteRule ^testimonials/(add|add-process|edit|edit-process|toggle|delete)/?$ pages/testimonials/$1.php [L,QSA]
+
 # ── Rotas especiais ──────────────────────────────────────────────
 RewriteRule ^messages/?$ pages/messages/inbox.php [L,QSA]
 RewriteRule ^analytics/?$ pages/analytics/analytics.php [L,QSA]

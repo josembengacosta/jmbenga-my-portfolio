@@ -34,7 +34,26 @@ $formErrors  = $_SESSION['form_errors']  ?? [];
 $formSuccess = $_SESSION['form_success'] ?? '';
 unset($_SESSION['form_data'], $_SESSION['form_errors'], $_SESSION['form_success']);
 
-if (empty($formData)) $formData = $configs;
+if (!is_array($formData) || empty($formData)) {
+    $formData = $configs;
+}
+
+if (!is_array($formData)) {
+    $formData = [];
+}
+
+$isHttpUrl = static function (string $url): bool {
+    if ($url === '' || strlen($url) > 2048 || filter_var($url, FILTER_VALIDATE_URL) === false) {
+        return false;
+    }
+
+    $parts = parse_url($url);
+    return is_array($parts)
+        && isset($parts['scheme'], $parts['host'])
+        && in_array(strtolower((string) $parts['scheme']), ['http', 'https'], true)
+        && !isset($parts['user'])
+        && !isset($parts['pass']);
+};
 
 // Redes sociais com ícones, cores e placeholders
 $socialNetworks = [
@@ -55,9 +74,14 @@ $socialNetworks = [
     'stackoverflow_url' => ['label' => 'Stack Overflow','icon' => 'fab fa-stack-overflow','color' => '#f58025', 'placeholder' => 'https://stackoverflow.com/users/seuuser'],
     'codepen_url'     => ['label' => 'CodePen',      'icon' => 'fab fa-codepen',       'color' => '#000000', 'placeholder' => 'https://codepen.io/seuuser'],
 ];
+
+foreach ($socialNetworks as $key => $network) {
+    $value = $formData[$key] ?? '';
+    $formData[$key] = is_string($value) ? trim($value) : '';
+}
 ?>
 <!DOCTYPE html>
-<html lang="pt" data-theme="dark" data-base-url="<?= BASE_URL ?>">
+<html lang="pt" data-theme="dark" data-base-url="<?= e(BASE_URL) ?>">
 <?php include __DIR__ . '/../../include/head.php'; ?>
 </head>
 
@@ -98,8 +122,8 @@ $socialNetworks = [
             </div>
             <?php endif; ?>
 
-            <form id="socialForm" novalidate data-api="<?= BASE_URL ?>/jm-panel/settings/social-process">
-                <input type="hidden" name="csrf_token" value="<?= $_SESSION['admin_csrf_token'] ?>">
+            <form id="socialForm" data-api="<?= e(BASE_URL) ?>/jm-panel/settings/social-process">
+                <input type="hidden" name="csrf_token" value="<?= e((string) ($_SESSION['admin_csrf_token'] ?? '')) ?>">
 
                 <!-- Redes Sociais -->
                 <div class="form-section">
@@ -119,9 +143,16 @@ $socialNetworks = [
                                 </div>
                                 <div class="social-info">
                                     <h4><?= $net['label'] ?></h4>
-                                    <?php if (!empty($formData[$key])): ?>
+                                    <?php
+                                        $socialValue = $formData[$key] ?? '';
+                                        $socialConfigured = $socialValue !== '' && $isHttpUrl($socialValue);
+                                    ?>
+                                    <?php if ($socialConfigured): ?>
                                     <span class="social-status active"><i class="fas fa-check-circle"></i>
                                         Configurado</span>
+                                    <?php elseif ($socialValue !== ''): ?>
+                                    <span class="social-status invalid"><i class="fas fa-exclamation-circle"></i>
+                                        URL inválida</span>
                                     <?php else: ?>
                                     <span class="social-status"><i class="fas fa-circle"></i> Não configurado</span>
                                     <?php endif; ?>
@@ -130,9 +161,10 @@ $socialNetworks = [
                             <div class="social-card-body">
                                 <div class="input-with-icon">
                                     <i class="fas fa-link"></i>
-                                    <input type="url" name="<?= $key ?>" class="form-control"
+                                    <input type="url" name="<?= e($key) ?>" class="form-control"
                                         value="<?= e($formData[$key] ?? '') ?>"
-                                        placeholder="<?= $net['placeholder'] ?>">
+                                        placeholder="<?= e($net['placeholder']) ?>" maxlength="2048" autocomplete="url"
+                                        inputmode="url">
                                 </div>
                             </div>
                         </div>
@@ -153,12 +185,14 @@ $socialNetworks = [
                         <?php
                         $hasAnySocial = false;
                         foreach ($socialNetworks as $key => $net):
-                            if (!empty($formData[$key])):
+                            $previewUrl = $formData[$key] ?? '';
+                            if ($previewUrl !== '' && $isHttpUrl($previewUrl)):
                                 $hasAnySocial = true;
                         ?>
-                        <a href="<?= e($formData[$key]) ?>" target="_blank" class="preview-social-link"
-                            style="--social-color:<?= $net['color'] ?>" title="<?= $net['label'] ?>">
-                            <i class="<?= $net['icon'] ?>"></i>
+                        <a href="<?= e($previewUrl) ?>" target="_blank" rel="noopener noreferrer"
+                            class="preview-social-link" style="--social-color:<?= e($net['color']) ?>"
+                            title="<?= e($net['label']) ?>">
+                            <i class="<?= e($net['icon']) ?>"></i>
                         </a>
                         <?php endif;
                         endforeach;
@@ -367,6 +401,10 @@ $socialNetworks = [
         color: var(--success)
     }
 
+    .social-status.invalid {
+        color: var(--danger, #f87171)
+    }
+
     .social-status i {
         font-size: .55rem
     }
@@ -497,98 +535,200 @@ $socialNetworks = [
     </style>
 
     <script>
-    const form = document.getElementById('socialForm');
-    const submitBtn = document.getElementById('submitBtn');
+    (() => {
+        'use strict';
 
-    function showToast(m, t = 'success') {
-        const c = document.getElementById('toast-container') || (() => {
-            const d = document.createElement('div');
-            d.id = 'toast-container';
-            d.style.cssText =
-                'position:fixed;top:1rem;right:1rem;z-index:9999;display:flex;flex-direction:column;gap:.5rem';
-            document.body.appendChild(d);
-            return d;
-        })();
-        const toast = document.createElement('div');
-        toast.className = `toast toast-${t}`;
-        toast.innerHTML = `<i class="fas fa-${t === 'success' ? 'check-circle' : 'times-circle'}"></i> ${m}`;
-        c.appendChild(toast);
-        setTimeout(() => {
-            toast.style.opacity = '0';
-            toast.style.transform = 'translateX(20px)';
-            setTimeout(() => toast.remove(), 300);
-        }, 4000);
-    }
-
-    // ── Actualizar preview e status ao digitar ─────────────────
-    document.querySelectorAll('.social-card input').forEach(input => {
-        input.addEventListener('input', function() {
-            const card = this.closest('.social-card');
-            const status = card.querySelector('.social-status');
-            if (this.value.trim()) {
-                status.className = 'social-status active';
-                status.innerHTML = '<i class="fas fa-check-circle"></i> Configurado';
-            } else {
-                status.className = 'social-status';
-                status.innerHTML = '<i class="fas fa-circle"></i> Não configurado';
-            }
-            updatePreview();
-        });
-    });
-
-    function updatePreview() {
+        const form = document.getElementById('socialForm');
+        const submitBtn = document.getElementById('submitBtn');
         const preview = document.getElementById('socialPreview');
-        const inputs = document.querySelectorAll('.social-card input');
-        let html = '';
-        let hasAny = false;
-        inputs.forEach(input => {
-            const val = input.value.trim();
-            if (val) {
-                hasAny = true;
+
+        if (!form || !submitBtn || !preview) return;
+
+        const isHttpUrl = (value) => {
+            try {
+                const url = new URL(value);
+                return ['http:', 'https:'].includes(url.protocol) &&
+                    Boolean(url.hostname) &&
+                    !url.username &&
+                    !url.password;
+            } catch {
+                return false;
+            }
+        };
+
+        function showToast(message, type = 'success') {
+            let container = document.getElementById('toast-container');
+
+            if (!container) {
+                container = document.createElement('div');
+                container.id = 'toast-container';
+                container.style.cssText =
+                    'position:fixed;top:1rem;right:1rem;z-index:9999;display:flex;flex-direction:column;gap:.5rem';
+                document.body.appendChild(container);
+            }
+
+            const toast = document.createElement('div');
+            toast.className = `toast toast-${type}`;
+
+            const icon = document.createElement('i');
+            icon.className = type === 'success' ?
+                'fas fa-check-circle' :
+                'fas fa-times-circle';
+            icon.setAttribute('aria-hidden', 'true');
+
+            const text = document.createElement('span');
+            text.textContent = String(message ?? '');
+
+            toast.append(icon, text);
+            container.appendChild(toast);
+
+            window.setTimeout(() => {
+                toast.style.opacity = '0';
+                toast.style.transform = 'translateX(20px)';
+                window.setTimeout(() => toast.remove(), 300);
+            }, 4000);
+        }
+
+        function setStatus(card, value) {
+            const status = card?.querySelector('.social-status');
+            if (!status) return;
+
+            status.replaceChildren();
+            const icon = document.createElement('i');
+            icon.setAttribute('aria-hidden', 'true');
+
+            if (!value) {
+                status.className = 'social-status';
+                icon.className = 'fas fa-circle';
+                status.append(icon, document.createTextNode(' Não configurado'));
+            } else if (isHttpUrl(value)) {
+                status.className = 'social-status active';
+                icon.className = 'fas fa-check-circle';
+                status.append(icon, document.createTextNode(' Configurado'));
+            } else {
+                status.className = 'social-status invalid';
+                icon.className = 'fas fa-exclamation-circle';
+                status.append(icon, document.createTextNode(' URL inválida'));
+            }
+        }
+
+        function updatePreview() {
+            preview.replaceChildren();
+            let hasAny = false;
+
+            form.querySelectorAll('.social-card input[type="url"]').forEach((input) => {
+                const value = input.value.trim();
+                if (!value || !isHttpUrl(value)) return;
+
                 const card = input.closest('.social-card');
-                const color = card.style.getPropertyValue('--social-color');
-                const icon = card.querySelector('.social-icon-wrap i').className;
-                const label = card.querySelector('h4').textContent;
-                html +=
-                    `<a href="${val}" target="_blank" class="preview-social-link" style="--social-color:${color}" title="${label}"><i class="${icon}"></i></a>`;
+                const iconSource = card?.querySelector('.social-icon-wrap i');
+                const labelSource = card?.querySelector('h4');
+
+                if (!card || !iconSource || !labelSource) return;
+
+                const link = document.createElement('a');
+                link.href = new URL(value).href;
+                link.target = '_blank';
+                link.rel = 'noopener noreferrer';
+                link.className = 'preview-social-link';
+                link.title = labelSource.textContent.trim();
+                link.style.setProperty(
+                    '--social-color',
+                    card.style.getPropertyValue('--social-color').trim()
+                );
+
+                const icon = document.createElement('i');
+                icon.className = iconSource.className;
+                icon.setAttribute('aria-hidden', 'true');
+                link.appendChild(icon);
+
+                preview.appendChild(link);
+                hasAny = true;
+            });
+
+            if (!hasAny) {
+                const empty = document.createElement('p');
+                empty.style.color = 'var(--text-muted)';
+                empty.style.fontSize = '.85rem';
+                empty.textContent =
+                    'Nenhuma rede social configurada. Preenche os campos acima para ver a pré-visualização.';
+                preview.appendChild(empty);
+            }
+        }
+
+        form.querySelectorAll('.social-card input[type="url"]').forEach((input) => {
+            input.addEventListener('input', () => {
+                setStatus(input.closest('.social-card'), input.value.trim());
+                updatePreview();
+            });
+        });
+
+        form.addEventListener('submit', async (event) => {
+            event.preventDefault();
+            if (submitBtn.disabled) return;
+
+            submitBtn.disabled = true;
+            submitBtn.innerHTML =
+            '<i class="fas fa-spinner fa-spin" aria-hidden="true"></i> A guardar…';
+
+            try {
+                const token = form.querySelector('[name="csrf_token"]')?.value ?? '';
+                const response = await fetch(form.dataset.api, {
+                    method: 'POST',
+                    body: new FormData(form),
+                    headers: {
+                        'X-Requested-With': 'XMLHttpRequest',
+                        'X-CSRF-Token': token
+                    },
+                    credentials: 'same-origin',
+                    cache: 'no-store'
+                });
+
+                let data;
+                try {
+                    data = await response.json();
+                } catch {
+                    throw new Error('O servidor devolveu uma resposta inválida.');
+                }
+
+                if (!response.ok || !data || data.success !== true) {
+                    const errors = Array.isArray(data?.errors) ?
+                        data.errors.filter((item) => typeof item === 'string') :
+                        [];
+
+                    if (errors.length) {
+                        errors.forEach((error) => showToast(error, 'error'));
+                    } else {
+                        showToast(
+                            typeof data?.message === 'string' ?
+                            data.message :
+                            'Não foi possível guardar as redes sociais.',
+                            'error'
+                        );
+                    }
+                    return;
+                }
+
+                showToast(
+                    typeof data.message === 'string' ?
+                    data.message :
+                    'Redes sociais guardadas com sucesso.',
+                    'success'
+                );
+            } catch (error) {
+                showToast(
+                    error instanceof Error ? error.message : 'Erro de comunicação com o servidor.',
+                    'error'
+                );
+            } finally {
+                submitBtn.disabled = false;
+                submitBtn.innerHTML =
+                    '<i class="fas fa-save" aria-hidden="true"></i> Guardar Redes Sociais';
             }
         });
-        if (!hasAny) {
-            html =
-                '<p style="color:var(--text-muted);font-size:.85rem">Nenhuma rede social configurada. Preenche os campos acima para ver a pré-visualização.</p>';
-        }
-        preview.innerHTML = html;
-    }
 
-    // ── Submissão ──────────────────────────────────────────────
-    form.addEventListener('submit', async function(e) {
-        e.preventDefault();
-        submitBtn.disabled = true;
-        submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> A guardar…';
-        try {
-            const fd = new FormData(form);
-            const res = await fetch(form.dataset.api, {
-                method: 'POST',
-                body: fd,
-                headers: {
-                    'X-Requested-With': 'XMLHttpRequest',
-                    'X-CSRF-Token': document.querySelector('[name="csrf_token"]').value
-                }
-            });
-            const data = await res.json();
-            if (data.success) {
-                showToast(data.message || 'Redes sociais guardadas!', 'success');
-            } else {
-                if (data.errors) data.errors.forEach(err => showToast(err, 'error'));
-                else showToast(data.message || 'Erro.', 'error');
-            }
-        } catch (err) {
-            showToast('Erro de rede.', 'error');
-        } finally {
-            submitBtn.disabled = false;
-            submitBtn.innerHTML = '<i class="fas fa-save"></i> Guardar Redes Sociais';
-        }
-    });
+        updatePreview();
+    })();
     </script>
 </body>
 
