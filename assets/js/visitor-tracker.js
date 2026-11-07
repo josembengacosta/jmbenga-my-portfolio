@@ -148,6 +148,10 @@
   const startTime = Date.now();
   flushPending();
 
+  // Envia os metadados iniciais sem criar uma segunda pageview.
+  // A API usa este evento para guardar resolução e fuso horário.
+  send({ event: 'tab_focus' });
+
   // ── Scroll depth ────────────────────────────────────────────
   let maxScroll = 0;
   const scrollSent = { 25: false, 50: false, 75: false, 90: false };
