@@ -74,7 +74,7 @@ $page_section = 'services';
 
 include __DIR__ . '/../includes/header.php';
 ?>
-<link rel="stylesheet" href="<?= BASE_URL ?>/assets/css/services.css">
+<link rel="stylesheet" href="<?= BASE_URL ?>/assets/css/services/web-development.css">
 
 <style>
 /* ════════════════════════════════════════════════════════════
@@ -139,7 +139,7 @@ include __DIR__ . '/../includes/header.php';
 
 @media (max-width: 768px) {
     .service-hero-text h1 {
-        font-size: 1.6rem !important;
+        font-size: 1.8rem !important;
         line-height: 1.3 !important;
         letter-spacing: normal !important;
         margin-bottom: 12px !important;

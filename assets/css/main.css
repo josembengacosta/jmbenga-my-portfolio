@@ -246,18 +246,15 @@ ul {
 }
 
 .tag {
-  display: inline-flex;
-  align-items: center;
-  gap: 7px;
-  font-family: var(--font-mono);
-  font-size: 0.7rem;
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
-  color: var(--accent);
-  background: var(--accent-glow);
-  border: 1px solid var(--border-acc);
-  padding: 5px 13px;
-  border-radius: 999px;
+    display: inline-flex;
+    gap: 9px;
+    align-items: center;
+    border: 1px solid var(--border-acc);
+    border-radius: 999px;
+    padding: 8px 13px;
+    color: var(--text-dim);
+    font-size: .82rem;
+    margin-bottom: 20px;
 }
 
 .tag::before {
@@ -624,18 +621,15 @@ ul {
 
 /* ── TIPOGRAFIA ──────────────────────────────────────────────── */
 .tag {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  font-family: var(--font-mono);
-  font-size: 0.72rem;
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
-  color: var(--accent);
-  background: var(--accent-glow);
-  border: 1px solid var(--border-acc);
-  padding: 6px 14px;
-  border-radius: 999px;
+    display: inline-flex;
+    gap: 9px;
+    align-items: center;
+    border: 1px solid var(--border-acc);
+    border-radius: 999px;
+    padding: 8px 13px;
+    color: var(--text-dim);
+    font-size: .82rem;
+    margin-bottom: 20px;
 }
 .tag::before {
   content: "//";
